@@ -19,13 +19,13 @@ public class Language {
     private String icon;
 
     // Indica si el lenguaje está activo y disponible para los estudiantes
-    private boolean isActive;
+    private boolean active;
 
     /**
      * Constructor por defecto
      */
     public Language() {
-        this.isActive = true;
+        this.active = true;
     }
 
     /**
@@ -35,14 +35,14 @@ public class Language {
      * @param name Nombre del lenguaje
      * @param description Descripción del lenguaje
      * @param icon Ruta o nombre del icono
-     * @param isActive Estado de actividad
+     * @param active Estado de actividad
      */
-    public Language(int id, String name, String description, String icon, boolean isActive) {
+    public Language(int id, String name, String description, String icon, boolean active) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.icon = icon;
-        this.isActive = isActive;
+        this.active = active;
     }
 
     // --- Getters y Setters ---
@@ -80,10 +80,10 @@ public class Language {
     }
 
     public boolean isActive() {
-        return isActive;
+        return active;
     }
 
     public void setActive(boolean active) {
-        isActive = active;
+        this.active = active;
     }
 }
