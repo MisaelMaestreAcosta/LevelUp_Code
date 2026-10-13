@@ -1,6 +1,6 @@
 package com.mycompany.levelup_code.model;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * Entidad que representa a un Usuario del sistema.
@@ -37,7 +37,7 @@ public class User {
     private int maxStreak;
     
     // Fecha de registro del usuario
-    private Date registrationDate;
+    private LocalDateTime registrationDate;
 
     /**
      * Constructor por defecto
@@ -47,7 +47,7 @@ public class User {
         this.level = 1;
         this.currentStreak = 0;
         this.maxStreak = 0;
-        this.registrationDate = new Date();
+        this.registrationDate = LocalDateTime.now();
     }
 
     /**
@@ -136,11 +136,11 @@ public class User {
         this.maxStreak = maxStreak;
     }
 
-    public Date getRegistrationDate() {
+    public LocalDateTime getRegistrationDate() {
         return registrationDate;
     }
 
-    public void setRegistrationDate(Date registrationDate) {
+    public void setRegistrationDate(LocalDateTime registrationDate) {
         this.registrationDate = registrationDate;
     }
 }
