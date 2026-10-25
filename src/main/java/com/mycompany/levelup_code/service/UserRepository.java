@@ -12,4 +12,7 @@ public interface UserRepository {
     Optional<User> findByEmail(String email);
 
     User save(User user);
+
+    /** Actualiza un usuario existente. */
+    User update(User user);
 }

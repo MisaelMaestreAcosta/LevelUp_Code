@@ -107,7 +107,7 @@ public class ProgressService {
         // La gamificación aplica la recompensa y actualiza XP, nivel y actividad.
         if (lesson.getExpReward() > 0) {
             gamificationService.awardExperience(
-                    user.getId(), lesson.getExpReward()
+                    user, lesson.getExpReward()
             );
         }
 
