@@ -76,4 +76,22 @@ public class UserAchievement {
     public void setUnlockedAt(LocalDateTime unlockedAt) {
         this.unlockedAt = unlockedAt;
     }
+
+    /**
+     * Consulta si el logro desbloqueado pertenece a un usuario dado por su identificador.
+     *
+     * @param userId Identificador del usuario a consultar
+     * @return true si coincide el usuario, false en caso contrario
+     */
+    public boolean belongsTo(int userId) {
+        return user != null && user.getId() == userId;
+    }
+
+    public int getUserId() {
+        return user != null ? user.getId() : 0;
+    }
+
+    public int getAchievementId() {
+        return achievement != null ? achievement.getId() : 0;
+    }
 }

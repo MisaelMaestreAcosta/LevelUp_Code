@@ -89,4 +89,29 @@ public class LessonProgress {
     public void setApprovedAt(LocalDateTime approvedAt) {
         this.approvedAt = approvedAt;
     }
+
+    /**
+     * Marca la lección como completada y registra la fecha de aprobación actual.
+     */
+    public void markCompleted() {
+        this.status = ProgressStatus.COMPLETED;
+        this.approvedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Consulta si la lección ha sido completada exitosamente.
+     *
+     * @return true si el estado es COMPLETED, false en caso contrario
+     */
+    public boolean isCompleted() {
+        return this.status == ProgressStatus.COMPLETED;
+    }
+
+    public LocalDateTime getCompletedAt() {
+        return approvedAt;
+    }
+
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.approvedAt = completedAt;
+    }
 }

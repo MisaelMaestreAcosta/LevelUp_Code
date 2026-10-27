@@ -1,5 +1,8 @@
 package com.mycompany.levelup_code.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Entidad que representa un módulo de aprendizaje dentro de un lenguaje.
  * Según RF-04, organiza el contenido pedagógico en unidades temáticas ordenadas.
@@ -22,10 +25,14 @@ public class CourseModule {
     // Lenguaje de programación al que pertenece el módulo
     private Language language;
 
+    // Lista de lecciones ordenadas que componen el módulo
+    private List<Lesson> lessons;
+
     /**
      * Constructor por defecto
      */
     public CourseModule() {
+        this.lessons = new ArrayList<>();
     }
 
     /**
@@ -43,6 +50,19 @@ public class CourseModule {
         this.description = description;
         this.orderIndex = orderIndex;
         this.language = language;
+        this.lessons = new ArrayList<>();
+    }
+
+    /**
+     * Agrega una lección al módulo y establece su pertenencia.
+     *
+     * @param lesson Lección a agregar
+     */
+    public void addLesson(Lesson lesson) {
+        if (lesson != null) {
+            lesson.setModule(this);
+            this.lessons.add(lesson);
+        }
     }
 
     // --- Getters y Setters ---
@@ -85,5 +105,13 @@ public class CourseModule {
 
     public void setLanguage(Language language) {
         this.language = language;
+    }
+
+    public List<Lesson> getLessons() {
+        return lessons;
+    }
+
+    public void setLessons(List<Lesson> lessons) {
+        this.lessons = lessons != null ? lessons : new ArrayList<>();
     }
 }

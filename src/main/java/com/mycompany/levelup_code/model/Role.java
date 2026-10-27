@@ -61,4 +61,13 @@ public class Role {
     public void setDescription(String description) {
         this.description = description;
     }
+
+    /**
+     * Verifica si el rol corresponde a un perfil de Administrador.
+     *
+     * @return true si el nombre del rol es Administrador (o Administrator), false en caso contrario
+     */
+    public boolean isAdministrator() {
+        return name != null && (name.equalsIgnoreCase("ADMINISTRATOR") || name.equalsIgnoreCase("ADMINISTRADOR"));
+    }
 }

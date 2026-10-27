@@ -3,7 +3,7 @@ package com.mycompany.levelup_code.model;
 /**
  * Clase abstracta que representa un logro dentro del sistema de gamificación.
  * Modela la especialización ES-UN entre logros genéricos y sus subtipos
- * (StreakAchievement, ExperienceAchievement y ChallengeCountAchievement),
+ * (StreakAchievement, ExpAchievement y ChallengeCountAchievement),
  * según lo especificado en RF-11 y la arquitectura del proyecto.
  */
 public abstract class Achievement {
@@ -17,7 +17,7 @@ public abstract class Achievement {
     // Descripción del logro y de su criterio de obtención
     private String description;
 
-    // Icono o insignia gráfica que representa el logro
+    // Icono o insignia gráfica que representa el logro (iconPath)
     private String icon;
 
     /**
@@ -40,6 +40,14 @@ public abstract class Achievement {
         this.description = description;
         this.icon = icon;
     }
+
+    /**
+     * Evalúa polimórficamente si el logro se desbloquea en base a las estadísticas del usuario (RF-11).
+     *
+     * @param stats Estadísticas acumuladas del estudiante
+     * @return true si cumple con el criterio de desbloqueo, false en caso contrario
+     */
+    public abstract boolean isUnlockedBy(UserStats stats);
 
     /**
      * Retorna el tipo de criterio del logro (ej. "STREAK", "EXPERIENCE", "CHALLENGES").
@@ -87,5 +95,13 @@ public abstract class Achievement {
 
     public void setIcon(String icon) {
         this.icon = icon;
+    }
+
+    public String getIconPath() {
+        return icon;
+    }
+
+    public void setIconPath(String iconPath) {
+        this.icon = iconPath;
     }
 }

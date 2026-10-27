@@ -90,4 +90,22 @@ public class Enrollment {
     public void setActive(boolean active) {
         this.active = active;
     }
+
+    /**
+     * Consulta si la inscripción corresponde a un lenguaje dado por su identificador.
+     *
+     * @param languageId Identificador del lenguaje
+     * @return true si coincide el lenguaje, false en caso contrario
+     */
+    public boolean isForLanguage(int languageId) {
+        return language != null && language.getId() == languageId;
+    }
+
+    public LocalDateTime getEnrolledAt() {
+        return enrollmentDate;
+    }
+
+    public void setEnrolledAt(LocalDateTime enrolledAt) {
+        this.enrollmentDate = enrolledAt;
+    }
 }
