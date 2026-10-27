@@ -77,4 +77,23 @@ public class DailyActivity {
     public void setExperienceGained(int experienceGained) {
         this.experienceGained = experienceGained;
     }
+
+    /**
+     * Suma experiencia al registro del día actual.
+     *
+     * @param amount Puntos de experiencia a agregar
+     */
+    public void addExperience(int amount) {
+        if (amount > 0) {
+            this.experienceGained += amount;
+        }
+    }
+
+    public int getExpEarned() {
+        return experienceGained;
+    }
+
+    public void setExpEarned(int expEarned) {
+        this.experienceGained = expEarned;
+    }
 }
