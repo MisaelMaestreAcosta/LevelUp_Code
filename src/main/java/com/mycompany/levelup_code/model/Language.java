@@ -1,8 +1,11 @@
 package com.mycompany.levelup_code.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Entidad que representa un Lenguaje de programación disponible en la plataforma.
- * Incluye información como nombre, descripción, si está activo y su icono.
+ * Incluye información como nombre, descripción, si está activo, su icono y sus módulos asociados.
  */
 public class Language {
 
@@ -21,11 +24,15 @@ public class Language {
     // Indica si el lenguaje está activo y disponible para los estudiantes
     private boolean active;
 
+    // Lista de módulos temáticos contenidos en este lenguaje
+    private List<CourseModule> modules;
+
     /**
      * Constructor por defecto
      */
     public Language() {
         this.active = true;
+        this.modules = new ArrayList<>();
     }
 
     /**
@@ -43,6 +50,26 @@ public class Language {
         this.description = description;
         this.icon = icon;
         this.active = active;
+        this.modules = new ArrayList<>();
+    }
+
+    /**
+     * Agrega un módulo a la colección de módulos del lenguaje.
+     *
+     * @param module Módulo a agregar
+     */
+    public void addModule(CourseModule module) {
+        if (module != null) {
+            module.setLanguage(this);
+            this.modules.add(module);
+        }
+    }
+
+    /**
+     * Desactiva la disponibilidad del lenguaje sin eliminar su contenido (RNF-04).
+     */
+    public void deactivate() {
+        this.active = false;
     }
 
     // --- Getters y Setters ---
@@ -79,11 +106,27 @@ public class Language {
         this.icon = icon;
     }
 
+    public String getIconPath() {
+        return icon;
+    }
+
+    public void setIconPath(String iconPath) {
+        this.icon = iconPath;
+    }
+
     public boolean isActive() {
         return active;
     }
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public List<CourseModule> getModules() {
+        return modules;
+    }
+
+    public void setModules(List<CourseModule> modules) {
+        this.modules = modules != null ? modules : new ArrayList<>();
     }
 }

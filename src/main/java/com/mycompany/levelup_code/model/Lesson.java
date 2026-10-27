@@ -1,9 +1,12 @@
 package com.mycompany.levelup_code.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Entidad que representa una lección dentro de un módulo de aprendizaje.
- * Según RF-04, contiene teoría explicativa, un orden secuencial dentro del módulo
- * y una recompensa de puntos de experiencia al ser completada.
+ * Según RF-04, contiene teoría explicativa, un orden secuencial dentro del módulo,
+ * una recompensa de puntos de experiencia al ser completada y sus retos de evaluación asociados.
  */
 public class Lesson {
 
@@ -25,11 +28,15 @@ public class Lesson {
     // Módulo al que pertenece la lección
     private CourseModule module;
 
+    // Lista de retos de evaluación asociados a esta lección (RF-06)
+    private List<Challenge> challenges;
+
     /**
      * Constructor por defecto
      */
     public Lesson() {
         this.expReward = 0;
+        this.challenges = new ArrayList<>();
     }
 
     /**
@@ -49,6 +56,19 @@ public class Lesson {
         this.orderIndex = orderIndex;
         this.expReward = expReward;
         this.module = module;
+        this.challenges = new ArrayList<>();
+    }
+
+    /**
+     * Agrega un reto de evaluación a la lección y establece la relación.
+     *
+     * @param challenge Reto a agregar
+     */
+    public void addChallenge(Challenge challenge) {
+        if (challenge != null) {
+            challenge.setLesson(this);
+            this.challenges.add(challenge);
+        }
     }
 
     // --- Getters y Setters ---
@@ -99,5 +119,13 @@ public class Lesson {
 
     public void setModule(CourseModule module) {
         this.module = module;
+    }
+
+    public List<Challenge> getChallenges() {
+        return challenges;
+    }
+
+    public void setChallenges(List<Challenge> challenges) {
+        this.challenges = challenges != null ? challenges : new ArrayList<>();
     }
 }
