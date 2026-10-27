@@ -6,7 +6,7 @@ package com.mycompany.levelup_code.model;
  */
 public class StreakAchievement extends Achievement {
 
-    // Número de días consecutivos requeridos para desbloquear el logro
+    // Número de días consecutivos requeridos para desbloquear el logro (requiredDays)
     private int requiredStreakDays;
 
     /**
@@ -31,6 +31,14 @@ public class StreakAchievement extends Achievement {
     }
 
     @Override
+    public boolean isUnlockedBy(UserStats stats) {
+        if (stats == null) {
+            return false;
+        }
+        return stats.getCurrentStreak() >= requiredStreakDays;
+    }
+
+    @Override
     public String getAchievementType() {
         return "STREAK";
     }
@@ -48,5 +56,13 @@ public class StreakAchievement extends Achievement {
 
     public void setRequiredStreakDays(int requiredStreakDays) {
         this.requiredStreakDays = requiredStreakDays;
+    }
+
+    public int getRequiredDays() {
+        return requiredStreakDays;
+    }
+
+    public void setRequiredDays(int requiredDays) {
+        this.requiredStreakDays = requiredDays;
     }
 }

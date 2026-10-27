@@ -6,7 +6,7 @@ package com.mycompany.levelup_code.model;
  */
 public class ChallengeCountAchievement extends Achievement {
 
-    // Número de retos resueltos con éxito necesarios para desbloquear el logro
+    // Número de retos resueltos con éxito necesarios para desbloquear el logro (requiredChallenges)
     private int requiredChallengesCount;
 
     /**
@@ -31,6 +31,14 @@ public class ChallengeCountAchievement extends Achievement {
     }
 
     @Override
+    public boolean isUnlockedBy(UserStats stats) {
+        if (stats == null) {
+            return false;
+        }
+        return stats.getSolvedChallenges() >= requiredChallengesCount;
+    }
+
+    @Override
     public String getAchievementType() {
         return "CHALLENGES";
     }
@@ -48,5 +56,13 @@ public class ChallengeCountAchievement extends Achievement {
 
     public void setRequiredChallengesCount(int requiredChallengesCount) {
         this.requiredChallengesCount = requiredChallengesCount;
+    }
+
+    public int getRequiredChallenges() {
+        return requiredChallengesCount;
+    }
+
+    public void setRequiredChallenges(int requiredChallenges) {
+        this.requiredChallengesCount = requiredChallenges;
     }
 }
