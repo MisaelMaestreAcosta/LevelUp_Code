@@ -4,9 +4,9 @@ import java.time.LocalDateTime;
 
 /**
  * Entidad que registra el intento de resolución de un reto por parte de un usuario.
- * Según RF-08, almacena el código o respuesta enviada, el resultado obtenido,
+ * Según RF-08, almacena el código o respuesta enviada, el resultado obtenido (AttemptResult),
  * el tiempo de ejecución y la experiencia otorgada.
- * Según RNF-06, asegura la trazabilidad histórica de los intentos.
+ * Según RNF-06, asegura la trazabilidad histórica de los envíos.
  */
 public class Attempt {
 
@@ -19,11 +19,11 @@ public class Attempt {
     // Reto al que corresponde el intento (CodeChallenge o QuizChallenge)
     private Challenge challenge;
 
-    // Código fuente o respuesta textual enviada por el estudiante
+    // Código fuente o respuesta textual enviada por el estudiante (submission)
     private String submittedContent;
 
-    // Indica si el intento fue resuelto con éxito (aprobado)
-    private boolean successful;
+    // Resultado formal de la evaluación del intento (CORRECT, INCORRECT, ERROR, TIMEOUT)
+    private AttemptResult result;
 
     // Tiempo de ejecución registrado en milisegundos
     private long executionTimeMs;
@@ -31,7 +31,7 @@ public class Attempt {
     // Experiencia otorgada por este intento
     private int earnedExperience;
 
-    // Fecha y hora exacta en la que se registró el intento
+    // Fecha y hora exacta en la que se registró el intento (submittedAt)
     private LocalDateTime attemptDate;
 
     /**
@@ -39,6 +39,7 @@ public class Attempt {
      */
     public Attempt() {
         this.attemptDate = LocalDateTime.now();
+        this.result = AttemptResult.INCORRECT;
     }
 
     /**
@@ -48,21 +49,43 @@ public class Attempt {
      * @param user Usuario
      * @param challenge Reto evaluado
      * @param submittedContent Código o respuesta enviada
-     * @param successful Si fue exitoso
+     * @param result Resultado de la evaluación
      * @param executionTimeMs Tiempo de ejecución en milisegundos
      * @param earnedExperience Experiencia otorgada
      * @param attemptDate Fecha del intento
      */
     public Attempt(int id, User user, Challenge challenge, String submittedContent,
-                   boolean successful, long executionTimeMs, int earnedExperience, LocalDateTime attemptDate) {
+                   AttemptResult result, long executionTimeMs, int earnedExperience, LocalDateTime attemptDate) {
         this.id = id;
         this.user = user;
         this.challenge = challenge;
         this.submittedContent = submittedContent;
-        this.successful = successful;
+        this.result = result;
         this.executionTimeMs = executionTimeMs;
         this.earnedExperience = earnedExperience;
         this.attemptDate = attemptDate;
+    }
+
+    /**
+     * Consulta si el intento fue resuelto de forma correcta.
+     *
+     * @return true si el resultado es CORRECT, false en caso contrario
+     */
+    public boolean isCorrect() {
+        return this.result == AttemptResult.CORRECT;
+    }
+
+    /**
+     * Alias de compatibilidad para consultar si fue exitoso.
+     *
+     * @return true si fue correcto
+     */
+    public boolean isSuccessful() {
+        return isCorrect();
+    }
+
+    public void setSuccessful(boolean successful) {
+        this.result = successful ? AttemptResult.CORRECT : AttemptResult.INCORRECT;
     }
 
     // --- Getters y Setters ---
@@ -83,12 +106,20 @@ public class Attempt {
         this.user = user;
     }
 
+    public int getUserId() {
+        return user != null ? user.getId() : 0;
+    }
+
     public Challenge getChallenge() {
         return challenge;
     }
 
     public void setChallenge(Challenge challenge) {
         this.challenge = challenge;
+    }
+
+    public int getChallengeId() {
+        return challenge != null ? challenge.getId() : 0;
     }
 
     public String getSubmittedContent() {
@@ -99,12 +130,20 @@ public class Attempt {
         this.submittedContent = submittedContent;
     }
 
-    public boolean isSuccessful() {
-        return successful;
+    public String getSubmission() {
+        return submittedContent;
     }
 
-    public void setSuccessful(boolean successful) {
-        this.successful = successful;
+    public void setSubmission(String submission) {
+        this.submittedContent = submission;
+    }
+
+    public AttemptResult getResult() {
+        return result;
+    }
+
+    public void setResult(AttemptResult result) {
+        this.result = result;
     }
 
     public long getExecutionTimeMs() {
@@ -123,11 +162,27 @@ public class Attempt {
         this.earnedExperience = earnedExperience;
     }
 
+    public int getExpEarned() {
+        return earnedExperience;
+    }
+
+    public void setExpEarned(int expEarned) {
+        this.earnedExperience = expEarned;
+    }
+
     public LocalDateTime getAttemptDate() {
         return attemptDate;
     }
 
     public void setAttemptDate(LocalDateTime attemptDate) {
         this.attemptDate = attemptDate;
+    }
+
+    public LocalDateTime getSubmittedAt() {
+        return attemptDate;
+    }
+
+    public void setSubmittedAt(LocalDateTime submittedAt) {
+        this.attemptDate = submittedAt;
     }
 }
