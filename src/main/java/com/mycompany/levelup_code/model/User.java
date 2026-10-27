@@ -143,4 +143,33 @@ public class User {
     public void setRegistrationDate(LocalDateTime registrationDate) {
         this.registrationDate = registrationDate;
     }
+
+    /**
+     * Consulta si el usuario tiene asignado el rol de Administrador.
+     *
+     * @return true si el rol es Administrador, false en caso contrario
+     */
+    public boolean isAdministrator() {
+        return role != null && role.isAdministrator();
+    }
+
+    /**
+     * Suma experiencia al acumulado del usuario; rechaza valores no positivos.
+     *
+     * @param amount Puntos de experiencia a sumar
+     */
+    public void addExperience(int amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("La cantidad de experiencia a sumar debe ser positiva.");
+        }
+        this.experience += amount;
+    }
+
+    public int getTotalExp() {
+        return experience;
+    }
+
+    public void setTotalExp(int totalExp) {
+        this.experience = totalExp;
+    }
 }
