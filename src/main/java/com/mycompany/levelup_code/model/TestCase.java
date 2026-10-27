@@ -87,4 +87,20 @@ public class TestCase {
     public void setHidden(boolean hidden) {
         this.hidden = hidden;
     }
+
+    /**
+     * Valida si una salida generada por la ejecución coincide con la salida esperada del caso de prueba.
+     *
+     * @param actualOutput Salida obtenida
+     * @return true si coincide ignorando saltos y espacios residuales, false en caso contrario
+     */
+    public boolean matches(String actualOutput) {
+        if (expectedOutput == null && actualOutput == null) {
+            return true;
+        }
+        if (expectedOutput == null || actualOutput == null) {
+            return false;
+        }
+        return expectedOutput.trim().equals(actualOutput.trim());
+    }
 }

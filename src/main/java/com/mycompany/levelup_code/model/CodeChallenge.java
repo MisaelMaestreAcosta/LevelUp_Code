@@ -48,8 +48,14 @@ public class CodeChallenge extends Challenge {
     }
 
     @Override
-    public String getChallengeType() {
-        return "CODE";
+    public ChallengeType getType() {
+        return ChallengeType.CODE;
+    }
+
+    @Override
+    public String getSummary() {
+        int casesCount = testCases != null ? testCases.size() : 0;
+        return "Reto de código (Límite: " + timeLimitSeconds + "s, Casos de prueba: " + casesCount + ")";
     }
 
     /**
@@ -58,8 +64,27 @@ public class CodeChallenge extends Challenge {
      * @param testCase Caso de prueba a vincular
      */
     public void addTestCase(TestCase testCase) {
-        testCase.setChallenge(this);
-        this.testCases.add(testCase);
+        if (testCase != null) {
+            testCase.setChallenge(this);
+            this.testCases.add(testCase);
+        }
+    }
+
+    /**
+     * Retorna únicamente los casos de prueba visibles para el estudiante (RF-07).
+     *
+     * @return Lista filtrada de casos de prueba visibles
+     */
+    public List<TestCase> getVisibleTestCases() {
+        List<TestCase> visible = new ArrayList<>();
+        if (testCases != null) {
+            for (TestCase tc : testCases) {
+                if (!tc.isHidden()) {
+                    visible.add(tc);
+                }
+            }
+        }
+        return visible;
     }
 
     // --- Getters y Setters ---
@@ -70,6 +95,14 @@ public class CodeChallenge extends Challenge {
 
     public void setInitialTemplate(String initialTemplate) {
         this.initialTemplate = initialTemplate;
+    }
+
+    public String getStarterTemplate() {
+        return initialTemplate;
+    }
+
+    public void setStarterTemplate(String starterTemplate) {
+        this.initialTemplate = starterTemplate;
     }
 
     public int getTimeLimitSeconds() {
@@ -85,6 +118,6 @@ public class CodeChallenge extends Challenge {
     }
 
     public void setTestCases(List<TestCase> testCases) {
-        this.testCases = testCases;
+        this.testCases = testCases != null ? testCases : new ArrayList<>();
     }
 }

@@ -14,7 +14,7 @@ public abstract class Challenge {
     // Título descriptivo del reto
     private String title;
 
-    // Enunciado o descripción del problema a resolver
+    // Enunciado o descripción del problema a resolver (statement)
     private String description;
 
     // Lección a la cual está asociado el reto (RF-06)
@@ -48,13 +48,28 @@ public abstract class Challenge {
     }
 
     /**
-     * Método polimórfico que retorna el tipo identificador del reto.
-     * Facilita la identificación en la capa de servicios y presentación
-     * sin acoplar lógica pesada al modelo de dominio.
+     * Método polimórfico que retorna el tipo enumerado del reto.
      *
-     * @return Nombre o tipo de reto (ej. "CODE", "QUIZ")
+     * @return Tipo de reto (CODE o QUIZ)
      */
-    public abstract String getChallengeType();
+    public abstract ChallengeType getType();
+
+    /**
+     * Retorna un resumen descriptivo del reto para listados y vistas.
+     *
+     * @return Resumen en texto legible
+     */
+    public abstract String getSummary();
+
+    /**
+     * Método polimórfico de compatibilidad que retorna el tipo identificador del reto como String.
+     *
+     * @return Nombre textual del tipo de reto
+     */
+    public String getChallengeType() {
+        ChallengeType type = getType();
+        return type != null ? type.name() : null;
+    }
 
     // --- Getters y Setters ---
 
@@ -82,12 +97,24 @@ public abstract class Challenge {
         this.description = description;
     }
 
+    public String getStatement() {
+        return description;
+    }
+
+    public void setStatement(String statement) {
+        this.description = statement;
+    }
+
     public Lesson getLesson() {
         return lesson;
     }
 
     public void setLesson(Lesson lesson) {
         this.lesson = lesson;
+    }
+
+    public int getLessonId() {
+        return lesson != null ? lesson.getId() : 0;
     }
 
     public int getExpReward() {
