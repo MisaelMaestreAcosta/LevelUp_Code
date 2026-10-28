@@ -111,4 +111,15 @@ public class DashboardFrame extends JFrame {
 
         return card;
     }
+    public static void main(String[] args) {
+    javax.swing.SwingUtilities.invokeLater(() -> {
+        com.mycompany.levelup_code.model.User demoUser = new com.mycompany.levelup_code.model.User();
+        demoUser.setUsername("Rafael Vega");
+        demoUser.setTotalExp(1450);
+        demoUser.setLevel(5);
+        demoUser.setCurrentStreak(7);
+
+        new DashboardFrame(demoUser).setVisible(true);
+    });
+}
 }
