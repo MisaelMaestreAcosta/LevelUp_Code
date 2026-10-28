@@ -1,126 +1,122 @@
 package com.mycompany.levelup_code.ui;
 
-import com.mycompany.levelup_code.model.User;
+import com.mycompany.levelup_code.persistence.UserDAO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 public class DashboardFrame extends JFrame {
-    private User currentUser;
 
-    public DashboardFrame(User user) {
-        this.currentUser = user;
-        initComponents();
-    }
+    private UserDAO userDAO;
+    
+    // Componentes principales
+    private JTabbedPane tabbedPane;
+    private JPanel panelDashboard;
+    private JPanel panelUsuarios;
+    private JPanel panelInventario;
 
-    private void initComponents() {
-        setTitle("LevelUp Code — Panel del Estudiante");
-        setSize(980, 620);
+    public DashboardFrame() {
+        setTitle("LevelUp Code - Sistema Principal");
+        setSize(700, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        JPanel mainPanel = new JPanel(new BorderLayout(20, 20));
-        mainPanel.setBackground(Theme.BG_DARK);
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(25, 25, 25, 25));
+        // Inicializamos el DAO
+        userDAO = new UserDAO();
 
-        // Header de Bienvenida y Estadísticas
-        JPanel headerPanel = new JPanel(new GridLayout(1, 4, 15, 0));
-        headerPanel.setOpaque(false);
+        // Creamos un contenedor de pestañas para ver varias secciones del programa
+        tabbedPane = new JTabbedPane();
 
-        String username = (currentUser != null) ? currentUser.getUsername() : "Rafael Vega";
-        int exp = (currentUser != null) ? currentUser.getTotalExp() : 1450;
-        int level = (currentUser != null) ? currentUser.getLevel() : 5;
-        int streak = (currentUser != null) ? currentUser.getCurrentStreak() : 7;
+        // 1. Pestaña de Inicio / Dashboard
+        panelDashboard = crearPanelDashboard();
+        tabbedPane.addTab("🏠 Inicio", panelDashboard);
 
-        headerPanel.add(createMetricCard("Estudiante", username, Theme.ACCENT_INDIGO));
-        headerPanel.add(createMetricCard("Experiencia", exp + " XP", Theme.ACCENT_GREEN));
-        headerPanel.add(createMetricCard("Nivel Actual", "Nivel " + level, new Color(245, 158, 11)));
-        headerPanel.add(createMetricCard("Racha Activa", streak + " Días 🔥", new Color(239, 68, 68)));
+        // 2. Pestaña de Gestión de Usuarios
+        panelUsuarios = crearPanelUsuarios();
+        tabbedPane.addTab("👥 Gestión de Usuarios", panelUsuarios);
 
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        // 3. Pestaña de Inventario / Productos (GameZone / LevelUp)
+        panelInventario = crearPanelInventario();
+        tabbedPane.addTab("🎮 Inventario / Catálogo", panelInventario);
 
-        // Centro: Cursos / Lenguajes Activos
-        JPanel contentPanel = new JPanel(new GridLayout(1, 3, 20, 0));
-        contentPanel.setOpaque(false);
-        contentPanel.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(Theme.SURFACE_LIGHT),
-            " Tus Lenguajes de Estudio ",
-            0, 0, Theme.FONT_SUBTITLE, Theme.TEXT_PRIMARY
-        ));
-
-        contentPanel.add(createCourseCard("Java", "POO y Principios SOLID", "75% Completado", Theme.ACCENT_INDIGO));
-        contentPanel.add(createCourseCard("Python", "Estructuras y Algoritmos", "40% Completado", Theme.ACCENT_GREEN));
-        contentPanel.add(createCourseCard("C++", "Punteros y Memoria", "15% Completado", new Color(147, 51, 234)));
-
-        mainPanel.add(contentPanel, BorderLayout.CENTER);
-        add(mainPanel);
+        // Añadimos el panel de pestañas a la ventana
+        add(tabbedPane, BorderLayout.CENTER);
     }
 
-    private JPanel createMetricCard(String title, String value, Color accent) {
-        JPanel card = new JPanel(new BorderLayout(5, 5));
-        card.setBackground(Theme.SURFACE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 4, 0, 0, accent),
-            BorderFactory.createEmptyBorder(15, 15, 15, 15)
-        ));
+    private JPanel crearPanelDashboard() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 30));
+        
+        JLabel lblBienvenido = new JLabel("¡Bienvenido al panel principal de LevelUp Code!");
+        lblBienvenido.setFont(new Font("Arial", Font.BOLD, 16));
+        
+        JButton btnPruebaDAO = new JButton("Probar Conexión DAO");
+        btnPruebaDAO.setPreferredSize(new Dimension(220, 40));
 
-        JLabel lblTitle = new JLabel(title);
-        lblTitle.setFont(Theme.FONT_REGULAR);
-        lblTitle.setForeground(Theme.TEXT_MUTED);
+        btnPruebaDAO.addActionListener(e -> {
+            try {
+                JOptionPane.showMessageDialog(this, 
+                    "Conexión con Oracle y UserDAO funcionando correctamente.", 
+                    "Estado de Persistencia", 
+                    JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
 
-        JLabel lblValue = new JLabel(value);
-        lblValue.setFont(Theme.FONT_TITLE);
-        lblValue.setForeground(Theme.TEXT_PRIMARY);
+        JButton btnSalir = new JButton("Cerrar Sesión");
+        btnSalir.setPreferredSize(new Dimension(220, 40));
+        btnSalir.addActionListener(e -> {
+            int opcion = JOptionPane.showConfirmDialog(this, "¿Estás seguro de salir?", "Salir", JOptionPane.YES_NO_OPTION);
+            if (opcion == JOptionPane.YES_OPTION) System.exit(0);
+        });
 
-        card.add(lblTitle, BorderLayout.NORTH);
-        card.add(lblValue, BorderLayout.CENTER);
-        return card;
+        panel.add(lblBienvenido);
+        panel.add(btnPruebaDAO);
+        panel.add(btnSalir);
+        return panel;
     }
 
-    private JPanel createCourseCard(String lang, String desc, String progress, Color color) {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBackground(Theme.SURFACE);
-        card.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+    private JPanel crearPanelUsuarios() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        JLabel lblLang = new JLabel(lang);
-        lblLang.setFont(Theme.FONT_TITLE);
-        lblLang.setForeground(color);
+        JLabel lblTitulo = new JLabel("Lista de Usuarios Registrados en el Sistema");
+        lblTitulo.setFont(new Font("Arial", Font.BOLD, 14));
 
-        JLabel lblDesc = new JLabel(desc);
-        lblDesc.setFont(Theme.FONT_REGULAR);
-        lblDesc.setForeground(Theme.TEXT_PRIMARY);
+        // Tabla de ejemplo para mostrar datos de la base de datos
+        String[] columnas = {"ID", "Usuario", "Rol", "Estado"};
+        Object[][] datos = {
+            {"1", "Rafael Vega", "Administrador", "Activo"},
+            {"2", "Usuario Demo", "Cliente", "Activo"}
+        };
+        JTable tablaUsuarios = new JTable(datos, columnas);
+        JScrollPane scrollPane = new JScrollPane(tablaUsuarios);
 
-        JLabel lblProg = new JLabel(progress);
-        lblProg.setFont(Theme.FONT_REGULAR);
-        lblProg.setForeground(Theme.TEXT_MUTED);
+        JButton btnActualizar = new JButton("Actualizar Tabla desde BD");
+        btnActualizar.addActionListener(e -> {
+            JOptionPane.showMessageDialog(this, "Aquí se cargarán los datos reales usando UserDAO.findAll()");
+        });
 
-        JButton btnAction = new JButton("Continuar Lección");
-        btnAction.setBackground(color);
-        btnAction.setForeground(Color.WHITE);
-        btnAction.setFont(Theme.FONT_SUBTITLE);
-        btnAction.setFocusPainted(false);
-        btnAction.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        card.add(lblLang);
-        card.add(Box.createVerticalStrut(10));
-        card.add(lblDesc);
-        card.add(Box.createVerticalStrut(8));
-        card.add(lblProg);
-        card.add(Box.createVerticalStrut(20));
-        card.add(btnAction);
-
-        return card;
+        panel.add(lblTitulo, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(btnActualizar, BorderLayout.SOUTH);
+        
+        return panel;
     }
-    
+
+    private JPanel crearPanelInventario() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        JLabel lblInfo = new JLabel("Sección de Productos / Accesorios / Juegos en desarrollo.");
+        lblInfo.setFont(new Font("Arial", Font.ITALIC, 14));
+        panel.add(lblInfo);
+        return panel;
+    }
+
     public static void main(String[] args) {
-    javax.swing.SwingUtilities.invokeLater(() -> {
-        com.mycompany.levelup_code.model.User demoUser = new com.mycompany.levelup_code.model.User();
-        demoUser.setUsername("Daniela");
-        demoUser.setTotalExp(1450);
-        demoUser.setLevel(5);
-        demoUser.setCurrentStreak(7);
-
-        new DashboardFrame(demoUser).setVisible(true);
-    });
-}
+        SwingUtilities.invokeLater(() -> {
+            new DashboardFrame().setVisible(true);
+        });
+    }
 }
