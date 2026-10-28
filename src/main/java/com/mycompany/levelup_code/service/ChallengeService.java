@@ -18,17 +18,19 @@ public class ChallengeService {
     private final AttemptRepository attemptRepository;
     private final Map<ChallengeType, ChallengeEvaluator> evaluators;
     private final GamificationService gamificationService;
+    private final AchievementService achievementService;
 
     public ChallengeService(
             ChallengeRepository challengeRepository,
             AttemptRepository attemptRepository,
             Map<ChallengeType, ChallengeEvaluator> evaluators,
-            GamificationService gamificationService) {
+            GamificationService gamificationService,
+            AchievementService achievementService) {
         if (challengeRepository == null || attemptRepository == null
                 || evaluators == null || evaluators.isEmpty()
-                || gamificationService == null) {
+                || gamificationService == null || achievementService == null) {
             throw new IllegalArgumentException(
-                    "Los repositorios, los evaluadores y el servicio de gamificación son obligatorios.");
+                    "Los repositorios, los evaluadores y los servicios de gamificación y logros son obligatorios.");
         }
 
         EnumMap<ChallengeType, ChallengeEvaluator> evaluatorCopy =
@@ -42,6 +44,7 @@ public class ChallengeService {
         this.attemptRepository = attemptRepository;
         this.evaluators = Collections.unmodifiableMap(evaluatorCopy);
         this.gamificationService = gamificationService;
+        this.achievementService = achievementService;
     }
 
     /**
@@ -91,6 +94,9 @@ public class ChallengeService {
 
         if (attempt.getEarnedExperience() > 0) {
             gamificationService.awardExperience(user, attempt.getEarnedExperience());
+        } else if (attempt.isCorrect()) {
+            // También comprueba logros por retos cuando la recompensa es cero.
+            achievementService.evaluateAndUnlock(user);
         }
         return savedAttempt;
     }
