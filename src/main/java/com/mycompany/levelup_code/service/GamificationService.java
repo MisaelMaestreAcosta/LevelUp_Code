@@ -5,35 +5,37 @@ import com.mycompany.levelup_code.model.User;
 import java.time.LocalDate;
 import java.util.Optional;
 
-/**
- * Actualiza la experiencia, el nivel y la actividad diaria de un usuario.
- */
+/** Actualiza experiencia, nivel, actividad diaria y logros del usuario. */
 public class GamificationService {
 
     private final UserRepository userRepository;
     private final ActivityRepository activityRepository;
     private final LevelPolicy levelPolicy;
+    private final AchievementService achievementService;
 
-    /** Recibe los contratos de persistencia y la política de nivel. */
+    /** Recibe los contratos y servicios necesarios para aplicar la gamificación. */
     public GamificationService(
             UserRepository userRepository,
             ActivityRepository activityRepository,
-            LevelPolicy levelPolicy) {
+            LevelPolicy levelPolicy,
+            AchievementService achievementService) {
 
         if (userRepository == null
                 || activityRepository == null
-                || levelPolicy == null) {
+                || levelPolicy == null
+                || achievementService == null) {
             throw new IllegalArgumentException(
-                    "Los repositorios y la política de nivel son obligatorios."
+                    "Los repositorios y servicios de gamificación son obligatorios."
             );
         }
 
         this.userRepository = userRepository;
         this.activityRepository = activityRepository;
         this.levelPolicy = levelPolicy;
+        this.achievementService = achievementService;
     }
 
-    /** Otorga experiencia y acumula la actividad del día. */
+    /** Otorga experiencia, actualiza la actividad diaria y evalúa logros. */
     public void awardExperience(User user, int points) {
         validateAward(user, points);
 
@@ -64,6 +66,9 @@ public class GamificationService {
         user.setExperience(totalExperience);
         user.setLevel(levelPolicy.levelForExperience(totalExperience));
         userRepository.update(user);
+
+        // Evalúa los logros con las estadísticas ya actualizadas.
+        achievementService.evaluateAndUnlock(user);
     }
 
     /** Continúa la racha si hubo actividad ayer; si no, la inicia de nuevo. */
