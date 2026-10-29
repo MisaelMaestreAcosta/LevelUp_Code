@@ -1,6 +1,6 @@
-package com.mycompany.levelup_code.ui;
+package com.mycompany.levelup_code.presentation.component;
 
-import com.mycompany.levelup_code.model.Lesson;
+import com.mycompany.levelup_code.domain.model.Lesson;
 import javax.swing.*;
 import java.awt.*;
 

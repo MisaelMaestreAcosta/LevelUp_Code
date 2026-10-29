@@ -1,6 +1,8 @@
-package com.mycompany.levelup_code.persistence;
+package com.mycompany.levelup_code.data.oracle;
 
-import com.mycompany.levelup_code.model.User;
+import com.mycompany.levelup_code.data.connection.DatabaseConnection;
+import com.mycompany.levelup_code.data.dao.GenericDAO;
+import com.mycompany.levelup_code.domain.model.User;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
