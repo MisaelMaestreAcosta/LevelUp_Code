@@ -14,3 +14,4 @@ public class LoginFrame extends JFrame {
         setLocationRelativeTo(null);
     }
 }
+

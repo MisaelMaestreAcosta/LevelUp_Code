@@ -26,3 +26,4 @@ public final class DatabaseConnection {
         return DriverManager.getConnection(DEFAULT_URL, DEFAULT_USER, DEFAULT_PASSWORD);
     }
 }
+

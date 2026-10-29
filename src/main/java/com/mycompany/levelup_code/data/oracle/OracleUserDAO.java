@@ -24,3 +24,4 @@ public class OracleUserDAO implements UserRepository {
         throw new UnsupportedOperationException("Pendiente de implementación en fase de conexión a Oracle.");
     }
 }
+

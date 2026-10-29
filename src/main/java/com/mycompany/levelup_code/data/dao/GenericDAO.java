@@ -21,3 +21,4 @@ public interface GenericDAO<T, ID> {
 
     void deleteById(ID id);
 }
+

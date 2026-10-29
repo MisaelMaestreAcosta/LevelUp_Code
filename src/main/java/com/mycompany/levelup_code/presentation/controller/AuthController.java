@@ -26,3 +26,4 @@ public class AuthController {
         return userService.register(username, email, password);
     }
 }
+
