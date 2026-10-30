@@ -1,6 +1,6 @@
-package com.mycompany.levelup_code.ui;
+package com.mycompany.levelup_code.presentation.component;
 
-import com.mycompany.levelup_code.model.User;
+import com.mycompany.levelup_code.domain.model.User;
 import javax.swing.*;
 import java.awt.*;
 
@@ -113,14 +113,14 @@ public class DashboardFrame extends JFrame {
     }
     
     public static void main(String[] args) {
-    javax.swing.SwingUtilities.invokeLater(() -> {
-        com.mycompany.levelup_code.model.User demoUser = new com.mycompany.levelup_code.model.User();
-        demoUser.setUsername("Daniela");
-        demoUser.setTotalExp(1450);
-        demoUser.setLevel(5);
-        demoUser.setCurrentStreak(7);
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            User demoUser = new User();
+            demoUser.setUsername("Daniela");
+            demoUser.setTotalExp(1450);
+            demoUser.setLevel(5);
+            demoUser.setCurrentStreak(7);
 
-        new DashboardFrame(demoUser).setVisible(true);
-    });
-}
+            new DashboardFrame(demoUser).setVisible(true);
+        });
+    }
 }

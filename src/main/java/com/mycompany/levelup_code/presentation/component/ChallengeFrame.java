@@ -1,4 +1,4 @@
-package com.mycompany.levelup_code.ui;
+package com.mycompany.levelup_code.presentation.component;
 
 import javax.swing.*;
 import java.awt.*;
