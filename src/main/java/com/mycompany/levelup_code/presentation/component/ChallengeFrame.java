@@ -33,7 +33,7 @@ import javax.swing.event.DocumentListener;
 
 /**
  * Entorno interactivo de resolución de retos (Código y Quiz) con numeración de líneas,
- * casos de prueba visibles/ocultos (RF-06, RF-07) y consola de evaluación en vivo.
+ * casos de prueba visibles/ocultos y consola de evaluación en vivo.
  */
 public class ChallengeFrame extends JFrame {
 
@@ -180,7 +180,7 @@ public class ChallengeFrame extends JFrame {
         titleCluster.add(badgeType);
         titleCluster.add(badgeReward);
 
-        topRow.add(titleCluster, BorderLayout.WEST);
+        topRow.add(titleCluster, BorderLayout.CENTER);
 
         // Selector rápido entre retos de la lección
         if (availableChallenges.size() > 1) {
@@ -233,17 +233,17 @@ public class ChallengeFrame extends JFrame {
 
     private JPanel buildCodeEditorCard() {
         Theme.RoundedPanel editorCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        editorCard.setLayout(new BorderLayout(0, 10));
         editorCard.setBorder(BorderFactory.createEmptyBorder(12, 14, 14, 14));
 
-        JPanel toolbar = new JPanel(new BorderLayout());
+        JPanel toolbar = new JPanel(new BorderLayout(8, 0));
         toolbar.setOpaque(false);
-        toolbar.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        JLabel lblFileTab = new JLabel("  Solution.java · UTF-8 · Tab: 4 espacios");
+        JLabel lblFileTab = new JLabel("  Solution.java · UTF-8");
         lblFileTab.setFont(Theme.FONT_SECTION);
         lblFileTab.setForeground(Theme.TEXT_SECONDARY);
         lblFileTab.setIcon(Theme.createVectorIcon(Theme.IconKind.TERMINAL, 15, Theme.ACCENT_INDIGO));
-        toolbar.add(lblFileTab, BorderLayout.WEST);
+        toolbar.add(lblFileTab, BorderLayout.CENTER);
 
         JPanel editorActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         editorActions.setOpaque(false);
@@ -327,11 +327,11 @@ public class ChallengeFrame extends JFrame {
         rightColumn.setOpaque(false);
         rightColumn.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
 
-        // Tarjeta superior: Casos de prueba (RF-07)
+        // Tarjeta superior: Casos de prueba
         Theme.RoundedPanel casesCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
         casesCard.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
 
-        JPanel casesHeader = Theme.createSectionHeader("Casos de Prueba (RF-07)", "Visibles y Ocultos");
+        JPanel casesHeader = Theme.createSectionHeader("Casos de Prueba", "Visibles y Ocultos");
         casesCard.add(casesHeader, BorderLayout.NORTH);
 
         testCasesListPanel = new JPanel();
@@ -347,6 +347,7 @@ public class ChallengeFrame extends JFrame {
 
         // Tarjeta inferior: Consola de salida y métricas de tiempo
         Theme.RoundedPanel consoleCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        consoleCard.setLayout(new BorderLayout(0, 8));
         consoleCard.setPreferredSize(new Dimension(0, 195));
         consoleCard.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
 
@@ -369,13 +370,11 @@ public class ChallengeFrame extends JFrame {
         txtConsoleOutput.setBackground(Theme.EDITOR_BG);
         txtConsoleOutput.setForeground(Theme.TEXT_SECONDARY);
         txtConsoleOutput.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        txtConsoleOutput.setText("> Listo para validar solución.\n> Presiona 'Ejecutar y Validar' para correr la suite.");
+        txtConsoleOutput.setText("> Listo para validar solución.\n> Presiona 'Ejecutar y Validar' para correr las pruebas.");
 
         JScrollPane scrollConsole = new JScrollPane(txtConsoleOutput);
-        scrollConsole.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEmptyBorder(8, 0, 0, 0),
-                BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1)
-        ));
+        scrollConsole.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1));
+        scrollConsole.getViewport().setBackground(Theme.EDITOR_BG);
 
         consoleCard.add(consoleHeader, BorderLayout.NORTH);
         consoleCard.add(scrollConsole, BorderLayout.CENTER);
@@ -387,6 +386,7 @@ public class ChallengeFrame extends JFrame {
 
     private JPanel buildBottomActionBar() {
         Theme.RoundedPanel bottomBar = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        bottomBar.setLayout(new BorderLayout(16, 0));
         bottomBar.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
 
         lblResultBanner = new JLabel("Completa el reto para ganar experiencia y mantener tu racha activa.");
@@ -407,7 +407,7 @@ public class ChallengeFrame extends JFrame {
         actionsRight.add(btnClose);
         actionsRight.add(btnSubmit);
 
-        bottomBar.add(lblResultBanner, BorderLayout.WEST);
+        bottomBar.add(lblResultBanner, BorderLayout.CENTER);
         bottomBar.add(actionsRight, BorderLayout.EAST);
         return bottomBar;
     }
@@ -418,7 +418,7 @@ public class ChallengeFrame extends JFrame {
         this.selectedQuizIndex = -1;
 
         lblChallengeTitle.setText("  " + challenge.getTitle());
-        lblStatement.setText("<html><body style='width:760px;'>" + challenge.getDescription() + "</body></html>");
+        lblStatement.setText("<html><body style='width:740px;'>" + challenge.getDescription() + "</body></html>");
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
 
         testCasesListPanel.removeAll();
@@ -447,8 +447,8 @@ public class ChallengeFrame extends JFrame {
 
             Theme.RoundedPanel infoBox = new Theme.RoundedPanel(10, Theme.EDITOR_BG, Theme.BORDER_SUBTLE);
             infoBox.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-            JLabel lblQuizInfo = new JLabel("<html><body style='width:250px;color:#BAC4D6;'>"
-                    + "Selecciona una de las opciones a la izquierda y presiona <b>Ejecutar y Validar</b>."
+            JLabel lblQuizInfo = new JLabel("<html><body style='width:240px;color:#334155;'>"
+                    + "Selecciona una de las opciones a la izquierda y presiona <b>Ejecutar y Validar Solución</b>."
                     + "</body></html>");
             lblQuizInfo.setFont(Theme.FONT_SMALL);
             infoBox.add(lblQuizInfo, BorderLayout.CENTER);
@@ -468,11 +468,11 @@ public class ChallengeFrame extends JFrame {
         row.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
 
-        JPanel top = new JPanel(new BorderLayout());
+        JPanel top = new JPanel(new BorderLayout(8, 0));
         top.setOpaque(false);
 
         String titleText = tc.isHidden()
-                ? "Caso #" + index + " (Oculto · Validación RNF-02)"
+                ? "Caso #" + index + " (Oculto)"
                 : "Caso #" + index + " · Entrada: \"" + tc.getInput() + "\"";
         JLabel lblCase = new JLabel(titleText);
         lblCase.setFont(Theme.FONT_SUBTITLE);
@@ -481,7 +481,7 @@ public class ChallengeFrame extends JFrame {
         Theme.PillBadge statusBadge = new Theme.PillBadge("PENDIENTE", Theme.TEXT_MUTED);
         testCaseStatusBadges.add(statusBadge);
 
-        top.add(lblCase, BorderLayout.WEST);
+        top.add(lblCase, BorderLayout.CENTER);
         top.add(statusBadge, BorderLayout.EAST);
 
         String detailText = tc.isHidden()
@@ -642,7 +642,7 @@ public class ChallengeFrame extends JFrame {
         } else {
             txtConsoleOutput.setForeground(Theme.ACCENT_ROSE);
             lblResultBanner.setForeground(Theme.ACCENT_ROSE);
-            lblResultBanner.setText("Algunos casos de prueba fallaron. Revisa la consola o usa 'Insertar Solución Modelo'.");
+            lblResultBanner.setText("Algunos casos fallaron. Revisa la consola o usa 'Insertar Solución Modelo'.");
         }
     }
 

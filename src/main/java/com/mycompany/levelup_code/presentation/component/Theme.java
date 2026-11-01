@@ -29,94 +29,75 @@ import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
 /**
- * Sistema de diseño visual y primitivos gráficos personalizados para LevelUp Code.
- * Implementa renderizado vectorial con Graphics2D para evitar el aspecto genérico de Swing.
+ * Sistema de diseño visual claro (Daylight Paper) y componentes personalizados para LevelUp Code.
  */
 public final class Theme {
 
-    // Paleta de superficies (Obsidian Studio Dark)
-    public static final Color BG_DARK = new Color(11, 13, 19);
-    public static final Color BG_SIDEBAR = new Color(15, 18, 26);
-    public static final Color SURFACE = new Color(21, 25, 36);
-    public static final Color SURFACE_ELEVATED = new Color(28, 33, 47);
-    public static final Color SURFACE_LIGHT = new Color(39, 46, 64);
-    public static final Color EDITOR_BG = new Color(13, 16, 23);
-    public static final Color EDITOR_GUTTER = new Color(18, 22, 31);
-    public static final Color BORDER_SUBTLE = new Color(36, 43, 61);
-    public static final Color BORDER_STRONG = new Color(56, 67, 94);
+    // Paleta de superficies claras (Blanco limpio y gris papel suave)
+    public static final Color BG_DARK = new Color(243, 245, 249);
+    public static final Color BG_SIDEBAR = new Color(255, 255, 255);
+    public static final Color SURFACE = new Color(255, 255, 255);
+    public static final Color SURFACE_ELEVATED = new Color(241, 245, 249);
+    public static final Color SURFACE_LIGHT = new Color(226, 232, 240);
+    public static final Color EDITOR_BG = new Color(248, 250, 252);
+    public static final Color EDITOR_GUTTER = new Color(238, 242, 246);
+    public static final Color BORDER_SUBTLE = new Color(216, 222, 233);
+    public static final Color BORDER_STRONG = new Color(180, 190, 206);
 
-    // Paleta de acentos funcionales
-    public static final Color ACCENT_INDIGO = new Color(79, 110, 247);
-    public static final Color ACCENT_INDIGO_HOVER = new Color(99, 128, 255);
-    public static final Color ACCENT_CYAN = new Color(14, 165, 233);
-    public static final Color ACCENT_GREEN = new Color(16, 185, 129);
-    public static final Color ACCENT_GREEN_HOVER = new Color(5, 150, 105);
-    public static final Color ACCENT_AMBER = new Color(245, 158, 11);
-    public static final Color ACCENT_ROSE = new Color(244, 63, 94);
-    public static final Color ACCENT_VIOLET = new Color(139, 92, 246);
+    // Paleta de acentos de alto contraste sobre fondo blanco
+    public static final Color ACCENT_INDIGO = new Color(37, 99, 235);
+    public static final Color ACCENT_INDIGO_HOVER = new Color(29, 78, 216);
+    public static final Color ACCENT_CYAN = new Color(2, 132, 199);
+    public static final Color ACCENT_GREEN = new Color(22, 163, 74);
+    public static final Color ACCENT_GREEN_HOVER = new Color(21, 128, 61);
+    public static final Color ACCENT_AMBER = new Color(217, 119, 6);
+    public static final Color ACCENT_ROSE = new Color(225, 29, 72);
+    public static final Color ACCENT_VIOLET = new Color(124, 58, 237);
 
-    // Jerarquía tipográfica de color
-    public static final Color TEXT_PRIMARY = new Color(241, 245, 249);
-    public static final Color TEXT_SECONDARY = new Color(186, 196, 214);
-    public static final Color TEXT_MUTED = new Color(120, 132, 156);
+    // Jerarquía tipográfica oscura sobre fondo claro
+    public static final Color TEXT_PRIMARY = new Color(15, 23, 42);
+    public static final Color TEXT_SECONDARY = new Color(51, 65, 85);
+    public static final Color TEXT_MUTED = new Color(100, 116, 139);
 
     // Escala tipográfica
-    public static final Font FONT_HERO = new Font("Segoe UI", Font.BOLD, 24);
-    public static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 18);
-    public static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.BOLD, 14);
+    public static final Font FONT_HERO = new Font("Segoe UI", Font.BOLD, 22);
+    public static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 17);
+    public static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.BOLD, 13);
     public static final Font FONT_SECTION = new Font("Segoe UI", Font.BOLD, 11);
     public static final Font FONT_REGULAR = new Font("Segoe UI", Font.PLAIN, 13);
     public static final Font FONT_SMALL = new Font("Segoe UI", Font.PLAIN, 12);
-    public static final Font FONT_METRIC = new Font("Segoe UI", Font.BOLD, 22);
+    public static final Font FONT_METRIC = new Font("Segoe UI", Font.BOLD, 20);
     public static final Font FONT_CODE = new Font("Consolas", Font.PLAIN, 13);
     public static final Font FONT_CODE_BOLD = new Font("Consolas", Font.BOLD, 13);
 
     private Theme() {
     }
 
-    /**
-     * Activa el suavizado geométrico y tipográfico sobre el contexto gráfico.
-     */
     public static void enableAntialiasing(Graphics2D g2) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
     }
 
-    /**
-     * Crea un botón de acción principal con esquinas redondeadas y transición hover.
-     */
     public static JButton createPrimaryButton(String text, Color baseColor) {
-        Color hoverColor = brighten(baseColor, 0.14f);
+        Color hoverColor = darken(baseColor, 0.12f);
         return new ModernButton(text, baseColor, hoverColor, Color.WHITE, null);
     }
 
-    /**
-     * Crea un botón secundario con fondo sutil y borde delineado.
-     */
     public static JButton createSecondaryButton(String text) {
-        return new ModernButton(text, SURFACE_ELEVATED, SURFACE_LIGHT, TEXT_PRIMARY, BORDER_STRONG);
+        return new ModernButton(text, SURFACE_ELEVATED, SURFACE_LIGHT, TEXT_PRIMARY, BORDER_SUBTLE);
     }
 
-    /**
-     * Crea un botón discreto para navegación o acciones terciarias.
-     */
     public static JButton createGhostButton(String text, Color textColor) {
-        return new ModernButton(text, new Color(0, 0, 0, 0), SURFACE_ELEVATED, textColor, BORDER_SUBTLE);
+        return new ModernButton(text, SURFACE, SURFACE_ELEVATED, textColor, BORDER_SUBTLE);
     }
 
-    /**
-     * Crea un campo de texto estilizado con realce de foco.
-     */
     public static JTextField createStyledTextField(String placeholder) {
         JTextField field = new JTextField();
         styleInputComponent(field, placeholder);
         return field;
     }
 
-    /**
-     * Crea un campo de contraseña estilizado con realce de foco.
-     */
     public static JPasswordField createStyledPasswordField() {
         JPasswordField field = new JPasswordField();
         styleInputComponent(field, null);
@@ -127,43 +108,37 @@ public final class Theme {
         field.setFont(FONT_REGULAR);
         field.setForeground(TEXT_PRIMARY);
         field.setCaretColor(ACCENT_INDIGO);
-        field.setBackground(EDITOR_BG);
+        field.setBackground(SURFACE);
         if (toolTip != null && !toolTip.isEmpty()) {
             field.setToolTipText(toolTip);
         }
         field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_SUBTLE, 1),
-                BorderFactory.createEmptyBorder(9, 12, 9, 12)
+                BorderFactory.createLineBorder(BORDER_STRONG, 1),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)
         ));
         field.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
                 field.setBorder(BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(ACCENT_INDIGO, 1),
-                        BorderFactory.createEmptyBorder(9, 12, 9, 12)
+                        BorderFactory.createEmptyBorder(8, 12, 8, 12)
                 ));
             }
 
             @Override
             public void focusLost(FocusEvent e) {
                 field.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(BORDER_SUBTLE, 1),
-                        BorderFactory.createEmptyBorder(9, 12, 9, 12)
+                        BorderFactory.createLineBorder(BORDER_STRONG, 1),
+                        BorderFactory.createEmptyBorder(8, 12, 8, 12)
                 ));
             }
         });
     }
 
-    /**
-     * Crea una etiqueta tipo píldora (badge) con color semántico.
-     */
     public static JComponent createPillBadge(String text, Color accent) {
         return new PillBadge(text, accent);
     }
 
-    /**
-     * Crea una barra de progreso suavizada.
-     */
     public static ModernProgressBar createProgressBar(int value, int max, Color accent) {
         return new ModernProgressBar(value, max, accent);
     }
@@ -175,17 +150,20 @@ public final class Theme {
         return new Color(r, g, b, color.getAlpha());
     }
 
+    public static Color darken(Color color, float fraction) {
+        int r = Math.max(0, Math.round(color.getRed() * (1f - fraction)));
+        int g = Math.max(0, Math.round(color.getGreen() * (1f - fraction)));
+        int b = Math.max(0, Math.round(color.getBlue() * (1f - fraction)));
+        return new Color(r, g, b, color.getAlpha());
+    }
+
     public static Color withAlpha(Color color, int alpha) {
         return new Color(color.getRed(), color.getGreen(), color.getBlue(), Math.max(0, Math.min(255, alpha)));
     }
 
-    /**
-     * Panel con bordes redondeados, relleno personalizado y franja lateral opcional.
-     */
     public static class RoundedPanel extends JPanel {
 
         private static final long serialVersionUID = 1L;
-
         private Color fillColor;
         private Color borderColor;
         private Color accentStripe;
@@ -249,13 +227,9 @@ public final class Theme {
         }
     }
 
-    /**
-     * Botón pintado por completo mediante Graphics2D para garantizar legibilidad en cualquier SO.
-     */
     public static class ModernButton extends JButton {
 
         private static final long serialVersionUID = 1L;
-
         private Color baseColor;
         private Color hoverColor;
         private Color borderColor;
@@ -275,7 +249,7 @@ public final class Theme {
             setContentAreaFilled(false);
             setOpaque(false);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            setMargin(new Insets(9, 18, 9, 18));
+            setMargin(new Insets(8, 16, 8, 16));
 
             addMouseListener(new MouseAdapter() {
                 @Override
@@ -323,17 +297,17 @@ public final class Theme {
 
             Color activeFill = !isEnabled()
                     ? SURFACE_LIGHT
-                    : (pressed ? hoverColor.darker() : (hovered ? hoverColor : baseColor));
+                    : (pressed ? darken(hoverColor, 0.08f) : (hovered ? hoverColor : baseColor));
 
             if (activeFill.getAlpha() > 0) {
                 g2.setColor(activeFill);
-                g2.fill(new RoundRectangle2D.Float(0, 0, w - 1, h - 1, 10, 10));
+                g2.fill(new RoundRectangle2D.Float(0, 0, w - 1, h - 1, 8, 8));
             }
 
             if (borderColor != null) {
-                g2.setColor(hovered ? brighten(borderColor, 0.25f) : borderColor);
+                g2.setColor(hovered ? darken(borderColor, 0.15f) : borderColor);
                 g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Float(0.5f, 0.5f, w - 1f, h - 1f, 10, 10));
+                g2.draw(new RoundRectangle2D.Float(0.5f, 0.5f, w - 1f, h - 1f, 8, 8));
             }
 
             g2.dispose();
@@ -341,27 +315,23 @@ public final class Theme {
         }
     }
 
-    /**
-     * Etiqueta tipo píldora (badge) con fondo translúcido y texto contrastado.
-     */
     public static class PillBadge extends JLabel {
 
         private static final long serialVersionUID = 1L;
-
         private Color accent;
 
         public PillBadge(String text, Color accent) {
             super(text);
             this.accent = accent;
             setFont(FONT_SECTION);
-            setForeground(brighten(accent, 0.35f));
-            setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
+            setForeground(darken(accent, 0.15f));
+            setBorder(BorderFactory.createEmptyBorder(3, 9, 3, 9));
             setOpaque(false);
         }
 
         public void setAccent(Color accent) {
             this.accent = accent;
-            setForeground(brighten(accent, 0.35f));
+            setForeground(darken(accent, 0.15f));
             repaint();
         }
 
@@ -372,9 +342,9 @@ public final class Theme {
 
             int w = getWidth();
             int h = getHeight();
-            g2.setColor(withAlpha(accent, 34));
+            g2.setColor(withAlpha(accent, 26));
             g2.fill(new RoundRectangle2D.Float(0, 0, w - 1, h - 1, h, h));
-            g2.setColor(withAlpha(accent, 95));
+            g2.setColor(withAlpha(accent, 85));
             g2.draw(new RoundRectangle2D.Float(0.5f, 0.5f, w - 1f, h - 1f, h, h));
 
             g2.dispose();
@@ -382,13 +352,9 @@ public final class Theme {
         }
     }
 
-    /**
-     * Barra de progreso personalizada con esquinas redondeadas.
-     */
     public static class ModernProgressBar extends JComponent {
 
         private static final long serialVersionUID = 1L;
-
         private int value;
         private int maximum;
         private Color accent;
@@ -420,7 +386,7 @@ public final class Theme {
             int w = getWidth();
             int h = getHeight();
 
-            g2.setColor(EDITOR_BG);
+            g2.setColor(SURFACE_LIGHT);
             g2.fill(new RoundRectangle2D.Float(0, 0, w, h, h, h));
 
             float ratio = Math.min(1f, Math.max(0f, (float) value / (float) maximum));
@@ -434,9 +400,6 @@ public final class Theme {
         }
     }
 
-    /**
-     * Iconos vectoriales dibujados con primitivas geométricas para evitar emojis rotos en Windows.
-     */
     public enum IconKind {
         TERMINAL,
         FLAME,
@@ -576,11 +539,8 @@ public final class Theme {
         }
     }
 
-    /**
-     * Crea un encabezado de sección limpio con línea divisoria inferior.
-     */
     public static JPanel createSectionHeader(String title, String rightNote) {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout(12, 0));
         panel.setOpaque(false);
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_SUBTLE),
@@ -590,7 +550,7 @@ public final class Theme {
         JLabel lblTitle = new JLabel(title.toUpperCase());
         lblTitle.setFont(FONT_SECTION);
         lblTitle.setForeground(TEXT_MUTED);
-        panel.add(lblTitle, BorderLayout.WEST);
+        panel.add(lblTitle, BorderLayout.CENTER);
 
         if (rightNote != null && !rightNote.isEmpty()) {
             JLabel lblRight = new JLabel(rightNote);
@@ -602,9 +562,6 @@ public final class Theme {
         return panel;
     }
 
-    /**
-     * Monograma circular con iniciales del usuario o símbolo del lenguaje.
-     */
     public static JComponent createAvatarBadge(String initials, Color accent, int diameter) {
         return new AvatarBadge(initials, accent, diameter);
     }
@@ -629,13 +586,13 @@ public final class Theme {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             enableAntialiasing(g2);
-            g2.setColor(withAlpha(accent, 42));
+            g2.setColor(withAlpha(accent, 28));
             g2.fillOval(0, 0, diameter - 1, diameter - 1);
-            g2.setColor(withAlpha(accent, 140));
+            g2.setColor(withAlpha(accent, 110));
             g2.drawOval(0, 0, diameter - 1, diameter - 1);
 
             g2.setFont(new Font("Segoe UI", Font.BOLD, Math.max(11, diameter / 3)));
-            g2.setColor(brighten(accent, 0.35f));
+            g2.setColor(darken(accent, 0.15f));
             FontMetrics fm = g2.getFontMetrics();
             int tx = (diameter - fm.stringWidth(initials)) / 2;
             int ty = (diameter - fm.getHeight()) / 2 + fm.getAscent();

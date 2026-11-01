@@ -60,7 +60,7 @@ public class LessonFrame extends JFrame {
 
         setTitle("LevelUp Code — Lección: " + lessonTitle);
         setSize(1040, 640);
-        setMinimumSize(new Dimension(900, 560));
+        setMinimumSize(new Dimension(920, 560));
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -90,7 +90,7 @@ public class LessonFrame extends JFrame {
         // Panel dividido: Teoría Conceptual (Izquierda) vs Código Comparativo (Derecha)
         JSplitPane splitPane = new JSplitPane(
                 JSplitPane.HORIZONTAL_SPLIT, buildTheoryPane(), buildComparativeCodePane());
-        splitPane.setDividerLocation(510);
+        splitPane.setDividerLocation(490);
         splitPane.setResizeWeight(0.50);
         splitPane.setDividerSize(8);
         splitPane.setBorder(null);
@@ -105,6 +105,7 @@ public class LessonFrame extends JFrame {
 
     private JPanel buildTheoryPane() {
         Theme.RoundedPanel card = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        card.setLayout(new BorderLayout(0, 10));
         card.setBorder(BorderFactory.createEmptyBorder(14, 16, 16, 16));
 
         JPanel top = Theme.createSectionHeader("Fundamento Teórico y Diseño", "Lectura interactiva");
@@ -135,25 +136,24 @@ public class LessonFrame extends JFrame {
                 : defaultTheory);
 
         JScrollPane scroll = new JScrollPane(txtTheory);
-        scroll.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEmptyBorder(10, 0, 0, 0),
-                BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1)
-        ));
+        scroll.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1));
+        scroll.getViewport().setBackground(Theme.EDITOR_BG);
         card.add(scroll, BorderLayout.CENTER);
         return card;
     }
 
     private JPanel buildComparativeCodePane() {
         Theme.RoundedPanel card = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        card.setLayout(new BorderLayout(0, 10));
         card.setBorder(BorderFactory.createEmptyBorder(14, 16, 16, 16));
 
-        JPanel header = new JPanel(new BorderLayout());
+        JPanel header = new JPanel(new BorderLayout(8, 0));
         header.setOpaque(false);
 
         JLabel lblSection = new JLabel("TRADUCCIÓN ENTRE PARADIGMAS");
         lblSection.setFont(Theme.FONT_SECTION);
         lblSection.setForeground(Theme.TEXT_MUTED);
-        header.add(lblSection, BorderLayout.WEST);
+        header.add(lblSection, BorderLayout.CENTER);
 
         JPanel langSwitch = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         langSwitch.setOpaque(false);
@@ -190,13 +190,11 @@ public class LessonFrame extends JFrame {
         lblComparisonCaption.setFont(Theme.FONT_SMALL);
         lblComparisonCaption.setForeground(Theme.ACCENT_CYAN);
         lblComparisonCaption.setIcon(Theme.createVectorIcon(Theme.IconKind.CODE, 14, Theme.ACCENT_CYAN));
-        lblComparisonCaption.setBorder(BorderFactory.createEmptyBorder(8, 2, 0, 2));
+        lblComparisonCaption.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 2));
 
         JScrollPane scrollCode = new JScrollPane(txtComparativeCode);
-        scrollCode.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEmptyBorder(10, 0, 0, 0),
-                BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1)
-        ));
+        scrollCode.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1));
+        scrollCode.getViewport().setBackground(Theme.EDITOR_BG);
 
         card.add(header, BorderLayout.NORTH);
         card.add(scrollCode, BorderLayout.CENTER);
@@ -206,16 +204,17 @@ public class LessonFrame extends JFrame {
 
     private JPanel buildBottomBar(final int reward) {
         Theme.RoundedPanel bar = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        bar.setLayout(new BorderLayout(16, 0));
         bar.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
 
-        lblStatusInfo = new JLabel("Estado de la lección: EN CURSO · Completa la lectura o pasa al reto práctico.");
+        lblStatusInfo = new JLabel("Estado: En curso — Completa la lectura o abre el reto práctico.");
         lblStatusInfo.setFont(Theme.FONT_REGULAR);
         lblStatusInfo.setForeground(Theme.TEXT_SECONDARY);
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttons.setOpaque(false);
 
-        btnMarkComplete = Theme.createSecondaryButton("Marcar Lección Completada (+" + reward + " XP)");
+        btnMarkComplete = Theme.createSecondaryButton("Completar Lección (+" + reward + " XP)");
         btnMarkComplete.setIcon(Theme.createVectorIcon(Theme.IconKind.CHECK, 14, Theme.ACCENT_GREEN));
         btnMarkComplete.addActionListener(e -> {
             if (!lessonCompleted) {
@@ -234,7 +233,7 @@ public class LessonFrame extends JFrame {
             }
         });
 
-        JButton btnOpenChallenge = Theme.createPrimaryButton("Abrir Laboratorio de Retos", Theme.ACCENT_INDIGO);
+        JButton btnOpenChallenge = Theme.createPrimaryButton("Ir al Reto Práctico", Theme.ACCENT_INDIGO);
         btnOpenChallenge.setIcon(Theme.createVectorIcon(Theme.IconKind.PLAY, 14, Color.WHITE));
         btnOpenChallenge.addActionListener(e -> {
             Challenge firstChallenge = (currentLesson != null && currentLesson.getChallenges() != null
@@ -248,7 +247,7 @@ public class LessonFrame extends JFrame {
         buttons.add(btnMarkComplete);
         buttons.add(btnOpenChallenge);
 
-        bar.add(lblStatusInfo, BorderLayout.WEST);
+        bar.add(lblStatusInfo, BorderLayout.CENTER);
         bar.add(buttons, BorderLayout.EAST);
         return bar;
     }
@@ -286,7 +285,7 @@ public class LessonFrame extends JFrame {
                     + "    def emitir_sonido(self) -> str:\n"
                     + "        return \"Guau\""
             );
-            lblComparisonCaption.setText("Python emplea decoradores '@abstractmethod' y resolución dinámica de nombres.");
+            lblComparisonCaption.setText("Python emplea decoradores '@abstractmethod' y resolución dinámica.");
         } else {
             btnTabCpp.setPalette(Theme.ACCENT_VIOLET, Theme.brighten(Theme.ACCENT_VIOLET, 0.15f), Color.WHITE, null);
             btnTabJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
@@ -306,7 +305,7 @@ public class LessonFrame extends JFrame {
                     + "    }\n"
                     + "};"
             );
-            lblComparisonCaption.setText("C++ requiere 'virtual' explícito y destructor virtual para liberar memoria sin fugas.");
+            lblComparisonCaption.setText("C++ requiere 'virtual' explícito y destructor virtual en la clase base.");
         }
     }
 }

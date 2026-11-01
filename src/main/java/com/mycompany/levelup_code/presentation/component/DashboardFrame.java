@@ -35,7 +35,7 @@ import javax.swing.SwingUtilities;
 
 /**
  * Panel principal interactivo del estudiante y administrador con barra lateral de navegación,
- * telemetría de gamificación en tiempo real, comparador multi-lenguaje y sistema de logros (RF-09, RF-11).
+ * telemetría de gamificación en tiempo real, comparador multi-lenguaje y sistema de logros.
  */
 public class DashboardFrame extends JFrame {
 
@@ -301,7 +301,7 @@ public class DashboardFrame extends JFrame {
         sidebar.add(navColumn, BorderLayout.NORTH);
 
         // Tarjeta inferior de perfil activo y cierre de sesión
-        Theme.RoundedPanel userBox = new Theme.RoundedPanel(10, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        Theme.RoundedPanel userBox = new Theme.RoundedPanel(10, Theme.EDITOR_BG, Theme.BORDER_SUBTLE);
         userBox.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
         JPanel profileTop = new JPanel(new BorderLayout(10, 0));
@@ -380,10 +380,10 @@ public class DashboardFrame extends JFrame {
         cardExp.add(lblExpValue, BorderLayout.CENTER);
         cardExp.add(lblExpSub, BorderLayout.SOUTH);
 
-        // 3. Tarjeta de Racha Activa (RF-10)
+        // 3. Tarjeta de Racha Activa
         Theme.RoundedPanel cardStreak = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE, Theme.ACCENT_AMBER);
         cardStreak.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 14));
-        JLabel lblStreakCaption = new JLabel("RACHA DIARIA (RF-10)");
+        JLabel lblStreakCaption = new JLabel("RACHA DIARIA");
         lblStreakCaption.setFont(Theme.FONT_SECTION);
         lblStreakCaption.setForeground(Theme.TEXT_MUTED);
         lblStreakValue = new JLabel();
@@ -397,10 +397,10 @@ public class DashboardFrame extends JFrame {
         cardStreak.add(lblStreakValue, BorderLayout.CENTER);
         cardStreak.add(lblStreakSub, BorderLayout.SOUTH);
 
-        // 4. Tarjeta de Vidas / Intentos (Diccionario de Datos Tabla 2)
+        // 4. Tarjeta de Vidas / Intentos
         Theme.RoundedPanel cardLives = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE, Theme.ACCENT_ROSE);
         cardLives.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 14));
-        JLabel lblLivesCaption = new JLabel("VIDAS DISPONIBLES (RF-08)");
+        JLabel lblLivesCaption = new JLabel("VIDAS DISPONIBLES");
         lblLivesCaption.setFont(Theme.FONT_SECTION);
         lblLivesCaption.setForeground(Theme.TEXT_MUTED);
         lblLivesValue = new JLabel();
@@ -429,8 +429,8 @@ public class DashboardFrame extends JFrame {
         JPanel topSection = new JPanel(new BorderLayout(0, 10));
         topSection.setOpaque(false);
         topSection.add(Theme.createSectionHeader(
-                "Lenguajes de Estudio Inscritos (RF-02, RF-03)",
-                "Haz clic en un lenguaje para filtrar sus lecciones o abre un reto directo"), BorderLayout.NORTH);
+                "Lenguajes de Estudio Inscritos",
+                "Selecciona un lenguaje para filtrar sus lecciones o abre un reto práctico"), BorderLayout.NORTH);
 
         JPanel langGrid = new JPanel(new GridLayout(1, 3, 16, 0));
         langGrid.setOpaque(false);
@@ -452,7 +452,7 @@ public class DashboardFrame extends JFrame {
         Theme.RoundedPanel lessonsCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
         lessonsCard.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
 
-        JPanel lessonsHeader = new JPanel(new BorderLayout());
+        JPanel lessonsHeader = new JPanel(new BorderLayout(12, 0));
         lessonsHeader.setOpaque(false);
         lessonsHeader.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_SUBTLE),
@@ -462,7 +462,7 @@ public class DashboardFrame extends JFrame {
         lblSelectedLanguageHeader = new JLabel("RUTA DE LECCIONES SECUENCIALES · JAVA");
         lblSelectedLanguageHeader.setFont(Theme.FONT_SECTION);
         lblSelectedLanguageHeader.setForeground(Theme.TEXT_MUTED);
-        lessonsHeader.add(lblSelectedLanguageHeader, BorderLayout.WEST);
+        lessonsHeader.add(lblSelectedLanguageHeader, BorderLayout.CENTER);
 
         JLabel lblHint = new JLabel("Completa lecciones y retos para sumar XP en tiempo real");
         lblHint.setFont(Theme.FONT_SMALL);
@@ -493,16 +493,16 @@ public class DashboardFrame extends JFrame {
         Theme.RoundedPanel card = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
         card.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
 
-        JPanel headerRow = new JPanel(new BorderLayout());
+        JPanel headerRow = new JPanel(new BorderLayout(8, 0));
         headerRow.setOpaque(false);
 
         JLabel lblName = new JLabel(langKey);
         lblName.setFont(Theme.FONT_TITLE);
         lblName.setForeground(Theme.TEXT_PRIMARY);
-        headerRow.add(lblName, BorderLayout.WEST);
+        headerRow.add(lblName, BorderLayout.CENTER);
         headerRow.add(Theme.createPillBadge(versionTag, accent), BorderLayout.EAST);
 
-        JLabel lblDesc = new JLabel("<html><body style='width:220px;color:#BAC4D6;'>" + description + "</body></html>");
+        JLabel lblDesc = new JLabel("<html><body style='width:210px;color:#334155;'>" + description + "</body></html>");
         lblDesc.setFont(Theme.FONT_REGULAR);
 
         JPanel progressRow = new JPanel(new BorderLayout(0, 6));
@@ -564,6 +564,7 @@ public class DashboardFrame extends JFrame {
 
         for (Lesson lesson : targetLessons) {
             Theme.RoundedPanel row = new Theme.RoundedPanel(10, Theme.EDITOR_BG, Theme.BORDER_SUBTLE);
+            row.setLayout(new BorderLayout(16, 0));
             row.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
             row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 76));
 
@@ -608,7 +609,7 @@ public class DashboardFrame extends JFrame {
             rightButtons.add(btnRead);
             rightButtons.add(btnChallenge);
 
-            row.add(leftInfo, BorderLayout.WEST);
+            row.add(leftInfo, BorderLayout.CENTER);
             row.add(rightButtons, BorderLayout.EAST);
 
             lessonsListContainer.add(row);
@@ -624,6 +625,7 @@ public class DashboardFrame extends JFrame {
         panel.setOpaque(false);
 
         Theme.RoundedPanel topControl = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
+        topControl.setLayout(new BorderLayout(12, 0));
         topControl.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
 
         JLabel lblTitle = new JLabel("  Comparador Algorítmico Simultáneo (Java · Python · C++)");
@@ -649,7 +651,7 @@ public class DashboardFrame extends JFrame {
         topicButtons.add(btnTopic2);
         topicButtons.add(btnTopic3);
 
-        topControl.add(lblTitle, BorderLayout.WEST);
+        topControl.add(lblTitle, BorderLayout.CENTER);
         topControl.add(topicButtons, BorderLayout.EAST);
 
         // 3 columnas simultáneas
@@ -689,15 +691,16 @@ public class DashboardFrame extends JFrame {
 
     private JPanel wrapCodeColumn(String headerTitle, Color accent, JTextArea area) {
         Theme.RoundedPanel col = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE, accent);
+        col.setLayout(new BorderLayout(0, 8));
         col.setBorder(BorderFactory.createEmptyBorder(12, 14, 14, 14));
 
         JLabel lblH = new JLabel(headerTitle);
         lblH.setFont(Theme.FONT_SECTION);
-        lblH.setForeground(Theme.brighten(accent, 0.3f));
-        lblH.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        lblH.setForeground(accent);
 
         JScrollPane scroll = new JScrollPane(area);
         scroll.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1));
+        scroll.getViewport().setBackground(Theme.EDITOR_BG);
 
         col.add(lblH, BorderLayout.NORTH);
         col.add(scroll, BorderLayout.CENTER);
@@ -804,8 +807,8 @@ public class DashboardFrame extends JFrame {
         view.setOpaque(false);
 
         view.add(Theme.createSectionHeader(
-                "Sistema de Logros e Insignias Desbloqueables (RF-11)",
-                "Se evalúan polimórficamente según tu racha, XP y retos aprobados"), BorderLayout.NORTH);
+                "Sistema de Logros e Insignias Desbloqueables",
+                "Se desbloquean automáticamente según tu racha, XP y retos aprobados"), BorderLayout.NORTH);
 
         achievementsGridContainer = new JPanel(new GridLayout(2, 3, 14, 14));
         achievementsGridContainer.setOpaque(false);
@@ -834,13 +837,13 @@ public class DashboardFrame extends JFrame {
 
             Theme.RoundedPanel card = new Theme.RoundedPanel(
                     12,
-                    unlocked ? Theme.SURFACE : Theme.BG_SIDEBAR,
+                    unlocked ? Theme.SURFACE : Theme.SURFACE_ELEVATED,
                     unlocked ? Theme.ACCENT_GREEN : Theme.BORDER_SUBTLE,
                     accent
             );
             card.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 16));
 
-            JPanel top = new JPanel(new BorderLayout());
+            JPanel top = new JPanel(new BorderLayout(8, 0));
             top.setOpaque(false);
 
             JLabel lblName = new JLabel("  " + ach.getName());
@@ -849,10 +852,10 @@ public class DashboardFrame extends JFrame {
             lblName.setIcon(Theme.createVectorIcon(
                     unlocked ? Theme.IconKind.TROPHY : Theme.IconKind.SHIELD, 18, accent));
 
-            top.add(lblName, BorderLayout.WEST);
+            top.add(lblName, BorderLayout.CENTER);
             top.add(Theme.createPillBadge(unlocked ? "DESBLOQUEADO" : "BLOQUEADO", accent), BorderLayout.EAST);
 
-            JLabel lblDesc = new JLabel("<html><body style='width:210px;color:#BAC4D6;'>"
+            JLabel lblDesc = new JLabel("<html><body style='width:200px;color:#334155;'>"
                     + ach.getDescription() + "</body></html>");
             lblDesc.setFont(Theme.FONT_REGULAR);
 

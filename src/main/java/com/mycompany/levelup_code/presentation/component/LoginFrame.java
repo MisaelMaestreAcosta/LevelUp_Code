@@ -67,14 +67,14 @@ public class LoginFrame extends JFrame {
         UserService userService = new UserService(repository, studentRole);
         this.authController = new AuthController(userService);
 
-        // Semilla inicial de cuentas verificables con PBKDF2 (RNF-01)
+        // Semilla inicial de cuentas verificables con PBKDF2
         this.demoStudent = userService.register("Misael Maestre", "misael@unicesar.edu.co", "estudiante123");
         this.demoStudent.setExperience(1450);
         this.demoStudent.setLevel(5);
         this.demoStudent.setCurrentStreak(7);
         this.demoStudent.setMaxStreak(12);
 
-        this.demoAdmin = userService.register("Amilkar Sierra", "admin@levelup.edu.co", "admin12345");
+        this.demoAdmin = userService.register("Admin", "admin@levelup.edu.co", "admin12345");
         this.demoAdmin.setRole(adminRole);
         this.demoAdmin.setExperience(4200);
         this.demoAdmin.setLevel(10);
@@ -86,8 +86,8 @@ public class LoginFrame extends JFrame {
 
     private void initComponents() {
         setTitle("LevelUp Code — Plataforma de Aprendizaje Comparativo");
-        setSize(1020, 650);
-        setMinimumSize(new Dimension(920, 600));
+        setSize(1040, 660);
+        setMinimumSize(new Dimension(940, 610));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -102,12 +102,12 @@ public class LoginFrame extends JFrame {
     }
 
     private JPanel buildLeftShowcasePane() {
-        JPanel leftPane = new JPanel(new BorderLayout(0, 18));
-        leftPane.setPreferredSize(new Dimension(460, 0));
+        JPanel leftPane = new JPanel(new BorderLayout(0, 16));
+        leftPane.setPreferredSize(new Dimension(470, 0));
         leftPane.setBackground(Theme.BG_SIDEBAR);
         leftPane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.BORDER_SUBTLE),
-                BorderFactory.createEmptyBorder(32, 32, 28, 32)
+                BorderFactory.createEmptyBorder(28, 28, 24, 28)
         ));
 
         // Encabezado de marca
@@ -136,19 +136,19 @@ public class LoginFrame extends JFrame {
         lblHero2.setForeground(Theme.ACCENT_INDIGO);
         lblHero2.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel lblDesc = new JLabel("<html><body style='width:340px;color:#BAC4D6;'>"
+        JLabel lblDesc = new JLabel("<html><body style='width:315px;color:#334155;'>"
                 + "Compara estructuras de datos, herencia y algoritmos en tiempo real entre "
-                + "<b>Java</b>, <b>Python</b> y <b>C++</b> con validación automática de casos de prueba."
+                + "<b>Java</b>, <b>Python</b> y <b>C++</b> con validación automática."
                 + "</body></html>");
         lblDesc.setFont(Theme.FONT_REGULAR);
         lblDesc.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         topSection.add(brandRow);
-        topSection.add(Box.createVerticalStrut(22));
+        topSection.add(Box.createVerticalStrut(18));
         topSection.add(lblHero1);
         topSection.add(Box.createVerticalStrut(2));
         topSection.add(lblHero2);
-        topSection.add(Box.createVerticalStrut(12));
+        topSection.add(Box.createVerticalStrut(10));
         topSection.add(lblDesc);
 
         leftPane.add(topSection, BorderLayout.NORTH);
@@ -157,13 +157,13 @@ public class LoginFrame extends JFrame {
         Theme.RoundedPanel codeCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
         codeCard.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
 
-        JPanel codeHeader = new JPanel(new BorderLayout());
+        JPanel codeHeader = new JPanel(new BorderLayout(8, 0));
         codeHeader.setOpaque(false);
 
-        JLabel lblSnippetTitle = new JLabel("VISTA COMPARATIVA · BÚSQUEDA BINARIA O(log n)");
+        JLabel lblSnippetTitle = new JLabel("BÚSQUEDA BINARIA · O(log n)");
         lblSnippetTitle.setFont(Theme.FONT_SECTION);
         lblSnippetTitle.setForeground(Theme.TEXT_MUTED);
-        codeHeader.add(lblSnippetTitle, BorderLayout.WEST);
+        codeHeader.add(lblSnippetTitle, BorderLayout.CENTER);
 
         JPanel langTabs = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         langTabs.setOpaque(false);
@@ -195,7 +195,7 @@ public class LoginFrame extends JFrame {
         txtCodePreview.setForeground(Theme.TEXT_PRIMARY);
         txtCodePreview.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1),
-                BorderFactory.createEmptyBorder(12, 14, 12, 14)
+                BorderFactory.createEmptyBorder(12, 12, 12, 12)
         ));
 
         lblPreviewNote = new JLabel();
@@ -214,10 +214,10 @@ public class LoginFrame extends JFrame {
 
         leftPane.add(codeCard, BorderLayout.CENTER);
 
-        // Pie técnico de seguridad
+        // Pie de seguridad sin códigos de requerimiento
         JPanel footer = new JPanel(new BorderLayout());
         footer.setOpaque(false);
-        JLabel lblSecurity = new JLabel("Seguridad RNF-01 · Hash PBKDF2-HMAC-SHA256 (120k iteraciones)");
+        JLabel lblSecurity = new JLabel("Autenticación segura · Hash PBKDF2-HMAC-SHA256");
         lblSecurity.setFont(Theme.FONT_SMALL);
         lblSecurity.setForeground(Theme.TEXT_MUTED);
         lblSecurity.setIcon(Theme.createVectorIcon(Theme.IconKind.SHIELD, 14, Theme.ACCENT_GREEN));
@@ -230,7 +230,7 @@ public class LoginFrame extends JFrame {
     private JPanel buildRightAuthPane() {
         JPanel rightWrapper = new JPanel(new BorderLayout());
         rightWrapper.setBackground(Theme.BG_DARK);
-        rightWrapper.setBorder(BorderFactory.createEmptyBorder(32, 48, 28, 48));
+        rightWrapper.setBorder(BorderFactory.createEmptyBorder(32, 44, 28, 44));
 
         JPanel formColumn = new JPanel();
         formColumn.setLayout(new BoxLayout(formColumn, BoxLayout.Y_AXIS));
@@ -320,7 +320,7 @@ public class LoginFrame extends JFrame {
         btnSubmit.addActionListener(e -> handleAuthSubmit());
 
         // Sección de perfiles de acceso rápido
-        JPanel quickHeader = Theme.createSectionHeader("Perfiles de Laboratorio (1 Clic)", "Datos precargados");
+        JPanel quickHeader = Theme.createSectionHeader("Perfiles de Acceso Rápido", "1 clic");
         quickHeader.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
         quickHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -338,8 +338,8 @@ public class LoginFrame extends JFrame {
                 "estudiante123"
         ));
         demoCardsGrid.add(createQuickProfileCard(
-                "Prof. Amilkar Sierra",
-                "Docente / Admin · Nivel 10",
+                "Admin",
+                "Administrador · Nivel 10",
                 "ADMIN",
                 Theme.ACCENT_GREEN,
                 "admin@levelup.edu.co",
@@ -379,21 +379,21 @@ public class LoginFrame extends JFrame {
         card.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 12));
         card.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
 
-        JPanel topRow = new JPanel(new BorderLayout());
+        JPanel topRow = new JPanel(new BorderLayout(8, 0));
         topRow.setOpaque(false);
         JLabel lblName = new JLabel(name);
         lblName.setFont(Theme.FONT_SUBTITLE);
         lblName.setForeground(Theme.TEXT_PRIMARY);
-        topRow.add(lblName, BorderLayout.WEST);
+        topRow.add(lblName, BorderLayout.CENTER);
         topRow.add(Theme.createPillBadge(badgeText, accent), BorderLayout.EAST);
 
         JLabel lblMeta = new JLabel(meta);
         lblMeta.setFont(Theme.FONT_SMALL);
         lblMeta.setForeground(Theme.TEXT_MUTED);
 
-        JLabel lblAction = new JLabel("Clic para entrar con este perfil →");
+        JLabel lblAction = new JLabel("Entrar con este perfil →");
         lblAction.setFont(Theme.FONT_SMALL);
-        lblAction.setForeground(Theme.brighten(accent, 0.25f));
+        lblAction.setForeground(accent);
 
         JPanel content = new JPanel();
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
@@ -442,55 +442,55 @@ public class LoginFrame extends JFrame {
             btnLangCpp.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtCodePreview.setText(
                     "public class BinarySearch {\n"
-                    + "    public static int search(int[] arr, int target) {\n"
-                    + "        int low = 0, high = arr.length - 1;\n"
+                    + "    static int search(int[] a, int target) {\n"
+                    + "        int low = 0, high = a.length - 1;\n"
                     + "        while (low <= high) {\n"
                     + "            int mid = low + (high - low) / 2;\n"
-                    + "            if (arr[mid] == target) return mid;\n"
-                    + "            if (arr[mid] < target) low = mid + 1;\n"
+                    + "            if (a[mid] == target) return mid;\n"
+                    + "            if (a[mid] < target) low = mid + 1;\n"
                     + "            else high = mid - 1;\n"
                     + "        }\n"
                     + "        return -1;\n"
                     + "    }\n"
                     + "}"
             );
-            lblPreviewNote.setText("Java 21 · Tipado estático fuerte y aritmética segura contra overflow.");
+            lblPreviewNote.setText("Java 21 · Tipado estático y aritmética segura.");
         } else if ("PYTHON".equals(lang)) {
             btnLangPython.setPalette(Theme.ACCENT_GREEN, Theme.ACCENT_GREEN_HOVER, Color.WHITE, null);
             btnLangJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnLangCpp.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtCodePreview.setText(
-                    "def binary_search(arr: list[int], target: int) -> int:\n"
-                    + "    low, high = 0, len(arr) - 1\n"
+                    "def binary_search(a: list[int], target: int) -> int:\n"
+                    + "    low, high = 0, len(a) - 1\n"
                     + "    while low <= high:\n"
                     + "        mid = (low + high) // 2\n"
-                    + "        if arr[mid] == target:\n"
+                    + "        if a[mid] == target:\n"
                     + "            return mid\n"
-                    + "        elif arr[mid] < target:\n"
+                    + "        elif a[mid] < target:\n"
                     + "            low = mid + 1\n"
                     + "        else:\n"
                     + "            high = mid - 1\n"
                     + "    return -1"
             );
-            lblPreviewNote.setText("Python 3.12 · División entera con // y enteros de precisión arbitraria.");
+            lblPreviewNote.setText("Python 3.12 · División entera // y sintaxis limpia.");
         } else {
             btnLangCpp.setPalette(Theme.ACCENT_VIOLET, Theme.brighten(Theme.ACCENT_VIOLET, 0.15f), Color.WHITE, null);
             btnLangJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnLangPython.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtCodePreview.setText(
                     "#include <vector>\n\n"
-                    + "int binarySearch(const std::vector<int>& arr, int target) {\n"
-                    + "    int low = 0, high = static_cast<int>(arr.size()) - 1;\n"
+                    + "int binarySearch(const std::vector<int>& a, int x) {\n"
+                    + "    int low = 0, high = (int)a.size() - 1;\n"
                     + "    while (low <= high) {\n"
                     + "        int mid = low + (high - low) / 2;\n"
-                    + "        if (arr[mid] == target) return mid;\n"
-                    + "        if (arr[mid] < target) low = mid + 1;\n"
+                    + "        if (a[mid] == x) return mid;\n"
+                    + "        if (a[mid] < x) low = mid + 1;\n"
                     + "        else high = mid - 1;\n"
                     + "    }\n"
                     + "    return -1;\n"
                     + "}"
             );
-            lblPreviewNote.setText("C++ 20 · Paso por referencia constante (const std::vector&) sin copia en memoria.");
+            lblPreviewNote.setText("C++ 20 · Referencia constante sin copia en memoria.");
         }
     }
 
@@ -538,7 +538,7 @@ public class LoginFrame extends JFrame {
                     openDashboard(authResult.get());
                 } else {
                     lblFeedback.setForeground(Theme.ACCENT_ROSE);
-                    lblFeedback.setText("Credenciales incorrectas. Verifica tu correo o usa un perfil de laboratorio.");
+                    lblFeedback.setText("Credenciales incorrectas. Verifica tu correo o usa un perfil rápido.");
                 }
             }
         } catch (IllegalArgumentException ex) {
