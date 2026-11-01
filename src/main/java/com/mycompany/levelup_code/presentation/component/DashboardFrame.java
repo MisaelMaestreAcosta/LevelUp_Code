@@ -89,8 +89,8 @@ public class DashboardFrame extends JFrame {
     private static User createFallbackUser() {
         User u = new User();
         u.setId(1);
-        u.setUsername("Misael Maestre");
-        u.setEmail("misael@unicesar.edu.co");
+        u.setUsername("Estudiante");
+        u.setEmail("estudiante@levelup.edu.co");
         u.setTotalExp(1450);
         u.setLevel(5);
         u.setCurrentStreak(7);

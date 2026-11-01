@@ -68,7 +68,7 @@ public class LoginFrame extends JFrame {
         this.authController = new AuthController(userService);
 
         // Semilla inicial de cuentas verificables con PBKDF2
-        this.demoStudent = userService.register("Misael Maestre", "misael@unicesar.edu.co", "estudiante123");
+        this.demoStudent = userService.register("Estudiante", "estudiante@levelup.edu.co", "estudiante123");
         this.demoStudent.setExperience(1450);
         this.demoStudent.setLevel(5);
         this.demoStudent.setCurrentStreak(7);
@@ -290,8 +290,8 @@ public class LoginFrame extends JFrame {
         lblEmail.setForeground(Theme.TEXT_SECONDARY);
         lblEmail.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        txtEmail = Theme.createStyledTextField("usuario@unicesar.edu.co");
-        txtEmail.setText("misael@unicesar.edu.co");
+        txtEmail = Theme.createStyledTextField("estudiante@levelup.edu.co");
+        txtEmail.setText("estudiante@levelup.edu.co");
         txtEmail.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         txtEmail.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -330,11 +330,11 @@ public class LoginFrame extends JFrame {
         demoCardsGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         demoCardsGrid.add(createQuickProfileCard(
-                "Misael Maestre",
+                "Estudiante",
                 "Estudiante · Nivel 5 (1,450 XP)",
                 "ESTUDIANTE",
                 Theme.ACCENT_INDIGO,
-                "misael@unicesar.edu.co",
+                "estudiante@levelup.edu.co",
                 "estudiante123"
         ));
         demoCardsGrid.add(createQuickProfileCard(
