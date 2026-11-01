@@ -13,3 +13,4 @@ public class StandardLevelPolicy implements LevelPolicy {
         return 1 + Math.max(0, totalExperience) / XP_PER_LEVEL;
     }
 }
+

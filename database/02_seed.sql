@@ -1,9 +1,9 @@
 -- =============================================================================
 -- LEVELUP CODE - DATOS SEMILLA INICIALES (18 TABLAS - ORACLE SQL)
 -- Incluye roles, cuentas con hash PBKDF2-HMAC-SHA256 (120k iteraciones),
--- lenguajes (Java, Python, C++), módulos, lecciones, retos de código y quiz,
--- casos de prueba visibles/ocultos, logros polimórficos e historial inicial.
--- Ejecutar después de 01_schema.sql en la conexión: level_up_admin
+-- lenguajes (Java, Python, C++), módulos y lecciones espejo por orden_secuencia
+-- para aprendizaje comparativo, retos de código y quiz, casos de prueba y logros.
+-- Ejecutar después de 01_schema.sql en la conexión: LEVELUP_ADMIN
 -- =============================================================================
 
 SET DEFINE OFF;
@@ -42,7 +42,10 @@ INSERT INTO Usuarios (
     TRUNC(SYSDATE) - 60, SYSTIMESTAMP
 );
 
--- 3. ACTIVIDAD_DIARIA (Últimos 7 días de racha para el Estudiante)
+-- 3. ACTIVIDAD_DIARIA (Últimos 14 días para alimentar el mapa de calor y racha)
+INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 13, 60);
+INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 11, 120);
+INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 9, 80);
 INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 6, 120);
 INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 5, 180);
 INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 4, 90);
@@ -66,67 +69,98 @@ INSERT INTO Inscripciones (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (1
 INSERT INTO Inscripciones (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (1, 2, TRUNC(SYSDATE) - 18);
 INSERT INTO Inscripciones (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (1, 3, TRUNC(SYSDATE) - 10);
 
--- 6. MODULOS
+-- 6. MODULOS (Alineados por orden_secuencia entre los 3 lenguajes)
 INSERT INTO Modulos (id_modulo, id_lenguaje, nombre_modulo, descripcion, orden_secuencia)
-VALUES (1, 1, 'Arquitectura Orientada a Objetos', 'Abstracción, herencia, polimorfismo y despacho dinámico en Java.', 1);
+VALUES (1, 1, 'Fundamentos Comparativos y POO en Java', 'Herencia, polimorfismo, colecciones y búsqueda algorítmica en JVM.', 1);
 
 INSERT INTO Modulos (id_modulo, id_lenguaje, nombre_modulo, descripcion, orden_secuencia)
-VALUES (2, 1, 'Estructuras Lineales y Búsqueda', 'Arreglos, listas dinámicas y búsqueda binaria O(log n).', 2);
+VALUES (2, 2, 'Fundamentos Comparativos y POO en Python', 'Clases abstractas ABC, listas dinámicas y búsqueda binaria en Python.', 1);
 
 INSERT INTO Modulos (id_modulo, id_lenguaje, nombre_modulo, descripcion, orden_secuencia)
-VALUES (3, 2, 'Algoritmia y Secuencias en Python', 'Listas dinámicas, slicing, búsqueda binaria y protocolos ABC.', 1);
+VALUES (3, 3, 'Fundamentos Comparativos y POO en C++', 'Funciones virtuales puras, std::vector, referencias constantes y RAII.', 1);
 
-INSERT INTO Modulos (id_modulo, id_lenguaje, nombre_modulo, descripcion, orden_secuencia)
-VALUES (4, 3, 'Memoria, Referencias y Contenedores STL', 'Paso por referencia constante, constructores y std::vector.', 1);
-
--- 7. LECCIONES
+-- 7. LECCIONES (Espejo por orden_secuencia 1, 2 y 3 en cada lenguaje)
+-- Lecciones de JAVA (id_modulo = 1)
 INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
 VALUES (
     1, 1,
     'Herencia, Clases Abstractas y Despacho Dinámico',
-    '1. JERARQUÍAS ES-UN Y CONTRATOS DE COMPORTAMIENTO' || CHR(10) ||
-    'Las clases abstractas permiten factorizar estado y comportamiento común mientras delegan operaciones específicas a las subclases mediante métodos abstractos.' || CHR(10) || CHR(10) ||
-    '2. POLIMORFISMO EN JAVA VS PYTHON VS C++' || CHR(10) ||
-    '• En Java, todo método no final ni static se enlaza dinámicamente en tiempo de ejecución.' || CHR(10) ||
-    '• En C++, el despacho dinámico exige declarar el método como virtual en la clase base.' || CHR(10) ||
-    '• En Python, el protocolo se resuelve en tiempo de ejecución mediante Duck Typing o abc.ABC.',
+    '1. CONTRATOS ABSTRACTOS Y DESPACHO DINÁMICO EN JAVA' || CHR(10) ||
+    'En Java, todos los métodos de instancia no marcados como final ni private se enlazan dinámicamente en tiempo de ejecución mediante la tabla virtual de la JVM.' || CHR(10) || CHR(10) ||
+    '2. COMPARACIÓN CON PYTHON Y C++' || CHR(10) ||
+    '• Java exige @Override y abstract explícito.' || CHR(10) ||
+    '• Python usa el módulo abc y @abstractmethod.' || CHR(10) ||
+    '• C++ requiere virtual explícito y destructor virtual (= default).',
     1, 60
 );
 
 INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
 VALUES (
     2, 1,
-    'Principios SOLID y Desacoplamiento por Capas',
-    '1. INVERSIÓN DE DEPENDENCIAS (DIP)' || CHR(10) ||
-    'Los módulos de alto nivel (Servicios de Negocio) no deben depender de implementaciones concretas de datos (Oracle JDBC), sino de abstracciones (Interfaces Repository).' || CHR(10) || CHR(10) ||
-    '2. ABIERTO / CERRADO (OCP)' || CHR(10) ||
-    'Las entidades de software deben estar abiertas para su extensión mediante polimorfismo pero cerradas para su modificación directa.',
+    'Búsqueda Binaria O(log n) y Aritmética Segura',
+    '1. DIVISIÓN DEL ESPACIO DE BÚSQUEDA' || CHR(10) ||
+    'La búsqueda binaria reduce a la mitad el intervalo [low, high] en cada paso sobre un arreglo ordenado.' || CHR(10) || CHR(10) ||
+    '2. PREVENCIÓN DE OVERFLOW EN ENTEROS DE 32 BITS' || CHR(10) ||
+    'En Java y C++, int tiene 32 bits con signo. Calcular mid = low + (high - low) / 2 evita que low + high supere Integer.MAX_VALUE.',
     2, 75
 );
 
 INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
 VALUES (
-    3, 2,
-    'Búsqueda Binaria y Prevención de Overflow',
-    'La búsqueda binaria divide el espacio de búsqueda a la mitad en cada iteración logrando complejidad O(log n).' || CHR(10) ||
-    'Calcular el punto medio como mid = low + (high - low) / 2 evita el desbordamiento aritmético que ocurre con (low + high) / 2 en arreglos masivos.',
-    1, 80
+    3, 1,
+    'Gestión de Memoria y Colecciones Dinámicas (ArrayList)',
+    'En Java, ArrayList<T> redimensiona un arreglo interno en el Heap en tiempo O(1) amortizado, mientras el recolector G1GC libera objetos sin referencias activas.',
+    3, 80
+);
+
+-- Lecciones de PYTHON (id_modulo = 2)
+INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
+VALUES (
+    4, 2,
+    'Protocolos Abstractos (abc.ABC) y Duck Typing',
+    'En Python, las clases base abstractas se definen heredando de abc.ABC y decorando métodos con @abstractmethod. Si una subclase no implementa el método, Python impide instanciarla en tiempo de ejecución.',
+    1, 60
 );
 
 INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
 VALUES (
-    4, 3,
-    'Complejidad Temporal y Búsqueda Binaria en Python',
-    'En Python, las listas son arreglos dinámicos de referencias en memoria contigua. El operador // realiza división entera truncada hacia abajo sin riesgo de desbordamiento porque int tiene precisión arbitraria.',
-    1, 65
+    5, 2,
+    'Búsqueda Binaria y División Entera (//) en Python',
+    'En Python, los enteros (int) tienen precisión arbitraria por lo que nunca sufren overflow de 32 bits. Sin embargo, es indispensable usar el operador // para obtener un índice entero.',
+    2, 75
 );
 
 INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
 VALUES (
-    5, 4,
-    'Paso por Valor vs Referencia Constante (const T&)',
-    'En C++, pasar un std::vector por valor copia todos sus elementos en memoria O(n). Usar const std::vector<int>& evita la copia en memoria y garantiza inmutabilidad durante la función.',
-    1, 80
+    6, 2,
+    'Listas Dinámicas y Conteo de Referencias en Python',
+    'Las listas de Python (list) almacenan punteros a PyObject en un bloque contiguo que crece con sobre-asignación para garantizar append() en O(1) amortizado.',
+    3, 80
+);
+
+-- Lecciones de C++ (id_modulo = 3)
+INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
+VALUES (
+    7, 3,
+    'Funciones Virtuales Puras (= 0) y Tabla Virtual (vtable)',
+    'En C++, el polimorfismo dinámico solo se activa cuando el método base se declara virtual. Una clase con al menos una función virtual pura (virtual T f() = 0) es abstracta y exige destructor virtual.',
+    1, 60
+);
+
+INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
+VALUES (
+    8, 3,
+    'Búsqueda Binaria sobre std::vector y Paso por Referencia',
+    'Al recibir const std::vector<int>& a, C++ accede en O(1) sin copiar el contenedor en memoria, manteniendo complejidad temporal O(log n) y espacial O(1).',
+    2, 75
+);
+
+INSERT INTO Lecciones (id_leccion, id_modulo, titulo, contenido, orden_secuencia, exp_recompensa)
+VALUES (
+    9, 3,
+    'Determinismo RAII, Smart Pointers y std::vector',
+    'A diferencia del Garbage Collector de Java y Python, C++ destruye los objetos de forma determinista al cerrarse su ámbito léxico (RAII) mediante destructores y std::unique_ptr.',
+    3, 80
 );
 
 -- 8. PROGRESO_LECCION
@@ -143,14 +177,14 @@ INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
 VALUES (1, 4, 'COMPLETADA', SYSTIMESTAMP - INTERVAL '1' DAY);
 
 INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
-VALUES (1, 5, 'EN_CURSO', NULL);
+VALUES (1, 7, 'EN_CURSO', NULL);
 
 -- 9. RETOS (Especializados en Reto_Codigo y Reto_Quiz)
 INSERT INTO Retos (id_reto, id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia)
 VALUES (
     101, 1,
     'Polimorfismo: Despacho Dinámico de Sonidos',
-    'Implementa el método emitirSonido(String tipo) para que retorne "Guau" cuando reciba "Perro" y "Miau" cuando reciba "Gato".',
+    'Implementa el método emitirSonido(String tipo) para que retorne "Guau" cuando reciba "Perro" y "Miau" cuando reciba "Gato" (sin importar mayúsculas o minúsculas).',
     'CODIGO', 'FACIL', 60, 1
 );
 
@@ -164,10 +198,26 @@ VALUES (
 
 INSERT INTO Retos (id_reto, id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia)
 VALUES (
-    103, 3,
+    103, 2,
     'Búsqueda Binaria Segura O(log n)',
-    'Implementa search(int[] a, int target) retornando el índice del elemento o -1 si no se encuentra en el arreglo ordenado.',
+    'Implementa search(int[] a, int target) retornando el índice del elemento buscado o -1 si no se encuentra en el arreglo ordenado.',
     'CODIGO', 'MEDIO', 90, 1
+);
+
+INSERT INTO Retos (id_reto, id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia)
+VALUES (
+    104, 4,
+    'Polimorfismo en Python: Sonidos por Especie',
+    'Completa la función emitir_sonido(tipo: str) -> str para retornar "Guau" con "Perro" y "Miau" con "Gato".',
+    'CODIGO', 'FACIL', 65, 1
+);
+
+INSERT INTO Retos (id_reto, id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia)
+VALUES (
+    105, 7,
+    'Polimorfismo en C++: Clasificación de Sonidos',
+    'Completa emitirSonido(std::string tipo) para retornar "Guau" cuando reciba "Perro" y "Miau" cuando reciba "Gato".',
+    'CODIGO', 'MEDIO', 75, 1
 );
 
 -- 10. RETO_CODIGO
@@ -204,6 +254,34 @@ VALUES (
     2000
 );
 
+INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
+VALUES (
+    104,
+    'def emitir_sonido(tipo: str) -> str:' || CHR(10) ||
+    '    if tipo.lower() == "perro":' || CHR(10) ||
+    '        return "Guau"' || CHR(10) ||
+    '    elif tipo.lower() == "gato":' || CHR(10) ||
+    '        return "Miau"' || CHR(10) ||
+    '    return "Desconocido"',
+    2000
+);
+
+INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
+VALUES (
+    105,
+    '#include <string>' || CHR(10) || CHR(10) ||
+    'std::string emitirSonido(std::string tipo) {' || CHR(10) ||
+    '    if (tipo == "Perro" || tipo == "PERRO") {' || CHR(10) ||
+    '        return "Guau";' || CHR(10) ||
+    '    }' || CHR(10) ||
+    '    if (tipo == "Gato") {' || CHR(10) ||
+    '        return "Miau";' || CHR(10) ||
+    '    }' || CHR(10) ||
+    '    return "Desconocido";' || CHR(10) ||
+    '}',
+    2000
+);
+
 -- 11. CASOS_PRUEBA
 INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
 VALUES (1, 101, 'Perro', 'Guau', 0);
@@ -220,6 +298,18 @@ VALUES (4, 103, '[2, 5, 8, 12, 16], target=12', '3', 0);
 INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
 VALUES (5, 103, '[2, 5, 8, 12, 16], target=7', '-1', 1);
 
+INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
+VALUES (6, 104, 'Perro', 'Guau', 0);
+
+INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
+VALUES (7, 104, 'Gato', 'Miau', 0);
+
+INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
+VALUES (8, 105, 'Perro', 'Guau', 0);
+
+INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
+VALUES (9, 105, 'Gato', 'Miau', 0);
+
 -- 12. RETO_QUIZ
 INSERT INTO Reto_Quiz (id_reto, opciones, respuesta_correcta)
 VALUES (
@@ -235,7 +325,7 @@ INSERT INTO Intentos (
 ) VALUES (
     1, 1, 102,
     'Enlace dinámico en tiempo de ejecución mediante tabla virtual (vtable)',
-    'Respuesta correcta',
+    'CORRECT',
     1, 3, 40, SYSTIMESTAMP - INTERVAL '2' DAY
 );
 
@@ -293,4 +383,3 @@ ALTER TABLE Intentos         MODIFY id_intento  GENERATED BY DEFAULT AS IDENTITY
 ALTER TABLE Logros           MODIFY id_logro    GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
 
 COMMIT;
-

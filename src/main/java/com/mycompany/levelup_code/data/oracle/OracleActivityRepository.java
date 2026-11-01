@@ -104,3 +104,4 @@ public class OracleActivityRepository implements ActivityRepository {
         return result;
     }
 }
+

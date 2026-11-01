@@ -298,3 +298,4 @@ CREATE INDEX idx_casos_reto           ON Casos_Prueba (id_reto);
 CREATE INDEX idx_intentos_usuario     ON Intentos (id_usuario, id_reto, fecha_intento DESC);
 CREATE INDEX idx_progreso_usuario     ON Progreso_Leccion (id_usuario, estado);
 CREATE INDEX idx_actividad_usuario    ON Actividad_Diaria (id_usuario, fecha DESC);
+

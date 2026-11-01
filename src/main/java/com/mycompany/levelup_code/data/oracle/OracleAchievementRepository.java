@@ -177,3 +177,4 @@ public class OracleAchievementRepository implements AchievementRepository {
         return new ChallengeCountAchievement(id, name, desc, "CODE", rs.getInt("retos_requeridos"));
     }
 }
+

@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -34,7 +35,7 @@ import javax.swing.event.DocumentListener;
 
 /**
  * Entorno interactivo de resolución de retos (Código y Quiz) con numeración de líneas,
- * casos de prueba visibles/ocultos y consola de evaluación en vivo.
+ * casos de prueba visibles/ocultos y motor de evaluación dinámica conectado a Casos_Prueba.
  */
 public class ChallengeFrame extends JFrame {
 
@@ -43,6 +44,7 @@ public class ChallengeFrame extends JFrame {
     private final User currentUser;
     private final List<Challenge> availableChallenges;
     private final Runnable onSolvedCallback;
+    private final SimulatedCodeRunner codeRunner = new SimulatedCodeRunner();
 
     private Challenge activeChallenge;
     private boolean xpAwardedForCurrent = false;
@@ -100,6 +102,13 @@ public class ChallengeFrame extends JFrame {
     }
 
     private static CodeChallenge createDefaultCodeChallenge() {
+        if (AppContext.getInstance().isOracleConnected()) {
+            java.util.Optional<Challenge> fromDb = AppContext.getInstance()
+                    .getChallengeRepository().findById(101);
+            if (fromDb.isPresent() && fromDb.get() instanceof CodeChallenge) {
+                return (CodeChallenge) fromDb.get();
+            }
+        }
         CodeChallenge code = new CodeChallenge(
                 101,
                 "Polimorfismo: Despacho Dinámico de Sonidos",
@@ -124,6 +133,13 @@ public class ChallengeFrame extends JFrame {
     }
 
     private static QuizChallenge createDefaultQuizChallenge() {
+        if (AppContext.getInstance().isOracleConnected()) {
+            java.util.Optional<Challenge> fromDb = AppContext.getInstance()
+                    .getChallengeRepository().findById(102);
+            if (fromDb.isPresent() && fromDb.get() instanceof QuizChallenge) {
+                return (QuizChallenge) fromDb.get();
+            }
+        }
         List<String> options = Arrays.asList(
                 "Sobrecarga estática en tiempo de compilación (Overloading)",
                 "Enlace dinámico en tiempo de ejecución mediante tabla virtual (vtable)",
@@ -240,7 +256,7 @@ public class ChallengeFrame extends JFrame {
         JPanel toolbar = new JPanel(new BorderLayout(8, 0));
         toolbar.setOpaque(false);
 
-        JLabel lblFileTab = new JLabel("  Solution.java · UTF-8");
+        JLabel lblFileTab = new JLabel("  Editor de Solución · UTF-8");
         lblFileTab.setFont(Theme.FONT_SECTION);
         lblFileTab.setForeground(Theme.TEXT_SECONDARY);
         lblFileTab.setIcon(Theme.createVectorIcon(Theme.IconKind.TERMINAL, 15, Theme.ACCENT_INDIGO));
@@ -548,61 +564,119 @@ public class ChallengeFrame extends JFrame {
         }
     }
 
+    /**
+     * Construye dinámicamente una solución de referencia a partir de la plantilla inicial
+     * y los casos de prueba registrados en la base de datos para este reto.
+     */
     private void fillReferenceSolution() {
-        if (activeChallenge instanceof CodeChallenge) {
+        if (!(activeChallenge instanceof CodeChallenge)) {
+            return;
+        }
+        CodeChallenge codeChallenge = (CodeChallenge) activeChallenge;
+        String template = codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "";
+        List<TestCase> cases = codeChallenge.getTestCases();
+
+        // Si es un reto de búsqueda binaria sobre arreglo
+        boolean isBinarySearch = !cases.isEmpty() && cases.get(0).getInput().contains("target");
+        if (isBinarySearch) {
             txtEditor.setText(
-                    "public class AnimalSoundSolver {\n"
-                    + "    public static String emitirSonido(String tipo) {\n"
-                    + "        if (\"Perro\".equalsIgnoreCase(tipo)) {\n"
-                    + "            return \"Guau\";\n"
-                    + "        }\n"
-                    + "        if (\"Gato\".equalsIgnoreCase(tipo)) {\n"
-                    + "            return \"Miau\";\n"
-                    + "        }\n"
-                    + "        return \"Desconocido\";\n"
+                    "#include <vector>\n\n"
+                    + "int binarySearch(const std::vector<int>& arr, int target) {\n"
+                    + "    int lo = 0;\n"
+                    + "    int hi = static_cast<int>(arr.size()) - 1;\n"
+                    + "    while (lo <= hi) {\n"
+                    + "        int mid = lo + (hi - lo) / 2;\n"
+                    + "        if (arr[mid] == target) return mid;\n"
+                    + "        if (arr[mid] < target) lo = mid + 1;\n"
+                    + "        else hi = mid - 1;\n"
                     + "    }\n"
+                    + "    return -1;\n"
                     + "}"
             );
             lineGutter.updateLineCount();
+            return;
         }
+
+        // Si la plantilla es Python (def ...)
+        if (template.contains("def ")) {
+            StringBuilder py = new StringBuilder();
+            py.append("def emitir_sonido(tipo: str) -> str:\n");
+            py.append("    clave = tipo.strip().lower()\n");
+            for (TestCase tc : cases) {
+                if (!tc.isHidden()) {
+                    py.append("    if clave == \"")
+                            .append(tc.getInput().trim().toLowerCase())
+                            .append("\":\n        return \"")
+                            .append(tc.getExpectedOutput())
+                            .append("\"\n");
+                }
+            }
+            py.append("    return \"\"\n");
+            txtEditor.setText(py.toString());
+            lineGutter.updateLineCount();
+            return;
+        }
+
+        // Plantilla Java estándar generada desde los casos de prueba
+        StringBuilder javaSol = new StringBuilder();
+        javaSol.append("public class Solution {\n");
+        javaSol.append("    public static String solve(String input) {\n");
+        for (TestCase tc : cases) {
+            if (!tc.isHidden()) {
+                javaSol.append("        if (\"")
+                        .append(tc.getInput().trim())
+                        .append("\".equalsIgnoreCase(input)) {\n")
+                        .append("            return \"")
+                        .append(tc.getExpectedOutput())
+                        .append("\";\n")
+                        .append("        }\n");
+            }
+        }
+        javaSol.append("        return \"\";\n");
+        javaSol.append("    }\n");
+        javaSol.append("}");
+        txtEditor.setText(javaSol.toString());
+        lineGutter.updateLineCount();
     }
 
     private void evaluateSubmission() {
         if (activeChallenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) activeChallenge;
             String code = txtEditor.getText() != null ? txtEditor.getText() : "";
-            List<TestCase> cases = codeChallenge.getTestCases();
 
-            int passed = 0;
+            SimulatedCodeRunner.ExecutionSummary summary = codeRunner.runAndValidate(codeChallenge, code);
+            List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
+
             StringBuilder log = new StringBuilder();
-            log.append("> Compilando y ejecutando casos de prueba...\n");
+            log.append("> Ejecutando motor dinámico contra ")
+                    .append(outcomes.size())
+                    .append(" casos de prueba (Casos_Prueba)...\n");
 
-            for (int i = 0; i < cases.size(); i++) {
-                TestCase tc = cases.get(i);
-                boolean ok = code.contains(tc.getExpectedOutput())
-                        && (code.contains("return") || code.contains("System.out"));
-
+            for (int i = 0; i < outcomes.size(); i++) {
+                SimulatedCodeRunner.CaseOutcome outcome = outcomes.get(i);
                 Theme.PillBadge badge = i < testCaseStatusBadges.size() ? testCaseStatusBadges.get(i) : null;
-                if (ok) {
-                    passed++;
+                if (outcome.isPassed()) {
                     if (badge != null) {
                         badge.setText("APROBADO");
                         badge.setAccent(Theme.ACCENT_GREEN);
                     }
-                    log.append("  [OK] Caso #").append(i + 1).append(" superado.\n");
+                    log.append("  [OK] ").append(outcome.getMessage()).append("\n");
                 } else {
                     if (badge != null) {
                         badge.setText("FALLIDO");
                         badge.setAccent(Theme.ACCENT_ROSE);
                     }
-                    log.append("  [X]  Caso #").append(i + 1)
-                            .append(": se esperaba \"").append(tc.getExpectedOutput()).append("\".\n");
+                    log.append("  [X]  ").append(outcome.getMessage()).append("\n");
                 }
             }
 
-            lblExecutionMetrics.setText("Tiempo: 14 ms · Memoria: 34 MB");
-            boolean allPassed = passed == cases.size() && !cases.isEmpty();
-            handleEvaluationOutcome(allPassed, log.toString());
+            lblExecutionMetrics.setText(String.format("Tiempo: %.2f ms · Casos: %d/%d",
+                    summary.getExecutionTimeSeconds() * 1000.0,
+                    summary.getPassedCount(),
+                    summary.getTotalCount()));
+
+            persistAttemptIfConnected(code);
+            handleEvaluationOutcome(summary.isAllPassed(), log.toString());
 
         } else if (activeChallenge instanceof QuizChallenge) {
             QuizChallenge quiz = (QuizChallenge) activeChallenge;
@@ -612,11 +686,29 @@ public class ChallengeFrame extends JFrame {
                 return;
             }
             boolean correct = quiz.isCorrectOption(selectedQuizIndex);
-            lblExecutionMetrics.setText("Tiempo: 2 ms");
+            String chosenOption = quiz.getOptions().get(selectedQuizIndex);
+            lblExecutionMetrics.setText("Tiempo: 2.00 ms");
             String msg = correct
                     ? "> Respuesta verificada: CORRECTA.\n> Concepto dominado con éxito."
-                    : "> Respuesta incorrecta.\n> Revisa la teoría de enlace dinámico e inténtalo de nuevo.";
+                    : "> Respuesta incorrecta.\n> Revisa la teoría de la lección e inténtalo de nuevo.";
+
+            persistAttemptIfConnected(chosenOption);
             handleEvaluationOutcome(correct, msg);
+        }
+    }
+
+    private void persistAttemptIfConnected(String submittedPayload) {
+        if (currentUser == null || currentUser.getId() <= 0 || activeChallenge == null || activeChallenge.getId() <= 0) {
+            return;
+        }
+        AppContext ctx = AppContext.getInstance();
+        if (!ctx.isOracleConnected()) {
+            return;
+        }
+        try {
+            ctx.getChallengeService().submitAttempt(currentUser, activeChallenge.getId(), submittedPayload);
+        } catch (Exception ignored) {
+            // Si el reto es local o falla la persistencia, se mantiene la evaluación en memoria
         }
     }
 
@@ -626,8 +718,10 @@ public class ChallengeFrame extends JFrame {
             txtConsoleOutput.setForeground(Theme.ACCENT_GREEN);
             int reward = activeChallenge.getExpReward();
             if (!xpAwardedForCurrent && currentUser != null && reward > 0) {
-                currentUser.addExperience(reward);
-                currentUser.setLevel(Math.max(1, 1 + currentUser.getTotalExp() / 300));
+                if (!AppContext.getInstance().isOracleConnected() || currentUser.getId() <= 0) {
+                    currentUser.addExperience(reward);
+                    currentUser.setLevel(Math.max(1, 1 + currentUser.getTotalExp() / 300));
+                }
                 xpAwardedForCurrent = true;
                 if (onSolvedCallback != null) {
                     onSolvedCallback.run();

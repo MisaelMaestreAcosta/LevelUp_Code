@@ -36,3 +36,4 @@ public class OracleUserRepository implements UserRepository {
         return user;
     }
 }
+

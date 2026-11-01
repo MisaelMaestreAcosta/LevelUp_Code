@@ -128,7 +128,12 @@ public final class AppContext {
         return challengeService;
     }
 
+    public ChallengeRepository getChallengeRepository() {
+        return challengeRepository;
+    }
+
     public SimulatedCodeRunner getCodeRunner() {
         return codeRunner;
     }
 }
+
