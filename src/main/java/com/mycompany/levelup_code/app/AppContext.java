@@ -132,8 +132,23 @@ public final class AppContext {
         return challengeRepository;
     }
 
+    public ContentRepository getContentRepository() {
+        return contentRepository;
+    }
+
+    public ProgressRepository getProgressRepository() {
+        return progressRepository;
+    }
+
+    public OracleActivityRepository getOracleActivityRepository() {
+        return (OracleActivityRepository) activityRepository;
+    }
+
+    public OracleAchievementRepository getOracleAchievementRepository() {
+        return (OracleAchievementRepository) achievementRepository;
+    }
+
     public SimulatedCodeRunner getCodeRunner() {
         return codeRunner;
     }
 }
-

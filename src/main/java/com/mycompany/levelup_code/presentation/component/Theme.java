@@ -54,6 +54,11 @@ public final class Theme {
     public static final Color ACCENT_ROSE = new Color(225, 29, 72);
     public static final Color ACCENT_VIOLET = new Color(124, 58, 237);
 
+    // Identidad cromática oficial por lenguaje de programación
+    public static final Color LANG_JAVA = new Color(231, 111, 0);     // #E76F00 Java Orange
+    public static final Color LANG_PYTHON = new Color(55, 118, 171);  // #3776AB Python Blue
+    public static final Color LANG_CPP = new Color(0, 89, 156);       // #00599C C++ Steel Blue
+
     // Jerarquía tipográfica oscura sobre fondo claro
     public static final Color TEXT_PRIMARY = new Color(15, 23, 42);
     public static final Color TEXT_SECONDARY = new Color(51, 65, 85);
@@ -71,6 +76,23 @@ public final class Theme {
     public static final Font FONT_CODE_BOLD = new Font("Consolas", Font.BOLD, 13);
 
     private Theme() {
+    }
+
+    public static Color colorForLanguage(String langName) {
+        if (langName == null) {
+            return ACCENT_INDIGO;
+        }
+        String lower = langName.trim().toLowerCase();
+        if (lower.contains("java")) {
+            return LANG_JAVA;
+        }
+        if (lower.contains("python")) {
+            return LANG_PYTHON;
+        }
+        if (lower.contains("c++") || lower.contains("cpp")) {
+            return LANG_CPP;
+        }
+        return ACCENT_INDIGO;
     }
 
     public static void enableAntialiasing(Graphics2D g2) {
