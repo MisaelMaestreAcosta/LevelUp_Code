@@ -3,41 +3,54 @@ package com.mycompany.levelup_code.domain.model;
 import java.time.LocalDateTime;
 
 /**
- * Entidad que representa a un Usuario del sistema.
+ * Entidad que representa a un Usuario del sistema (Tabla Usuarios).
  * Puede ser Estudiante o Administrador según su rol.
- * Contiene información de autenticación y estado de gamificación (racha, nivel, experiencia).
+ * Contiene información de identificación, autenticación y estado de gamificación
+ * (experiencia, nivel, rachas y vidas disponibles).
  */
 public class User {
 
-    // Identificador único del usuario
+    // Identificador único del usuario (id_usuario)
     private int id;
 
-    // Nombre de usuario para mostrar en la interfaz
+    // Nombre completo o alias para visualización rápida
     private String username;
 
-    // Correo electrónico utilizado para iniciar sesión
+    // Campos desglosados del Diccionario de Datos (Tabla 2: Usuarios)
+    private String firstName;
+    private String middleName;
+    private String lastName;
+    private String secondLastName;
+
+    // Correo electrónico utilizado para iniciar sesión (correo_electronico)
     private String email;
 
-    // Contraseña encriptada (hash), según RNF-01
+    // Contraseña encriptada (password_hash)
     private String passwordHash;
 
-    // Rol del usuario dentro del sistema (Estudiante o Administrador)
+    // Rol del usuario dentro del sistema (id_rol -> Roles)
     private Role role;
 
-    // Puntos de experiencia acumulados (gamificación)
+    // Puntos de experiencia acumulados (exp_total)
     private int experience;
 
-    // Nivel actual del usuario (gamificación)
+    // Nivel actual del usuario (nivel)
     private int level;
 
-    // Racha actual de días consecutivos resolviendo retos
+    // Racha actual de días consecutivos resolviendo retos (racha_actual)
     private int currentStreak;
 
-    // Racha máxima histórica del usuario
+    // Racha máxima histórica del usuario (racha_maxima)
     private int maxStreak;
-    
-    // Fecha de registro del usuario
+
+    // Vidas o intentos disponibles (vidas)
+    private int lives;
+
+    // Fecha de registro del usuario (fecha_registro)
     private LocalDateTime registrationDate;
+
+    // Última actividad registrada en la plataforma (ultima_actividad)
+    private LocalDateTime lastActivity;
 
     /**
      * Constructor por defecto
@@ -47,16 +60,18 @@ public class User {
         this.level = 1;
         this.currentStreak = 0;
         this.maxStreak = 0;
+        this.lives = 5;
         this.registrationDate = LocalDateTime.now();
+        this.lastActivity = LocalDateTime.now();
     }
 
     /**
-     * Constructor con parámetros
+     * Constructor con parámetros básicos
      */
     public User(int id, String username, String email, String passwordHash, Role role) {
         this();
         this.id = id;
-        this.username = username;
+        setUsername(username);
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
@@ -73,11 +88,77 @@ public class User {
     }
 
     public String getUsername() {
-        return username;
+        if (username != null && !username.trim().isEmpty()) {
+            return username;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (firstName != null && !firstName.isEmpty()) {
+            sb.append(firstName);
+        }
+        if (lastName != null && !lastName.isEmpty()) {
+            if (sb.length() > 0) {
+                sb.append(" ");
+            }
+            sb.append(lastName);
+        }
+        return sb.length() > 0 ? sb.toString() : "Estudiante";
     }
 
     public void setUsername(String username) {
         this.username = username;
+        if (username != null && !username.trim().isEmpty()) {
+            String[] parts = username.trim().split("\\s+");
+            if (parts.length == 1) {
+                this.firstName = parts[0];
+                if (this.lastName == null || this.lastName.isEmpty()) {
+                    this.lastName = "Usuario";
+                }
+            } else if (parts.length == 2) {
+                this.firstName = parts[0];
+                this.lastName = parts[1];
+            } else if (parts.length == 3) {
+                this.firstName = parts[0];
+                this.middleName = parts[1];
+                this.lastName = parts[2];
+            } else {
+                this.firstName = parts[0];
+                this.middleName = parts[1];
+                this.lastName = parts[2];
+                this.secondLastName = parts[3];
+            }
+        }
+    }
+
+    public String getFirstName() {
+        return firstName != null && !firstName.isEmpty() ? firstName : getUsername();
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getMiddleName() {
+        return middleName;
+    }
+
+    public void setMiddleName(String middleName) {
+        this.middleName = middleName;
+    }
+
+    public String getLastName() {
+        return lastName != null && !lastName.isEmpty() ? lastName : "Usuario";
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getSecondLastName() {
+        return secondLastName;
+    }
+
+    public void setSecondLastName(String secondLastName) {
+        this.secondLastName = secondLastName;
     }
 
     public String getEmail() {
@@ -136,12 +217,28 @@ public class User {
         this.maxStreak = maxStreak;
     }
 
+    public int getLives() {
+        return lives;
+    }
+
+    public void setLives(int lives) {
+        this.lives = Math.max(0, lives);
+    }
+
     public LocalDateTime getRegistrationDate() {
         return registrationDate;
     }
 
     public void setRegistrationDate(LocalDateTime registrationDate) {
         this.registrationDate = registrationDate;
+    }
+
+    public LocalDateTime getLastActivity() {
+        return lastActivity;
+    }
+
+    public void setLastActivity(LocalDateTime lastActivity) {
+        this.lastActivity = lastActivity;
     }
 
     /**
