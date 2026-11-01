@@ -606,30 +606,41 @@ public final class Theme {
      * Monograma circular con iniciales del usuario o símbolo del lenguaje.
      */
     public static JComponent createAvatarBadge(String initials, Color accent, int diameter) {
-        return new JComponent() {
-            {
-                setPreferredSize(new Dimension(diameter, diameter));
-                setMinimumSize(new Dimension(diameter, diameter));
-                setMaximumSize(new Dimension(diameter, diameter));
-            }
+        return new AvatarBadge(initials, accent, diameter);
+    }
 
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                enableAntialiasing(g2);
-                g2.setColor(withAlpha(accent, 42));
-                g2.fillOval(0, 0, diameter - 1, diameter - 1);
-                g2.setColor(withAlpha(accent, 140));
-                g2.drawOval(0, 0, diameter - 1, diameter - 1);
+    public static class AvatarBadge extends JComponent {
 
-                g2.setFont(new Font("Segoe UI", Font.BOLD, Math.max(11, diameter / 3)));
-                g2.setColor(brighten(accent, 0.35f));
-                FontMetrics fm = g2.getFontMetrics();
-                int tx = (diameter - fm.stringWidth(initials)) / 2;
-                int ty = (diameter - fm.getHeight()) / 2 + fm.getAscent();
-                g2.drawString(initials, tx, ty);
-                g2.dispose();
-            }
-        };
+        private static final long serialVersionUID = 1L;
+        private final String initials;
+        private final Color accent;
+        private final int diameter;
+
+        public AvatarBadge(String initials, Color accent, int diameter) {
+            this.initials = initials;
+            this.accent = accent;
+            this.diameter = diameter;
+            setPreferredSize(new Dimension(diameter, diameter));
+            setMinimumSize(new Dimension(diameter, diameter));
+            setMaximumSize(new Dimension(diameter, diameter));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            enableAntialiasing(g2);
+            g2.setColor(withAlpha(accent, 42));
+            g2.fillOval(0, 0, diameter - 1, diameter - 1);
+            g2.setColor(withAlpha(accent, 140));
+            g2.drawOval(0, 0, diameter - 1, diameter - 1);
+
+            g2.setFont(new Font("Segoe UI", Font.BOLD, Math.max(11, diameter / 3)));
+            g2.setColor(brighten(accent, 0.35f));
+            FontMetrics fm = g2.getFontMetrics();
+            int tx = (diameter - fm.stringWidth(initials)) / 2;
+            int ty = (diameter - fm.getHeight()) / 2 + fm.getAscent();
+            g2.drawString(initials, tx, ty);
+            g2.dispose();
+        }
     }
 }
