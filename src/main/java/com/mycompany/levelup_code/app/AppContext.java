@@ -1,0 +1,139 @@
+package com.mycompany.levelup_code.app;
+
+import com.mycompany.levelup_code.business.evaluator.ChallengeEvaluator;
+import com.mycompany.levelup_code.business.evaluator.CodeChallengeEvaluator;
+import com.mycompany.levelup_code.business.evaluator.QuizChallengeEvaluator;
+import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
+import com.mycompany.levelup_code.business.service.AchievementService;
+import com.mycompany.levelup_code.business.service.ChallengeService;
+import com.mycompany.levelup_code.business.service.ContentService;
+import com.mycompany.levelup_code.business.service.GamificationService;
+import com.mycompany.levelup_code.business.service.LevelPolicy;
+import com.mycompany.levelup_code.business.service.ProgressService;
+import com.mycompany.levelup_code.business.service.StandardLevelPolicy;
+import com.mycompany.levelup_code.business.service.UserService;
+import com.mycompany.levelup_code.data.connection.DatabaseConnection;
+import com.mycompany.levelup_code.data.dao.AchievementRepository;
+import com.mycompany.levelup_code.data.dao.ActivityRepository;
+import com.mycompany.levelup_code.data.dao.AttemptRepository;
+import com.mycompany.levelup_code.data.dao.ChallengeRepository;
+import com.mycompany.levelup_code.data.dao.ContentRepository;
+import com.mycompany.levelup_code.data.dao.ProgressRepository;
+import com.mycompany.levelup_code.data.dao.UserRepository;
+import com.mycompany.levelup_code.data.oracle.OracleAchievementRepository;
+import com.mycompany.levelup_code.data.oracle.OracleActivityRepository;
+import com.mycompany.levelup_code.data.oracle.OracleAttemptRepository;
+import com.mycompany.levelup_code.data.oracle.OracleChallengeRepository;
+import com.mycompany.levelup_code.data.oracle.OracleContentRepository;
+import com.mycompany.levelup_code.data.oracle.OracleProgressRepository;
+import com.mycompany.levelup_code.data.oracle.OracleUserRepository;
+import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.model.Role;
+import java.util.EnumMap;
+import java.util.Map;
+
+/**
+ * Contenedor de ensamblaje de dependencias de la aplicación (Inversión de Dependencias).
+ * Conecta automáticamente los repositorios Oracle JDBC con todos los servicios de negocio
+ * cuando la base de datos está disponible.
+ */
+public final class AppContext {
+
+    private static AppContext instance;
+
+    private final boolean oracleConnected;
+    private final UserRepository userRepository;
+    private final ContentRepository contentRepository;
+    private final ChallengeRepository challengeRepository;
+    private final AttemptRepository attemptRepository;
+    private final ProgressRepository progressRepository;
+    private final ActivityRepository activityRepository;
+    private final AchievementRepository achievementRepository;
+
+    private final UserService userService;
+    private final ContentService contentService;
+    private final AchievementService achievementService;
+    private final GamificationService gamificationService;
+    private final ProgressService progressService;
+    private final ChallengeService challengeService;
+    private final SimulatedCodeRunner codeRunner;
+
+    private AppContext() {
+        this.oracleConnected = DatabaseConnection.isDatabaseReady();
+        this.userRepository = new OracleUserRepository();
+        this.contentRepository = new OracleContentRepository();
+        this.challengeRepository = new OracleChallengeRepository();
+        this.attemptRepository = new OracleAttemptRepository();
+        this.progressRepository = new OracleProgressRepository();
+        this.activityRepository = new OracleActivityRepository();
+        this.achievementRepository = new OracleAchievementRepository();
+
+        Role studentRole = new Role(1, "Estudiante", "Acceso a cursos, retos y seguimiento de progreso");
+        LevelPolicy levelPolicy = new StandardLevelPolicy();
+        this.codeRunner = new SimulatedCodeRunner();
+
+        this.userService = new UserService(userRepository, studentRole);
+        this.contentService = new ContentService(contentRepository);
+        this.achievementService = new AchievementService(achievementRepository);
+        this.gamificationService = new GamificationService(
+                userRepository, activityRepository, levelPolicy, achievementService);
+        this.progressService = new ProgressService(
+                progressRepository, contentRepository, gamificationService);
+
+        Map<ChallengeType, ChallengeEvaluator> evaluators = new EnumMap<>(ChallengeType.class);
+        evaluators.put(ChallengeType.CODE, new CodeChallengeEvaluator(codeRunner));
+        evaluators.put(ChallengeType.QUIZ, new QuizChallengeEvaluator());
+
+        this.challengeService = new ChallengeService(
+                challengeRepository,
+                attemptRepository,
+                evaluators,
+                gamificationService,
+                achievementService
+        );
+    }
+
+    public static synchronized AppContext getInstance() {
+        if (instance == null) {
+            instance = new AppContext();
+        }
+        return instance;
+    }
+
+    public boolean isOracleConnected() {
+        return oracleConnected;
+    }
+
+    public UserService getUserService() {
+        return userService;
+    }
+
+    public ContentService getContentService() {
+        return contentService;
+    }
+
+    public AchievementService getAchievementService() {
+        return achievementService;
+    }
+
+    public GamificationService getGamificationService() {
+        return gamificationService;
+    }
+
+    public ProgressService getProgressService() {
+        return progressService;
+    }
+
+    public ChallengeService getChallengeService() {
+        return challengeService;
+    }
+
+    public ChallengeRepository getChallengeRepository() {
+        return challengeRepository;
+    }
+
+    public SimulatedCodeRunner getCodeRunner() {
+        return codeRunner;
+    }
+}
+
