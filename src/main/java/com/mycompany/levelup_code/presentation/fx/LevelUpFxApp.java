@@ -638,3 +638,4 @@ public class LevelUpFxApp extends Application {
         return box;
     }
 }
+
