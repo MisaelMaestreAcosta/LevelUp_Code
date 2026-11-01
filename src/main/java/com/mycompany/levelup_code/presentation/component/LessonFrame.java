@@ -23,6 +23,8 @@ import javax.swing.JTextArea;
  */
 public class LessonFrame extends JFrame {
 
+    private static final long serialVersionUID = 1L;
+
     private final User currentUser;
     private final Lesson currentLesson;
     private final Runnable onProgressCallback;

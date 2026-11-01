@@ -6,7 +6,6 @@ import com.mycompany.levelup_code.domain.model.Role;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.presentation.controller.AuthController;
 import java.awt.BorderLayout;
-import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -34,6 +33,8 @@ import javax.swing.SwingUtilities;
  * y autenticación respaldada por {@link AuthController} y {@link UserService}.
  */
 public class LoginFrame extends JFrame {
+
+    private static final long serialVersionUID = 1L;
 
     private final AuthController authController;
     private final User demoStudent;

@@ -36,7 +36,7 @@ public class Language {
     }
 
     /**
-     * Constructor con parámetros
+     * Constructor con parámetros completo
      *
      * @param id Identificador único
      * @param name Nombre del lenguaje
@@ -51,6 +51,18 @@ public class Language {
         this.icon = icon;
         this.active = active;
         this.modules = new ArrayList<>();
+    }
+
+    /**
+     * Constructor con parámetros sin icono explícito
+     *
+     * @param id Identificador único
+     * @param name Nombre del lenguaje
+     * @param description Descripción del lenguaje
+     * @param active Estado de actividad
+     */
+    public Language(int id, String name, String description, boolean active) {
+        this(id, name, description, null, active);
     }
 
     /**

@@ -25,3 +25,7 @@ replay_pid*
 
 # Maven build target directory
 target/
+
+# IDE metadata
+.idea/
+*.iml

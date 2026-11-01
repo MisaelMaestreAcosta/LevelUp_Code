@@ -9,13 +9,11 @@ import com.mycompany.levelup_code.domain.model.User;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -38,6 +36,8 @@ import javax.swing.event.DocumentListener;
  * casos de prueba visibles/ocultos (RF-06, RF-07) y consola de evaluación en vivo.
  */
 public class ChallengeFrame extends JFrame {
+
+    private static final long serialVersionUID = 1L;
 
     private final User currentUser;
     private final List<Challenge> availableChallenges;
@@ -650,6 +650,8 @@ public class ChallengeFrame extends JFrame {
      * Margen izquierdo con numeración de líneas sincronizada con el JTextArea del editor.
      */
     private static final class LineNumberGutter extends JComponent {
+
+        private static final long serialVersionUID = 1L;
 
         private final JTextArea textArea;
 

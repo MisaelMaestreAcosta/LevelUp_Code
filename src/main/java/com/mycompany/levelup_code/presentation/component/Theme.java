@@ -184,6 +184,8 @@ public final class Theme {
      */
     public static class RoundedPanel extends JPanel {
 
+        private static final long serialVersionUID = 1L;
+
         private Color fillColor;
         private Color borderColor;
         private Color accentStripe;
@@ -251,6 +253,8 @@ public final class Theme {
      * Botón pintado por completo mediante Graphics2D para garantizar legibilidad en cualquier SO.
      */
     public static class ModernButton extends JButton {
+
+        private static final long serialVersionUID = 1L;
 
         private Color baseColor;
         private Color hoverColor;
@@ -342,6 +346,8 @@ public final class Theme {
      */
     public static class PillBadge extends JLabel {
 
+        private static final long serialVersionUID = 1L;
+
         private Color accent;
 
         public PillBadge(String text, Color accent) {
@@ -380,6 +386,8 @@ public final class Theme {
      * Barra de progreso personalizada con esquinas redondeadas.
      */
     public static class ModernProgressBar extends JComponent {
+
+        private static final long serialVersionUID = 1L;
 
         private int value;
         private int maximum;

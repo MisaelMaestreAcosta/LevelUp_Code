@@ -39,6 +39,8 @@ import javax.swing.SwingUtilities;
  */
 public class DashboardFrame extends JFrame {
 
+    private static final long serialVersionUID = 1L;
+
     private final User currentUser;
     private final List<Language> catalogLanguages = new ArrayList<>();
     private final List<Lesson> javaLessons = new ArrayList<>();
