@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.User;
@@ -19,7 +20,7 @@ import javax.swing.JTextArea;
 
 /**
  * Visor interactivo de lección con teoría estructurada, comparador sintáctico
- * entre lenguajes (Java, Python, C++) y acceso directo al laboratorio de retos.
+ * entre lenguajes (Java, Python, C++) y persistencia en {@code Progreso_Leccion}.
  */
 public class LessonFrame extends JFrame {
 
@@ -46,8 +47,22 @@ public class LessonFrame extends JFrame {
         this.currentUser = user;
         this.currentLesson = lesson;
         this.onProgressCallback = onProgressCallback;
+        markLessonStartedInOracle();
         initComponents();
         switchComparativeSnippet("JAVA");
+    }
+
+    private void markLessonStartedInOracle() {
+        if (currentUser == null || currentUser.getId() <= 0 || currentLesson == null || currentLesson.getId() <= 0) {
+            return;
+        }
+        AppContext ctx = AppContext.getInstance();
+        if (ctx.isOracleConnected()) {
+            try {
+                ctx.getProgressService().startLesson(currentUser, currentLesson.getId());
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void initComponents() {
@@ -158,7 +173,7 @@ public class LessonFrame extends JFrame {
         JPanel langSwitch = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         langSwitch.setOpaque(false);
 
-        btnTabJava = new Theme.ModernButton("Java", Theme.ACCENT_INDIGO, Theme.ACCENT_INDIGO_HOVER, Color.WHITE, null);
+        btnTabJava = new Theme.ModernButton("Java", Theme.LANG_JAVA, Theme.darken(Theme.LANG_JAVA, 0.12f), Color.WHITE, null);
         btnTabPython = new Theme.ModernButton("Python", Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
         btnTabCpp = new Theme.ModernButton("C++", Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
 
@@ -221,15 +236,29 @@ public class LessonFrame extends JFrame {
                 lessonCompleted = true;
                 btnMarkComplete.setEnabled(false);
                 btnMarkComplete.setText("Lección Completada");
-                if (currentUser != null && reward > 0) {
+
+                AppContext ctx = AppContext.getInstance();
+                boolean persistedInOracle = false;
+                if (ctx.isOracleConnected() && currentUser != null && currentUser.getId() > 0
+                        && currentLesson != null && currentLesson.getId() > 0) {
+                    try {
+                        ctx.getProgressService().startLesson(currentUser, currentLesson.getId());
+                        ctx.getProgressService().completeLesson(currentUser, currentLesson.getId());
+                        persistedInOracle = true;
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                if (!persistedInOracle && currentUser != null && reward > 0) {
                     currentUser.addExperience(reward);
                     currentUser.setLevel(Math.max(1, 1 + currentUser.getTotalExp() / 300));
                 }
+
                 if (onProgressCallback != null) {
                     onProgressCallback.run();
                 }
                 lblStatusInfo.setForeground(Theme.ACCENT_GREEN);
-                lblStatusInfo.setText("¡Lección aprobada! Se sumaron +" + reward + " XP a tu progreso.");
+                lblStatusInfo.setText("¡Lección aprobada! Estado actualizado a COMPLETADA en Progreso_Leccion (+" + reward + " XP).");
             }
         });
 
@@ -254,7 +283,7 @@ public class LessonFrame extends JFrame {
 
     private void switchComparativeSnippet(String lang) {
         if ("JAVA".equals(lang)) {
-            btnTabJava.setPalette(Theme.ACCENT_INDIGO, Theme.ACCENT_INDIGO_HOVER, Color.WHITE, null);
+            btnTabJava.setPalette(Theme.LANG_JAVA, Theme.darken(Theme.LANG_JAVA, 0.12f), Color.WHITE, null);
             btnTabPython.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnTabCpp.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtComparativeCode.setText(
@@ -269,9 +298,10 @@ public class LessonFrame extends JFrame {
                     + "    }\n"
                     + "}"
             );
+            lblComparisonCaption.setForeground(Theme.LANG_JAVA);
             lblComparisonCaption.setText("Java usa 'extends' y '@Override'; el despacho dinámico es automático.");
         } else if ("PYTHON".equals(lang)) {
-            btnTabPython.setPalette(Theme.ACCENT_GREEN, Theme.ACCENT_GREEN_HOVER, Color.WHITE, null);
+            btnTabPython.setPalette(Theme.LANG_PYTHON, Theme.darken(Theme.LANG_PYTHON, 0.12f), Color.WHITE, null);
             btnTabJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnTabCpp.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtComparativeCode.setText(
@@ -285,9 +315,10 @@ public class LessonFrame extends JFrame {
                     + "    def emitir_sonido(self) -> str:\n"
                     + "        return \"Guau\""
             );
+            lblComparisonCaption.setForeground(Theme.LANG_PYTHON);
             lblComparisonCaption.setText("Python emplea decoradores '@abstractmethod' y resolución dinámica.");
         } else {
-            btnTabCpp.setPalette(Theme.ACCENT_VIOLET, Theme.brighten(Theme.ACCENT_VIOLET, 0.15f), Color.WHITE, null);
+            btnTabCpp.setPalette(Theme.LANG_CPP, Theme.darken(Theme.LANG_CPP, 0.12f), Color.WHITE, null);
             btnTabJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnTabPython.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtComparativeCode.setText(
@@ -305,6 +336,7 @@ public class LessonFrame extends JFrame {
                     + "    }\n"
                     + "};"
             );
+            lblComparisonCaption.setForeground(Theme.LANG_CPP);
             lblComparisonCaption.setText("C++ requiere 'virtual' explícito y destructor virtual en la clase base.");
         }
     }

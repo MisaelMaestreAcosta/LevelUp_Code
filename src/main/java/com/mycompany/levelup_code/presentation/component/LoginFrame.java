@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.service.UserService;
 import com.mycompany.levelup_code.data.dao.UserRepository;
 import com.mycompany.levelup_code.domain.model.Role;
@@ -30,15 +31,14 @@ import javax.swing.SwingUtilities;
 
 /**
  * Ventana de acceso y registro con vista interactiva de código comparativo
- * y autenticación respaldada por {@link AuthController} y {@link UserService}.
+ * y autenticación conectada a Oracle 18c XE mediante {@link AppContext}.
  */
 public class LoginFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
     private final AuthController authController;
-    private final User demoStudent;
-    private final User demoAdmin;
+    private final boolean oracleConnected;
 
     private boolean registerMode = false;
     private JPanel usernameRow;
@@ -60,33 +60,39 @@ public class LoginFrame extends JFrame {
     private Theme.ModernButton btnLangCpp;
 
     public LoginFrame() {
-        Role studentRole = new Role(1, "Estudiante", "Acceso a cursos, retos y seguimiento de progreso");
-        Role adminRole = new Role(2, "Administrador", "Gestión integral de lenguajes, módulos, retos y logros");
+        AppContext ctx = AppContext.getInstance();
+        this.oracleConnected = ctx.isOracleConnected();
 
-        InMemoryAuthRepository repository = new InMemoryAuthRepository();
-        UserService userService = new UserService(repository, studentRole);
-        this.authController = new AuthController(userService);
+        if (this.oracleConnected) {
+            this.authController = new AuthController(ctx.getUserService());
+        } else {
+            Role studentRole = new Role(1, "Estudiante", "Acceso a cursos, retos y seguimiento de progreso");
+            Role adminRole = new Role(2, "Administrador", "Gestión integral de lenguajes, módulos, retos y logros");
 
-        // Semilla inicial de cuentas verificables con PBKDF2
-        this.demoStudent = userService.register("Estudiante", "estudiante@levelup.edu.co", "estudiante123");
-        this.demoStudent.setExperience(1450);
-        this.demoStudent.setLevel(5);
-        this.demoStudent.setCurrentStreak(7);
-        this.demoStudent.setMaxStreak(12);
+            InMemoryAuthRepository repository = new InMemoryAuthRepository();
+            UserService fallbackService = new UserService(repository, studentRole);
+            this.authController = new AuthController(fallbackService);
 
-        this.demoAdmin = userService.register("Admin", "admin@levelup.edu.co", "admin12345");
-        this.demoAdmin.setRole(adminRole);
-        this.demoAdmin.setExperience(4200);
-        this.demoAdmin.setLevel(10);
-        this.demoAdmin.setCurrentStreak(21);
-        this.demoAdmin.setMaxStreak(30);
+            User demoStudent = fallbackService.register("Estudiante", "estudiante@levelup.edu.co", "estudiante123");
+            demoStudent.setExperience(1450);
+            demoStudent.setLevel(5);
+            demoStudent.setCurrentStreak(7);
+            demoStudent.setMaxStreak(12);
+
+            User demoAdmin = fallbackService.register("Admin", "admin@levelup.edu.co", "admin12345");
+            demoAdmin.setRole(adminRole);
+            demoAdmin.setExperience(4200);
+            demoAdmin.setLevel(10);
+            demoAdmin.setCurrentStreak(21);
+            demoAdmin.setMaxStreak(30);
+        }
 
         initComponents();
     }
 
     private void initComponents() {
         setTitle("LevelUp Code — Plataforma de Aprendizaje Comparativo");
-        setSize(1040, 660);
+        setSize(1060, 670);
         setMinimumSize(new Dimension(940, 610));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -103,7 +109,7 @@ public class LoginFrame extends JFrame {
 
     private JPanel buildLeftShowcasePane() {
         JPanel leftPane = new JPanel(new BorderLayout(0, 16));
-        leftPane.setPreferredSize(new Dimension(470, 0));
+        leftPane.setPreferredSize(new Dimension(480, 0));
         leftPane.setBackground(Theme.BG_SIDEBAR);
         leftPane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.BORDER_SUBTLE),
@@ -136,9 +142,9 @@ public class LoginFrame extends JFrame {
         lblHero2.setForeground(Theme.ACCENT_INDIGO);
         lblHero2.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel lblDesc = new JLabel("<html><body style='width:315px;color:#334155;'>"
+        JLabel lblDesc = new JLabel("<html><body style='width:325px;color:#334155;'>"
                 + "Compara estructuras de datos, herencia y algoritmos en tiempo real entre "
-                + "<b>Java</b>, <b>Python</b> y <b>C++</b> con validación automática."
+                + "<b>Java</b>, <b>Python</b> y <b>C++</b> con validación dinámica contra <b>Casos_Prueba</b>."
                 + "</body></html>");
         lblDesc.setFont(Theme.FONT_REGULAR);
         lblDesc.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -153,7 +159,7 @@ public class LoginFrame extends JFrame {
 
         leftPane.add(topSection, BorderLayout.NORTH);
 
-        // Tarjeta interactiva de comparación de código en vivo
+        // Tarjeta interactiva de comparación de código en vivo con identidad cromática por lenguaje
         Theme.RoundedPanel codeCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
         codeCard.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
 
@@ -167,7 +173,7 @@ public class LoginFrame extends JFrame {
 
         JPanel langTabs = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         langTabs.setOpaque(false);
-        btnLangJava = new Theme.ModernButton("Java", Theme.ACCENT_INDIGO, Theme.ACCENT_INDIGO_HOVER, Color.WHITE, null);
+        btnLangJava = new Theme.ModernButton("Java", Theme.LANG_JAVA, Theme.darken(Theme.LANG_JAVA, 0.12f), Color.WHITE, null);
         btnLangPython = new Theme.ModernButton("Python", Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
         btnLangCpp = new Theme.ModernButton("C++", Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
 
@@ -214,14 +220,18 @@ public class LoginFrame extends JFrame {
 
         leftPane.add(codeCard, BorderLayout.CENTER);
 
-        // Pie de seguridad sin códigos de requerimiento
-        JPanel footer = new JPanel(new BorderLayout());
+        // Pie de estado de base de datos Oracle y seguridad PBKDF2
+        JPanel footer = new JPanel(new BorderLayout(8, 0));
         footer.setOpaque(false);
-        JLabel lblSecurity = new JLabel("Autenticación segura · Hash PBKDF2-HMAC-SHA256");
+        JLabel lblSecurity = new JLabel("Hash PBKDF2-HMAC-SHA256");
         lblSecurity.setFont(Theme.FONT_SMALL);
         lblSecurity.setForeground(Theme.TEXT_MUTED);
         lblSecurity.setIcon(Theme.createVectorIcon(Theme.IconKind.SHIELD, 14, Theme.ACCENT_GREEN));
         footer.add(lblSecurity, BorderLayout.WEST);
+
+        String dbBadgeText = oracleConnected ? "ORACLE 18C XE · CONECTADO" : "MODO LOCAL EN MEMORIA";
+        Color dbBadgeColor = oracleConnected ? Theme.ACCENT_GREEN : Theme.ACCENT_AMBER;
+        footer.add(Theme.createPillBadge(dbBadgeText, dbBadgeColor), BorderLayout.EAST);
 
         leftPane.add(footer, BorderLayout.SOUTH);
         return leftPane;
@@ -275,7 +285,7 @@ public class LoginFrame extends JFrame {
         lblUsername.setForeground(Theme.TEXT_SECONDARY);
         lblUsername.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        txtUsername = Theme.createStyledTextField("Ej. Juan Esteban Vera");
+        txtUsername = Theme.createStyledTextField("Ej. Estudiante Nuevo");
         txtUsername.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         txtUsername.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -320,7 +330,7 @@ public class LoginFrame extends JFrame {
         btnSubmit.addActionListener(e -> handleAuthSubmit());
 
         // Sección de perfiles de acceso rápido
-        JPanel quickHeader = Theme.createSectionHeader("Perfiles de Acceso Rápido", "1 clic");
+        JPanel quickHeader = Theme.createSectionHeader("Perfiles de Acceso Rápido (Oracle XEPDB1)", "1 clic");
         quickHeader.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
         quickHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -339,7 +349,7 @@ public class LoginFrame extends JFrame {
         ));
         demoCardsGrid.add(createQuickProfileCard(
                 "Admin",
-                "Administrador · Nivel 10",
+                "Administrador · Gestión CRUD",
                 "ADMIN",
                 Theme.ACCENT_GREEN,
                 "admin@levelup.edu.co",
@@ -437,7 +447,7 @@ public class LoginFrame extends JFrame {
 
     private void selectLanguagePreview(String lang) {
         if ("JAVA".equals(lang)) {
-            btnLangJava.setPalette(Theme.ACCENT_INDIGO, Theme.ACCENT_INDIGO_HOVER, Color.WHITE, null);
+            btnLangJava.setPalette(Theme.LANG_JAVA, Theme.darken(Theme.LANG_JAVA, 0.12f), Color.WHITE, null);
             btnLangPython.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnLangCpp.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtCodePreview.setText(
@@ -454,9 +464,10 @@ public class LoginFrame extends JFrame {
                     + "    }\n"
                     + "}"
             );
-            lblPreviewNote.setText("Java 21 · Tipado estático y aritmética segura.");
+            lblPreviewNote.setForeground(Theme.LANG_JAVA);
+            lblPreviewNote.setText("Java 21 · Tipado estático y aritmética segura (#E76F00).");
         } else if ("PYTHON".equals(lang)) {
-            btnLangPython.setPalette(Theme.ACCENT_GREEN, Theme.ACCENT_GREEN_HOVER, Color.WHITE, null);
+            btnLangPython.setPalette(Theme.LANG_PYTHON, Theme.darken(Theme.LANG_PYTHON, 0.12f), Color.WHITE, null);
             btnLangJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnLangCpp.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtCodePreview.setText(
@@ -472,9 +483,10 @@ public class LoginFrame extends JFrame {
                     + "            high = mid - 1\n"
                     + "    return -1"
             );
-            lblPreviewNote.setText("Python 3.12 · División entera // y sintaxis limpia.");
+            lblPreviewNote.setForeground(Theme.LANG_PYTHON);
+            lblPreviewNote.setText("Python 3.12 · División entera // y sintaxis limpia (#3776AB).");
         } else {
-            btnLangCpp.setPalette(Theme.ACCENT_VIOLET, Theme.brighten(Theme.ACCENT_VIOLET, 0.15f), Color.WHITE, null);
+            btnLangCpp.setPalette(Theme.LANG_CPP, Theme.darken(Theme.LANG_CPP, 0.12f), Color.WHITE, null);
             btnLangJava.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             btnLangPython.setPalette(Theme.SURFACE_ELEVATED, Theme.SURFACE_LIGHT, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             txtCodePreview.setText(
@@ -490,7 +502,8 @@ public class LoginFrame extends JFrame {
                     + "    return -1;\n"
                     + "}"
             );
-            lblPreviewNote.setText("C++ 20 · Referencia constante sin copia en memoria.");
+            lblPreviewNote.setForeground(Theme.LANG_CPP);
+            lblPreviewNote.setText("C++ 20 · Referencia constante sin copia en memoria (#00599C).");
         }
     }
 
@@ -503,8 +516,8 @@ public class LoginFrame extends JFrame {
             btnTabRegister.setPalette(Theme.ACCENT_INDIGO, Theme.ACCENT_INDIGO_HOVER, Color.WHITE, null);
             btnTabLogin.setPalette(Theme.SURFACE, Theme.SURFACE_ELEVATED, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
             lblFormTitle.setText("Crear nueva cuenta de estudiante");
-            lblFormSubtitle.setText("Regístrate para inscribirte en Java, Python y C++ desde cero.");
-            btnSubmit.setText("Registrar y Entrar");
+            lblFormSubtitle.setText("Se registrará en la tabla Usuarios con contraseña cifrada en PBKDF2.");
+            btnSubmit.setText("Registrar en Oracle y Entrar");
             txtEmail.setText("");
             txtPassword.setText("");
             txtUsername.requestFocusInWindow();
@@ -527,10 +540,6 @@ public class LoginFrame extends JFrame {
             if (registerMode) {
                 String username = txtUsername.getText() != null ? txtUsername.getText().trim() : "";
                 User created = authController.register(username, email, password);
-                created.setExperience(100);
-                created.setLevel(1);
-                created.setCurrentStreak(1);
-                created.setMaxStreak(1);
                 openDashboard(created);
             } else {
                 Optional<User> authResult = authController.login(email, password);
@@ -541,7 +550,7 @@ public class LoginFrame extends JFrame {
                     lblFeedback.setText("Credenciales incorrectas. Verifica tu correo o usa un perfil rápido.");
                 }
             }
-        } catch (IllegalArgumentException ex) {
+        } catch (Exception ex) {
             lblFeedback.setForeground(Theme.ACCENT_ROSE);
             lblFeedback.setText(ex.getMessage());
         }
@@ -554,7 +563,7 @@ public class LoginFrame extends JFrame {
     }
 
     /**
-     * Repositorio en memoria para respaldar la sesión y registro mientras no haya conexión activa a Oracle.
+     * Repositorio en memoria de respaldo en caso de que el servicio local de Oracle esté detenido.
      */
     private static final class InMemoryAuthRepository implements UserRepository {
 
