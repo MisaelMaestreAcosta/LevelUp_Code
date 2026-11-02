@@ -326,7 +326,9 @@ public class DashboardFrame extends JFrame {
         workspaceContainer.add(buildCoursesWorkspaceView(), "COURSES");
         workspaceContainer.add(buildComparatorWorkspaceView(), "COMPARATOR");
         workspaceContainer.add(buildAchievementsWorkspaceView(), "ACHIEVEMENTS");
-        workspaceContainer.add(buildAdminCrudWorkspaceView(), "ADMIN");
+        if (currentUser != null && currentUser.isAdministrator()) {
+            workspaceContainer.add(buildAdminCrudWorkspaceView(), "ADMIN");
+        }
 
         centerShell.add(workspaceContainer, BorderLayout.CENTER);
         root.add(centerShell, BorderLayout.CENTER);
@@ -386,12 +388,15 @@ public class DashboardFrame extends JFrame {
         navAchievementsBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         navAchievementsBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        navAdminBtn = new Theme.ModernButton(
+        if (currentUser != null && currentUser.isAdministrator()) {
+            navAdminBtn = new Theme.ModernButton(
                 "Gestión de Retos (Oracle)", Theme.SURFACE, Theme.SURFACE_ELEVATED, Theme.TEXT_SECONDARY, Theme.BORDER_SUBTLE);
         navAdminBtn.setIcon(Theme.createVectorIcon(Theme.IconKind.SHIELD, 16, Theme.ACCENT_GREEN));
         navAdminBtn.setHorizontalAlignment(SwingUtilities.LEFT);
         navAdminBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
-        navAdminBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+            navAdminBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+            navAdminBtn.addActionListener(e -> switchWorkspaceView("ADMIN"));
+        }
 
         JButton btnQuickLab = Theme.createGhostButton("Abrir Laboratorio de Retos", Theme.ACCENT_GREEN);
         btnQuickLab.setIcon(Theme.createVectorIcon(Theme.IconKind.PLAY, 14, Theme.ACCENT_GREEN));
@@ -405,7 +410,6 @@ public class DashboardFrame extends JFrame {
             refreshAchievementsGrid();
             switchWorkspaceView("ACHIEVEMENTS");
         });
-        navAdminBtn.addActionListener(e -> switchWorkspaceView("ADMIN"));
         btnQuickLab.addActionListener(e -> {
             Lesson l = !javaLessons.isEmpty() ? javaLessons.get(0) : null;
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
@@ -424,8 +428,10 @@ public class DashboardFrame extends JFrame {
         navColumn.add(navComparatorBtn);
         navColumn.add(Box.createVerticalStrut(8));
         navColumn.add(navAchievementsBtn);
-        navColumn.add(Box.createVerticalStrut(8));
-        navColumn.add(navAdminBtn);
+        if (navAdminBtn != null) {
+            navColumn.add(Box.createVerticalStrut(8));
+            navColumn.add(navAdminBtn);
+        }
         navColumn.add(Box.createVerticalStrut(16));
         navColumn.add(btnQuickLab);
 
@@ -1332,6 +1338,12 @@ public class DashboardFrame extends JFrame {
     }
 
     private void handleCreateAdminChallenge() {
+        if (currentUser == null || !currentUser.isAdministrator()) {
+            lblAdminStatus.setForeground(Theme.ACCENT_ROSE);
+            lblAdminStatus.setText("Acceso denegado: Se requiere rol de Administrador.");
+            return;
+        }
+
         int lessonIdx = cmbAdminLesson.getSelectedIndex();
         Lesson targetLesson = (lessonIdx >= 0 && lessonIdx < allLessonsForAdmin.size())
                 ? allLessonsForAdmin.get(lessonIdx)
@@ -1360,12 +1372,7 @@ public class DashboardFrame extends JFrame {
 
         if (oracleConnected && targetLesson != null && targetLesson.getId() > 0) {
             try {
-                User adminActor = new User();
-                adminActor.setId(currentUser.getId() > 0 ? currentUser.getId() : 2);
-                adminActor.setUsername("Admin");
-                adminActor.setRole(new Role(2, "Administrador", "Gestión CRUD"));
-
-                Challenge saved = AppContext.getInstance().getContentService().createChallenge(adminActor, newCh);
+                Challenge saved = AppContext.getInstance().getContentService().createChallenge(currentUser, newCh);
                 targetLesson.addChallenge(saved);
                 lblAdminStatus.setForeground(Theme.ACCENT_GREEN);
                 lblAdminStatus.setText("¡Reto #" + saved.getId() + " guardado en Retos, Reto_Codigo y Casos_Prueba en Oracle!");
@@ -1375,6 +1382,7 @@ public class DashboardFrame extends JFrame {
             } catch (Exception ex) {
                 lblAdminStatus.setForeground(Theme.ACCENT_ROSE);
                 lblAdminStatus.setText("Aviso: " + ex.getMessage());
+                return;
             }
         }
 
@@ -1387,6 +1395,9 @@ public class DashboardFrame extends JFrame {
     }
 
     private void switchWorkspaceView(String cardKey) {
+        if ("ADMIN".equals(cardKey) && (currentUser == null || !currentUser.isAdministrator())) {
+            return;
+        }
         workspaceCardLayout.show(workspaceContainer, cardKey);
 
         navCoursesBtn.setPalette(
@@ -1407,12 +1418,14 @@ public class DashboardFrame extends JFrame {
                 "ACHIEVEMENTS".equals(cardKey) ? Color.WHITE : Theme.TEXT_SECONDARY,
                 "ACHIEVEMENTS".equals(cardKey) ? null : Theme.BORDER_SUBTLE
         );
-        navAdminBtn.setPalette(
+        if (navAdminBtn != null) {
+            navAdminBtn.setPalette(
                 "ADMIN".equals(cardKey) ? Theme.ACCENT_INDIGO : Theme.SURFACE,
                 "ADMIN".equals(cardKey) ? Theme.ACCENT_INDIGO_HOVER : Theme.SURFACE_ELEVATED,
                 "ADMIN".equals(cardKey) ? Color.WHITE : Theme.TEXT_SECONDARY,
                 "ADMIN".equals(cardKey) ? null : Theme.BORDER_SUBTLE
-        );
+            );
+        }
     }
 
     private void onChallengeOrLessonCompleted() {

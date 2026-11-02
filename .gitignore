@@ -29,3 +29,6 @@ target/
 # IDE metadata
 .idea/
 *.iml
+
+# Credenciales locales de base de datos
+src/main/resources/db.properties
