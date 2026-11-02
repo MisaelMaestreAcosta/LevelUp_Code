@@ -43,7 +43,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
 # Compilar el proyecto con Java 21
 mvn clean compile
 
-# Ejecutar la aplicación de escritorio Swing/JavaFX
+# Ejecutar la aplicación de escritorio en JavaFX 21 + CSS
 mvn exec:java
 ```
 

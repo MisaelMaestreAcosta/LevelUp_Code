@@ -8,38 +8,31 @@ import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
-import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
+import java.util.Optional;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 /**
- * Entorno interactivo de resolución de retos (Código y Quiz) con numeración de líneas,
- * casos de prueba visibles/ocultos y motor de evaluación dinámica conectado a Casos_Prueba.
+ * Entorno interactivo de resolución de retos (Código y Quiz) en JavaFX + CSS ({@code /styles/levelup.css})
+ * con numeración de líneas reactiva, casos de prueba visibles/ocultos y motor de evaluación
+ * dinámica conectado a {@code Casos_Prueba} e {@code Intentos} en Oracle Database.
  */
-public class ChallengeFrame extends JFrame {
-
-    private static final long serialVersionUID = 1L;
+public class ChallengeFrame extends Stage {
 
     private final User currentUser;
     private final List<Challenge> availableChallenges;
@@ -50,27 +43,28 @@ public class ChallengeFrame extends JFrame {
     private boolean xpAwardedForCurrent = false;
     private int selectedQuizIndex = -1;
 
-    private JLabel lblChallengeTitle;
-    private JLabel lblStatement;
-    private Theme.PillBadge badgeType;
-    private Theme.PillBadge badgeReward;
-    private JPanel centerCardPanel;
-    private CardLayout centerCardLayout;
+    private Label lblChallengeTitle;
+    private Label lblStatement;
+    private Label badgeType;
+    private Label badgeReward;
+    private StackPane centerCardPane;
+    private VBox codeEditorCard;
+    private VBox quizCard;
 
-    // Editor de código
-    private JTextArea txtEditor;
-    private LineNumberGutter lineGutter;
+    // Editor de código y numeración de líneas
+    private TextArea txtEditor;
+    private TextArea txtLineGutter;
 
-    // Panel de opciones Quiz
-    private JPanel quizOptionsContainer;
-    private final List<Theme.RoundedPanel> quizOptionCards = new ArrayList<>();
+    // Opciones de Quiz
+    private VBox quizOptionsContainer;
+    private final List<HBox> quizOptionCards = new ArrayList<>();
 
     // Panel lateral de casos de prueba y consola
-    private JPanel testCasesListPanel;
-    private final List<Theme.PillBadge> testCaseStatusBadges = new ArrayList<>();
-    private JTextArea txtConsoleOutput;
-    private JLabel lblExecutionMetrics;
-    private JLabel lblResultBanner;
+    private VBox testCasesListBox;
+    private final List<Label> testCaseStatusBadges = new ArrayList<>();
+    private TextArea txtConsoleOutput;
+    private Label lblExecutionMetrics;
+    private Label lblResultBanner;
 
     public ChallengeFrame() {
         this(null, createDefaultCodeChallenge(), null);
@@ -101,9 +95,18 @@ public class ChallengeFrame extends JFrame {
         loadChallengeIntoView(this.activeChallenge);
     }
 
+    public void setVisible(boolean visible) {
+        if (visible) {
+            show();
+            toFront();
+        } else {
+            close();
+        }
+    }
+
     private static CodeChallenge createDefaultCodeChallenge() {
         if (AppContext.getInstance().isOracleConnected()) {
-            java.util.Optional<Challenge> fromDb = AppContext.getInstance()
+            Optional<Challenge> fromDb = AppContext.getInstance()
                     .getChallengeRepository().findById(101);
             if (fromDb.isPresent() && fromDb.get() instanceof CodeChallenge) {
                 return (CodeChallenge) fromDb.get();
@@ -134,7 +137,7 @@ public class ChallengeFrame extends JFrame {
 
     private static QuizChallenge createDefaultQuizChallenge() {
         if (AppContext.getInstance().isOracleConnected()) {
-            java.util.Optional<Challenge> fromDb = AppContext.getInstance()
+            Optional<Challenge> fromDb = AppContext.getInstance()
                     .getChallengeRepository().findById(102);
             if (fromDb.isPresent() && fromDb.get() instanceof QuizChallenge) {
                 return (QuizChallenge) fromDb.get();
@@ -159,273 +162,253 @@ public class ChallengeFrame extends JFrame {
 
     private void initComponents() {
         setTitle("LevelUp Code — Laboratorio de Evaluación de Retos");
-        setSize(1120, 700);
-        setMinimumSize(new Dimension(960, 620));
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLocationRelativeTo(null);
+        setMinWidth(980);
+        setMinHeight(640);
 
-        JPanel root = new JPanel(new BorderLayout(0, 14));
-        root.setBackground(Theme.BG_DARK);
-        root.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+        BorderPane root = new BorderPane();
+        root.getStyleClass().add("root-shell");
+        root.setPadding(new Insets(18, 22, 18, 22));
 
-        root.add(buildTopHeaderBar(), BorderLayout.NORTH);
-        root.add(buildWorkspaceSplit(), BorderLayout.CENTER);
-        root.add(buildBottomActionBar(), BorderLayout.SOUTH);
+        VBox topHeader = buildTopHeaderBar();
+        BorderPane.setMargin(topHeader, new Insets(0, 0, 14, 0));
+        root.setTop(topHeader);
 
-        setContentPane(root);
+        HBox workspaceSplit = buildWorkspaceSplit();
+        root.setCenter(workspaceSplit);
+
+        HBox bottomBar = buildBottomActionBar();
+        BorderPane.setMargin(bottomBar, new Insets(14, 0, 0, 0));
+        root.setBottom(bottomBar);
+
+        Scene scene = new Scene(root, 1140, 720);
+        Theme.applyCss(scene);
+        setScene(scene);
     }
 
-    private JPanel buildTopHeaderBar() {
-        Theme.RoundedPanel headerCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
-        headerCard.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+    private VBox buildTopHeaderBar() {
+        VBox headerCard = new VBox(8);
+        headerCard.getStyleClass().add("surface-card");
 
-        JPanel topRow = new JPanel(new BorderLayout(16, 0));
-        topRow.setOpaque(false);
+        HBox topRow = new HBox(10);
+        topRow.setAlignment(Pos.CENTER_LEFT);
 
-        JPanel titleCluster = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        titleCluster.setOpaque(false);
+        lblChallengeTitle = new Label();
+        lblChallengeTitle.getStyleClass().add("page-title");
+        lblChallengeTitle.setGraphic(Theme.createIcon(Theme.IconKind.CODE, 20, Theme.HEX_INDIGO));
+        lblChallengeTitle.setGraphicTextGap(8);
 
-        lblChallengeTitle = new JLabel();
-        lblChallengeTitle.setFont(Theme.FONT_TITLE);
-        lblChallengeTitle.setForeground(Theme.TEXT_PRIMARY);
-        lblChallengeTitle.setIcon(Theme.createVectorIcon(Theme.IconKind.CODE, 20, Theme.ACCENT_INDIGO));
+        badgeType = Theme.createPillBadge("CÓDIGO", "badge-indigo");
+        badgeReward = Theme.createPillBadge("+60 XP", "badge-amber");
 
-        badgeType = new Theme.PillBadge("CÓDIGO", Theme.ACCENT_INDIGO);
-        badgeReward = new Theme.PillBadge("+60 XP", Theme.ACCENT_AMBER);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        titleCluster.add(lblChallengeTitle);
-        titleCluster.add(badgeType);
-        titleCluster.add(badgeReward);
+        topRow.getChildren().addAll(lblChallengeTitle, badgeType, badgeReward, spacer);
 
-        topRow.add(titleCluster, BorderLayout.CENTER);
-
-        // Selector rápido entre retos de la lección
         if (availableChallenges.size() > 1) {
-            JPanel switcher = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-            switcher.setOpaque(false);
-            JLabel lblSwitch = new JLabel("Cambiar ejercicio:");
-            lblSwitch.setFont(Theme.FONT_SMALL);
-            lblSwitch.setForeground(Theme.TEXT_MUTED);
-            switcher.add(lblSwitch);
+            HBox switcher = new HBox(8);
+            switcher.setAlignment(Pos.CENTER_RIGHT);
+            Label lblSwitch = new Label("Cambiar ejercicio:");
+            lblSwitch.getStyleClass().add("muted-text");
+            switcher.getChildren().add(lblSwitch);
 
             for (int i = 0; i < availableChallenges.size(); i++) {
                 final Challenge ch = availableChallenges.get(i);
                 String btnLabel = (ch.getType() == ChallengeType.QUIZ ? "Quiz #" : "Código #") + (i + 1);
-                JButton btnCh = Theme.createSecondaryButton(btnLabel);
-                btnCh.setFont(Theme.FONT_SMALL);
-                btnCh.addActionListener(e -> loadChallengeIntoView(ch));
-                switcher.add(btnCh);
+                Button btnCh = new Button(btnLabel);
+                btnCh.getStyleClass().add("btn-secondary");
+                btnCh.setOnAction(e -> loadChallengeIntoView(ch));
+                switcher.getChildren().add(btnCh);
             }
-            topRow.add(switcher, BorderLayout.EAST);
+            topRow.getChildren().add(switcher);
         }
 
-        lblStatement = new JLabel();
-        lblStatement.setFont(Theme.FONT_REGULAR);
-        lblStatement.setForeground(Theme.TEXT_SECONDARY);
-        lblStatement.setBorder(BorderFactory.createEmptyBorder(8, 4, 0, 4));
+        lblStatement = new Label();
+        lblStatement.getStyleClass().add("body-text");
+        lblStatement.setWrapText(true);
 
-        headerCard.add(topRow, BorderLayout.NORTH);
-        headerCard.add(lblStatement, BorderLayout.CENTER);
+        headerCard.getChildren().addAll(topRow, lblStatement);
         return headerCard;
     }
 
-    private JSplitPane buildWorkspaceSplit() {
-        centerCardLayout = new CardLayout();
-        centerCardPanel = new JPanel(centerCardLayout);
-        centerCardPanel.setOpaque(false);
+    private HBox buildWorkspaceSplit() {
+        HBox split = new HBox(16);
 
-        centerCardPanel.add(buildCodeEditorCard(), "CODE");
-        centerCardPanel.add(buildQuizCard(), "QUIZ");
+        centerCardPane = new StackPane();
+        codeEditorCard = buildCodeEditorCard();
+        quizCard = buildQuizCard();
+        centerCardPane.getChildren().setAll(codeEditorCard);
 
-        JPanel rightValidationPane = buildRightValidationPane();
+        VBox rightValidationPane = buildRightValidationPane();
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, centerCardPanel, rightValidationPane);
-        splitPane.setDividerLocation(640);
-        splitPane.setResizeWeight(0.60);
-        splitPane.setDividerSize(8);
-        splitPane.setBorder(null);
-        splitPane.setOpaque(false);
-        return splitPane;
+        HBox.setHgrow(centerCardPane, Priority.ALWAYS);
+        centerCardPane.setPrefWidth(640);
+        rightValidationPane.setPrefWidth(420);
+        rightValidationPane.setMinWidth(360);
+
+        split.getChildren().addAll(centerCardPane, rightValidationPane);
+        return split;
     }
 
-    private JPanel buildCodeEditorCard() {
-        Theme.RoundedPanel editorCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
-        editorCard.setLayout(new BorderLayout(0, 10));
-        editorCard.setBorder(BorderFactory.createEmptyBorder(12, 14, 14, 14));
+    private VBox buildCodeEditorCard() {
+        VBox editorCard = new VBox(10);
+        editorCard.getStyleClass().add("surface-card");
 
-        JPanel toolbar = new JPanel(new BorderLayout(8, 0));
-        toolbar.setOpaque(false);
+        HBox toolbar = new HBox(10);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
 
-        JLabel lblFileTab = new JLabel("  Editor de Solución · UTF-8");
-        lblFileTab.setFont(Theme.FONT_SECTION);
-        lblFileTab.setForeground(Theme.TEXT_SECONDARY);
-        lblFileTab.setIcon(Theme.createVectorIcon(Theme.IconKind.TERMINAL, 15, Theme.ACCENT_INDIGO));
-        toolbar.add(lblFileTab, BorderLayout.CENTER);
+        Label lblFileTab = new Label("Editor de Solución · UTF-8");
+        lblFileTab.getStyleClass().add("section-caption");
+        lblFileTab.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 15, Theme.HEX_INDIGO));
+        lblFileTab.setGraphicTextGap(6);
 
-        JPanel editorActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        editorActions.setOpaque(false);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        JButton btnSolutionHint = Theme.createGhostButton("Insertar Solución Modelo", Theme.ACCENT_CYAN);
-        btnSolutionHint.setFont(Theme.FONT_SMALL);
-        btnSolutionHint.addActionListener(e -> fillReferenceSolution());
+        Button btnSolutionHint = new Button("Insertar Solución Modelo");
+        btnSolutionHint.getStyleClass().add("btn-ghost");
+        btnSolutionHint.setOnAction(e -> fillReferenceSolution());
 
-        JButton btnResetCode = Theme.createGhostButton("Restaurar Plantilla", Theme.TEXT_MUTED);
-        btnResetCode.setFont(Theme.FONT_SMALL);
-        btnResetCode.addActionListener(e -> {
+        Button btnResetCode = new Button("Restaurar Plantilla");
+        btnResetCode.getStyleClass().add("btn-secondary");
+        btnResetCode.setOnAction(e -> {
             if (activeChallenge instanceof CodeChallenge) {
                 txtEditor.setText(((CodeChallenge) activeChallenge).getInitialTemplate());
             }
         });
 
-        editorActions.add(btnSolutionHint);
-        editorActions.add(btnResetCode);
-        toolbar.add(editorActions, BorderLayout.EAST);
+        toolbar.getChildren().addAll(lblFileTab, spacer, btnSolutionHint, btnResetCode);
 
-        txtEditor = new JTextArea();
-        txtEditor.setFont(Theme.FONT_CODE);
-        txtEditor.setBackground(Theme.EDITOR_BG);
-        txtEditor.setForeground(Theme.TEXT_PRIMARY);
-        txtEditor.setCaretColor(Theme.ACCENT_INDIGO);
-        txtEditor.setTabSize(4);
-        txtEditor.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        // Contenedor con numeración de líneas (gutter) y área de edición
+        HBox editorContainer = new HBox(0);
+        VBox.setVgrow(editorContainer, Priority.ALWAYS);
 
-        lineGutter = new LineNumberGutter(txtEditor);
-        txtEditor.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                lineGutter.updateLineCount();
-            }
+        txtLineGutter = new TextArea("1");
+        txtLineGutter.setEditable(false);
+        txtLineGutter.setFocusTraversable(false);
+        txtLineGutter.setPrefWidth(48);
+        txtLineGutter.setMinWidth(48);
+        txtLineGutter.setMaxWidth(48);
+        txtLineGutter.getStyleClass().add("line-gutter");
 
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                lineGutter.updateLineCount();
-            }
+        txtEditor = new TextArea();
+        txtEditor.getStyleClass().add("code-editor");
+        HBox.setHgrow(txtEditor, Priority.ALWAYS);
 
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                lineGutter.updateLineCount();
-            }
-        });
+        txtEditor.textProperty().addListener((obs, oldVal, newVal) -> updateLineGutter(newVal));
+        txtEditor.scrollTopProperty().addListener((obs, oldVal, newVal) -> txtLineGutter.setScrollTop(newVal.doubleValue()));
 
-        JScrollPane scrollEditor = new JScrollPane(txtEditor);
-        scrollEditor.setRowHeaderView(lineGutter);
-        scrollEditor.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1));
-        scrollEditor.getViewport().setBackground(Theme.EDITOR_BG);
-
-        editorCard.add(toolbar, BorderLayout.NORTH);
-        editorCard.add(scrollEditor, BorderLayout.CENTER);
+        editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
+        editorCard.getChildren().addAll(toolbar, editorContainer);
         return editorCard;
     }
 
-    private JPanel buildQuizCard() {
-        Theme.RoundedPanel quizCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
-        quizCard.setBorder(BorderFactory.createEmptyBorder(16, 18, 16, 18));
-
-        JPanel header = Theme.createSectionHeader(
-                "Selecciona la respuesta correcta", "Evaluación de selección única");
-        quizCard.add(header, BorderLayout.NORTH);
-
-        quizOptionsContainer = new JPanel();
-        quizOptionsContainer.setLayout(new BoxLayout(quizOptionsContainer, BoxLayout.Y_AXIS));
-        quizOptionsContainer.setOpaque(false);
-        quizOptionsContainer.setBorder(BorderFactory.createEmptyBorder(14, 0, 0, 0));
-
-        JScrollPane scrollQuiz = new JScrollPane(quizOptionsContainer);
-        scrollQuiz.setBorder(null);
-        scrollQuiz.setOpaque(false);
-        scrollQuiz.getViewport().setOpaque(false);
-
-        quizCard.add(scrollQuiz, BorderLayout.CENTER);
-        return quizCard;
+    private void updateLineGutter(String text) {
+        int lines = 1;
+        if (text != null && !text.isEmpty()) {
+            lines = text.split("\n", -1).length;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i <= lines; i++) {
+            if (i > 1) {
+                sb.append("\n");
+            }
+            sb.append(i);
+        }
+        txtLineGutter.setText(sb.toString());
     }
 
-    private JPanel buildRightValidationPane() {
-        JPanel rightColumn = new JPanel(new BorderLayout(0, 12));
-        rightColumn.setOpaque(false);
-        rightColumn.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
+    private VBox buildQuizCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("surface-card");
+
+        HBox header = Theme.createSectionHeader(
+                "Selecciona la respuesta correcta", "Evaluación de selección única", "badge-violet");
+
+        quizOptionsContainer = new VBox(10);
+        ScrollPane scrollQuiz = new ScrollPane(quizOptionsContainer);
+        scrollQuiz.setFitToWidth(true);
+        scrollQuiz.getStyleClass().add("scroll-pane-clean");
+        VBox.setVgrow(scrollQuiz, Priority.ALWAYS);
+
+        card.getChildren().addAll(header, scrollQuiz);
+        return card;
+    }
+
+    private VBox buildRightValidationPane() {
+        VBox rightColumn = new VBox(14);
 
         // Tarjeta superior: Casos de prueba
-        Theme.RoundedPanel casesCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
-        casesCard.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
+        VBox casesCard = new VBox(10);
+        casesCard.getStyleClass().add("surface-card");
+        VBox.setVgrow(casesCard, Priority.ALWAYS);
 
-        JPanel casesHeader = Theme.createSectionHeader("Casos de Prueba", "Visibles y Ocultos");
-        casesCard.add(casesHeader, BorderLayout.NORTH);
+        HBox casesHeader = Theme.createSectionHeader("Casos de Prueba", "Visibles y Ocultos", "badge-indigo");
 
-        testCasesListPanel = new JPanel();
-        testCasesListPanel.setLayout(new BoxLayout(testCasesListPanel, BoxLayout.Y_AXIS));
-        testCasesListPanel.setOpaque(false);
-        testCasesListPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        testCasesListBox = new VBox(8);
+        ScrollPane scrollCases = new ScrollPane(testCasesListBox);
+        scrollCases.setFitToWidth(true);
+        scrollCases.getStyleClass().add("scroll-pane-clean");
+        VBox.setVgrow(scrollCases, Priority.ALWAYS);
 
-        JScrollPane scrollCases = new JScrollPane(testCasesListPanel);
-        scrollCases.setBorder(null);
-        scrollCases.setOpaque(false);
-        scrollCases.getViewport().setOpaque(false);
-        casesCard.add(scrollCases, BorderLayout.CENTER);
+        casesCard.getChildren().addAll(casesHeader, scrollCases);
 
         // Tarjeta inferior: Consola de salida y métricas de tiempo
-        Theme.RoundedPanel consoleCard = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
-        consoleCard.setLayout(new BorderLayout(0, 8));
-        consoleCard.setPreferredSize(new Dimension(0, 195));
-        consoleCard.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
+        VBox consoleCard = new VBox(8);
+        consoleCard.getStyleClass().add("surface-card");
+        consoleCard.setPrefHeight(215);
 
-        JPanel consoleHeader = new JPanel(new BorderLayout());
-        consoleHeader.setOpaque(false);
-        JLabel lblConsoleTitle = new JLabel("SALIDA DE CONSOLA / VEREDICTO");
-        lblConsoleTitle.setFont(Theme.FONT_SECTION);
-        lblConsoleTitle.setForeground(Theme.TEXT_MUTED);
+        HBox consoleHeader = new HBox(8);
+        consoleHeader.setAlignment(Pos.CENTER_LEFT);
 
-        lblExecutionMetrics = new JLabel("Tiempo: -- ms");
-        lblExecutionMetrics.setFont(Theme.FONT_SMALL);
-        lblExecutionMetrics.setForeground(Theme.TEXT_SECONDARY);
+        Label lblConsoleTitle = new Label("SALIDA DE CONSOLA / VEREDICTO");
+        lblConsoleTitle.getStyleClass().add("section-caption");
 
-        consoleHeader.add(lblConsoleTitle, BorderLayout.WEST);
-        consoleHeader.add(lblExecutionMetrics, BorderLayout.EAST);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        txtConsoleOutput = new JTextArea();
+        lblExecutionMetrics = new Label("Tiempo: -- ms");
+        lblExecutionMetrics.getStyleClass().add("muted-text");
+
+        consoleHeader.getChildren().addAll(lblConsoleTitle, spacer, lblExecutionMetrics);
+
+        txtConsoleOutput = new TextArea();
         txtConsoleOutput.setEditable(false);
-        txtConsoleOutput.setFont(Theme.FONT_CODE);
-        txtConsoleOutput.setBackground(Theme.EDITOR_BG);
-        txtConsoleOutput.setForeground(Theme.TEXT_SECONDARY);
-        txtConsoleOutput.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        txtConsoleOutput.setText("> Listo para validar solución.\n> Presiona 'Ejecutar y Validar' para correr las pruebas.");
+        txtConsoleOutput.setWrapText(true);
+        txtConsoleOutput.getStyleClass().add("console-output");
+        txtConsoleOutput.setText("> Listo para validar solución.\n> Presiona 'Ejecutar y Validar Solución' para correr las pruebas.");
+        VBox.setVgrow(txtConsoleOutput, Priority.ALWAYS);
 
-        JScrollPane scrollConsole = new JScrollPane(txtConsoleOutput);
-        scrollConsole.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SUBTLE, 1));
-        scrollConsole.getViewport().setBackground(Theme.EDITOR_BG);
+        consoleCard.getChildren().addAll(consoleHeader, txtConsoleOutput);
 
-        consoleCard.add(consoleHeader, BorderLayout.NORTH);
-        consoleCard.add(scrollConsole, BorderLayout.CENTER);
-
-        rightColumn.add(casesCard, BorderLayout.CENTER);
-        rightColumn.add(consoleCard, BorderLayout.SOUTH);
+        rightColumn.getChildren().addAll(casesCard, consoleCard);
         return rightColumn;
     }
 
-    private JPanel buildBottomActionBar() {
-        Theme.RoundedPanel bottomBar = new Theme.RoundedPanel(12, Theme.SURFACE, Theme.BORDER_SUBTLE);
-        bottomBar.setLayout(new BorderLayout(16, 0));
-        bottomBar.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
+    private HBox buildBottomActionBar() {
+        HBox bottomBar = new HBox(14);
+        bottomBar.getStyleClass().add("surface-card");
+        bottomBar.setAlignment(Pos.CENTER_LEFT);
 
-        lblResultBanner = new JLabel("Completa el reto para ganar experiencia y mantener tu racha activa.");
-        lblResultBanner.setFont(Theme.FONT_REGULAR);
-        lblResultBanner.setForeground(Theme.TEXT_SECONDARY);
-        lblResultBanner.setIcon(Theme.createVectorIcon(Theme.IconKind.BOLT, 16, Theme.ACCENT_AMBER));
+        lblResultBanner = new Label("Completa el reto para ganar experiencia y mantener tu racha activa.");
+        lblResultBanner.getStyleClass().add("body-text");
+        lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.BOLT, 16, Theme.HEX_AMBER));
+        lblResultBanner.setGraphicTextGap(8);
 
-        JPanel actionsRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        actionsRight.setOpaque(false);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        JButton btnClose = Theme.createSecondaryButton("Volver al Panel");
-        btnClose.addActionListener(e -> dispose());
+        Button btnClose = new Button("Volver al Panel");
+        btnClose.getStyleClass().add("btn-secondary");
+        btnClose.setOnAction(e -> close());
 
-        JButton btnSubmit = Theme.createPrimaryButton("Ejecutar y Validar Solución", Theme.ACCENT_GREEN);
-        btnSubmit.setIcon(Theme.createVectorIcon(Theme.IconKind.PLAY, 14, Color.WHITE));
-        btnSubmit.addActionListener(e -> evaluateSubmission());
+        Button btnSubmit = new Button("Ejecutar y Validar Solución");
+        btnSubmit.getStyleClass().add("btn-success");
+        btnSubmit.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
+        btnSubmit.setGraphicTextGap(6);
+        btnSubmit.setOnAction(e -> evaluateSubmission());
 
-        actionsRight.add(btnClose);
-        actionsRight.add(btnSubmit);
-
-        bottomBar.add(lblResultBanner, BorderLayout.CENTER);
-        bottomBar.add(actionsRight, BorderLayout.EAST);
+        bottomBar.getChildren().addAll(lblResultBanner, spacer, btnClose, btnSubmit);
         return bottomBar;
     }
 
@@ -434,87 +417,81 @@ public class ChallengeFrame extends JFrame {
         this.xpAwardedForCurrent = false;
         this.selectedQuizIndex = -1;
 
-        lblChallengeTitle.setText("  " + challenge.getTitle());
-        lblStatement.setText("<html><body style='width:740px;'>" + challenge.getDescription() + "</body></html>");
+        lblChallengeTitle.setText(challenge.getTitle());
+        lblStatement.setText(challenge.getDescription());
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
 
-        testCasesListPanel.removeAll();
+        testCasesListBox.getChildren().clear();
         testCaseStatusBadges.clear();
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
             badgeType.setText("RETO DE CÓDIGO · LÍMITE " + codeChallenge.getTimeLimitSeconds() + "S");
-            badgeType.setAccent(Theme.ACCENT_INDIGO);
-            centerCardLayout.show(centerCardPanel, "CODE");
-            txtEditor.setText(codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "");
-            lineGutter.updateLineCount();
+            badgeType.getStyleClass().setAll("badge-indigo");
+            centerCardPane.getChildren().setAll(codeEditorCard);
+            String initial = codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "";
+            txtEditor.setText(initial);
+            updateLineGutter(initial);
 
             List<TestCase> cases = codeChallenge.getTestCases();
             for (int i = 0; i < cases.size(); i++) {
                 TestCase tc = cases.get(i);
-                testCasesListPanel.add(createTestCaseRow(i + 1, tc));
-                testCasesListPanel.add(Box.createVerticalStrut(8));
+                testCasesListBox.getChildren().add(createTestCaseRow(i + 1, tc));
             }
         } else if (challenge instanceof QuizChallenge) {
             QuizChallenge quizChallenge = (QuizChallenge) challenge;
             badgeType.setText("QUIZ DE SELECCIÓN");
-            badgeType.setAccent(Theme.ACCENT_VIOLET);
-            centerCardLayout.show(centerCardPanel, "QUIZ");
+            badgeType.getStyleClass().setAll("badge-violet");
+            centerCardPane.getChildren().setAll(quizCard);
             populateQuizOptions(quizChallenge);
 
-            Theme.RoundedPanel infoBox = new Theme.RoundedPanel(10, Theme.EDITOR_BG, Theme.BORDER_SUBTLE);
-            infoBox.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-            JLabel lblQuizInfo = new JLabel("<html><body style='width:240px;color:#334155;'>"
-                    + "Selecciona una de las opciones a la izquierda y presiona <b>Ejecutar y Validar Solución</b>."
-                    + "</body></html>");
-            lblQuizInfo.setFont(Theme.FONT_SMALL);
-            infoBox.add(lblQuizInfo, BorderLayout.CENTER);
-            testCasesListPanel.add(infoBox);
+            VBox infoBox = new VBox(6);
+            infoBox.getStyleClass().add("surface-subtle");
+            Label lblQuizInfo = new Label("Selecciona una de las opciones a la izquierda y presiona 'Ejecutar y Validar Solución'.");
+            lblQuizInfo.getStyleClass().add("body-text");
+            lblQuizInfo.setWrapText(true);
+            infoBox.getChildren().add(lblQuizInfo);
+            testCasesListBox.getChildren().add(infoBox);
         }
 
-        txtConsoleOutput.setForeground(Theme.TEXT_SECONDARY);
+        txtConsoleOutput.getStyleClass().setAll("console-output");
         txtConsoleOutput.setText("> Reto cargado: " + challenge.getTitle() + "\n> Esperando envío del estudiante...");
         lblExecutionMetrics.setText("Tiempo: -- ms");
-
-        revalidate();
-        repaint();
     }
 
-    private JPanel createTestCaseRow(int index, TestCase tc) {
-        Theme.RoundedPanel row = new Theme.RoundedPanel(10, Theme.EDITOR_BG, Theme.BORDER_SUBTLE);
-        row.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
+    private VBox createTestCaseRow(int index, TestCase tc) {
+        VBox row = new VBox(6);
+        row.getStyleClass().add("test-case-card");
 
-        JPanel top = new JPanel(new BorderLayout(8, 0));
-        top.setOpaque(false);
+        HBox top = new HBox(8);
+        top.setAlignment(Pos.CENTER_LEFT);
 
         String titleText = tc.isHidden()
                 ? "Caso #" + index + " (Oculto)"
                 : "Caso #" + index + " · Entrada: \"" + tc.getInput() + "\"";
-        JLabel lblCase = new JLabel(titleText);
-        lblCase.setFont(Theme.FONT_SUBTITLE);
-        lblCase.setForeground(Theme.TEXT_PRIMARY);
+        Label lblCase = new Label(titleText);
+        lblCase.getStyleClass().add("card-title");
 
-        Theme.PillBadge statusBadge = new Theme.PillBadge("PENDIENTE", Theme.TEXT_MUTED);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Label statusBadge = Theme.createPillBadge("PENDIENTE", "badge-neutral");
         testCaseStatusBadges.add(statusBadge);
 
-        top.add(lblCase, BorderLayout.CENTER);
-        top.add(statusBadge, BorderLayout.EAST);
+        top.getChildren().addAll(lblCase, spacer, statusBadge);
 
         String detailText = tc.isHidden()
                 ? "Los datos de entrada y salida se verifican internamente al enviar."
                 : "Salida esperada: \"" + tc.getExpectedOutput() + "\"";
-        JLabel lblDetail = new JLabel(detailText);
-        lblDetail.setFont(Theme.FONT_SMALL);
-        lblDetail.setForeground(Theme.TEXT_MUTED);
+        Label lblDetail = new Label(detailText);
+        lblDetail.getStyleClass().add("muted-text");
 
-        row.add(top, BorderLayout.NORTH);
-        row.add(lblDetail, BorderLayout.SOUTH);
+        row.getChildren().addAll(top, lblDetail);
         return row;
     }
 
     private void populateQuizOptions(QuizChallenge quiz) {
-        quizOptionsContainer.removeAll();
+        quizOptionsContainer.getChildren().clear();
         quizOptionCards.clear();
 
         List<String> opts = quiz.getOptions();
@@ -523,27 +500,19 @@ public class ChallengeFrame extends JFrame {
             final int optionIdx = i;
             String text = opts.get(i);
 
-            Theme.RoundedPanel optionCard = new Theme.RoundedPanel(
-                    10, Theme.EDITOR_BG, Theme.BORDER_SUBTLE, Theme.BORDER_STRONG);
-            optionCard.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 16));
-            optionCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
-            optionCard.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+            HBox optionCard = new HBox(12);
+            optionCard.setAlignment(Pos.CENTER_LEFT);
+            optionCard.getStyleClass().add("quiz-option-card");
 
-            JLabel lblOpt = new JLabel(letter + ")   " + text);
-            lblOpt.setFont(Theme.FONT_SUBTITLE);
-            lblOpt.setForeground(Theme.TEXT_PRIMARY);
-            optionCard.add(lblOpt, BorderLayout.CENTER);
+            Label lblOpt = new Label(letter + ")   " + text);
+            lblOpt.getStyleClass().add("card-title");
+            lblOpt.setWrapText(true);
+            optionCard.getChildren().add(lblOpt);
 
-            optionCard.addMouseListener(new java.awt.event.MouseAdapter() {
-                @Override
-                public void mouseClicked(java.awt.event.MouseEvent e) {
-                    selectQuizOption(optionIdx);
-                }
-            });
+            optionCard.setOnMouseClicked(e -> selectQuizOption(optionIdx));
 
             quizOptionCards.add(optionCard);
-            quizOptionsContainer.add(optionCard);
-            quizOptionsContainer.add(Box.createVerticalStrut(10));
+            quizOptionsContainer.getChildren().add(optionCard);
             letter++;
         }
     }
@@ -551,16 +520,8 @@ public class ChallengeFrame extends JFrame {
     private void selectQuizOption(int index) {
         this.selectedQuizIndex = index;
         for (int i = 0; i < quizOptionCards.size(); i++) {
-            Theme.RoundedPanel card = quizOptionCards.get(i);
-            if (i == index) {
-                card.setFillColor(Theme.SURFACE_ELEVATED);
-                card.setBorderColor(Theme.ACCENT_INDIGO);
-                card.setAccentStripe(Theme.ACCENT_INDIGO);
-            } else {
-                card.setFillColor(Theme.EDITOR_BG);
-                card.setBorderColor(Theme.BORDER_SUBTLE);
-                card.setAccentStripe(Theme.BORDER_STRONG);
-            }
+            HBox card = quizOptionCards.get(i);
+            card.getStyleClass().setAll(i == index ? "quiz-option-card-selected" : "quiz-option-card");
         }
     }
 
@@ -576,7 +537,6 @@ public class ChallengeFrame extends JFrame {
         String template = codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "";
         List<TestCase> cases = codeChallenge.getTestCases();
 
-        // Si es un reto de búsqueda binaria sobre arreglo
         boolean isBinarySearch = !cases.isEmpty() && cases.get(0).getInput().contains("target");
         if (isBinarySearch) {
             txtEditor.setText(
@@ -593,11 +553,9 @@ public class ChallengeFrame extends JFrame {
                     + "    return -1;\n"
                     + "}"
             );
-            lineGutter.updateLineCount();
             return;
         }
 
-        // Si la plantilla es Python (def ...)
         if (template.contains("def ")) {
             StringBuilder py = new StringBuilder();
             py.append("def emitir_sonido(tipo: str) -> str:\n");
@@ -613,11 +571,9 @@ public class ChallengeFrame extends JFrame {
             }
             py.append("    return \"\"\n");
             txtEditor.setText(py.toString());
-            lineGutter.updateLineCount();
             return;
         }
 
-        // Plantilla Java estándar generada desde los casos de prueba
         StringBuilder javaSol = new StringBuilder();
         javaSol.append("public class Solution {\n");
         javaSol.append("    public static String solve(String input) {\n");
@@ -636,7 +592,6 @@ public class ChallengeFrame extends JFrame {
         javaSol.append("    }\n");
         javaSol.append("}");
         txtEditor.setText(javaSol.toString());
-        lineGutter.updateLineCount();
     }
 
     private void evaluateSubmission() {
@@ -654,17 +609,17 @@ public class ChallengeFrame extends JFrame {
 
             for (int i = 0; i < outcomes.size(); i++) {
                 SimulatedCodeRunner.CaseOutcome outcome = outcomes.get(i);
-                Theme.PillBadge badge = i < testCaseStatusBadges.size() ? testCaseStatusBadges.get(i) : null;
+                Label badge = i < testCaseStatusBadges.size() ? testCaseStatusBadges.get(i) : null;
                 if (outcome.isPassed()) {
                     if (badge != null) {
                         badge.setText("APROBADO");
-                        badge.setAccent(Theme.ACCENT_GREEN);
+                        badge.getStyleClass().setAll("badge-green");
                     }
                     log.append("  [OK] ").append(outcome.getMessage()).append("\n");
                 } else {
                     if (badge != null) {
                         badge.setText("FALLIDO");
-                        badge.setAccent(Theme.ACCENT_ROSE);
+                        badge.getStyleClass().setAll("badge-rose");
                     }
                     log.append("  [X]  ").append(outcome.getMessage()).append("\n");
                 }
@@ -681,7 +636,7 @@ public class ChallengeFrame extends JFrame {
         } else if (activeChallenge instanceof QuizChallenge) {
             QuizChallenge quiz = (QuizChallenge) activeChallenge;
             if (selectedQuizIndex < 0) {
-                lblResultBanner.setForeground(Theme.ACCENT_AMBER);
+                lblResultBanner.getStyleClass().setAll("text-warning");
                 lblResultBanner.setText("Selecciona una opción antes de validar el quiz.");
                 return;
             }
@@ -698,7 +653,8 @@ public class ChallengeFrame extends JFrame {
     }
 
     private void persistAttemptIfConnected(String submittedPayload) {
-        if (currentUser == null || currentUser.getId() <= 0 || activeChallenge == null || activeChallenge.getId() <= 0) {
+        if (currentUser == null || currentUser.getId() <= 0
+                || activeChallenge == null || activeChallenge.getId() <= 0) {
             return;
         }
         AppContext ctx = AppContext.getInstance();
@@ -708,14 +664,12 @@ public class ChallengeFrame extends JFrame {
         try {
             ctx.getChallengeService().submitAttempt(currentUser, activeChallenge.getId(), submittedPayload);
         } catch (Exception ignored) {
-            // Si el reto es local o falla la persistencia, se mantiene la evaluación en memoria
         }
     }
 
     private void handleEvaluationOutcome(boolean success, String consoleMessage) {
         txtConsoleOutput.setText(consoleMessage);
         if (success) {
-            txtConsoleOutput.setForeground(Theme.ACCENT_GREEN);
             int reward = activeChallenge.getExpReward();
             if (!xpAwardedForCurrent && currentUser != null && reward > 0) {
                 if (!AppContext.getInstance().isOracleConnected() || currentUser.getId() <= 0) {
@@ -726,67 +680,17 @@ public class ChallengeFrame extends JFrame {
                 if (onSolvedCallback != null) {
                     onSolvedCallback.run();
                 }
-                lblResultBanner.setForeground(Theme.ACCENT_GREEN);
-                lblResultBanner.setIcon(Theme.createVectorIcon(Theme.IconKind.CHECK, 16, Theme.ACCENT_GREEN));
+                lblResultBanner.getStyleClass().setAll("text-success");
+                lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 16, Theme.HEX_GREEN));
                 lblResultBanner.setText("¡Reto superado! Se acreditaron +" + reward + " XP a tu perfil.");
             } else {
-                lblResultBanner.setForeground(Theme.ACCENT_GREEN);
-                lblResultBanner.setIcon(Theme.createVectorIcon(Theme.IconKind.CHECK, 16, Theme.ACCENT_GREEN));
+                lblResultBanner.getStyleClass().setAll("text-success");
+                lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 16, Theme.HEX_GREEN));
                 lblResultBanner.setText("¡Solución correcta! Todos los casos de prueba aprobaron.");
             }
         } else {
-            txtConsoleOutput.setForeground(Theme.ACCENT_ROSE);
-            lblResultBanner.setForeground(Theme.ACCENT_ROSE);
+            lblResultBanner.getStyleClass().setAll("text-danger");
             lblResultBanner.setText("Algunos casos fallaron. Revisa la consola o usa 'Insertar Solución Modelo'.");
-        }
-    }
-
-    /**
-     * Margen izquierdo con numeración de líneas sincronizada con el JTextArea del editor.
-     */
-    private static final class LineNumberGutter extends JComponent {
-
-        private static final long serialVersionUID = 1L;
-
-        private final JTextArea textArea;
-
-        private LineNumberGutter(JTextArea textArea) {
-            this.textArea = textArea;
-            setFont(Theme.FONT_CODE);
-            setBackground(Theme.EDITOR_GUTTER);
-            setForeground(Theme.TEXT_MUTED);
-            setPreferredSize(new Dimension(44, 100));
-        }
-
-        public void updateLineCount() {
-            revalidate();
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            Theme.enableAntialiasing(g2);
-
-            g2.setColor(Theme.EDITOR_GUTTER);
-            g2.fillRect(0, 0, getWidth(), getHeight());
-            g2.setColor(Theme.BORDER_SUBTLE);
-            g2.drawLine(getWidth() - 1, 0, getWidth() - 1, getHeight());
-
-            g2.setFont(Theme.FONT_CODE);
-            g2.setColor(Theme.TEXT_MUTED);
-            FontMetrics fm = g2.getFontMetrics();
-            int lineHeight = fm.getHeight();
-            int startY = textArea.getInsets().top + fm.getAscent();
-            int lines = Math.max(1, textArea.getLineCount());
-
-            for (int i = 1; i <= lines; i++) {
-                String num = String.valueOf(i);
-                int x = getWidth() - fm.stringWidth(num) - 10;
-                int y = startY + (i - 1) * lineHeight;
-                g2.drawString(num, x, y);
-            }
-            g2.dispose();
         }
     }
 }
