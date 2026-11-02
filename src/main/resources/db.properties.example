@@ -1,0 +1,11 @@
+# =============================================================================
+# Plantilla de configuración de conexión JDBC a Oracle (LevelUp Code)
+# Instrucciones:
+#   1. Copia este archivo como 'db.properties' en esta misma carpeta (src/main/resources/).
+#   2. Ajusta 'db.url', 'db.user' y 'db.password' con las credenciales de tu Oracle local.
+#   3. 'db.properties' está ignorado en Git para proteger tus credenciales.
+# =============================================================================
+db.url=jdbc:oracle:thin:@//localhost:1521/XEPDB1
+db.fallback.url=jdbc:oracle:thin:@localhost:1521:xe
+db.user=LEVELUP_ADMIN
+db.password=tu_contraseña_aqui
