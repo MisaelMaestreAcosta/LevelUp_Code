@@ -7,17 +7,21 @@ import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.exception.BusinessException;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Implementación Oracle JDBC de {@link AttemptRepository} sobre la tabla {@code Intentos}.
+ * Soporta ejecución transaccional delegada en PL/SQL ({@code PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO})
+ * con fallback a inserción SQL directa.
  */
 public class OracleAttemptRepository implements AttemptRepository {
 
@@ -41,6 +45,50 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public Attempt save(Attempt attempt) {
+        // 1. Intentar registrar mediante el procedimiento almacenado PL/SQL en Oracle
+        String plsql = "{call PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
+        try (Connection conn = DatabaseConnection.getConnection();
+             CallableStatement cstmt = conn.prepareCall(plsql)) {
+
+            cstmt.setInt(1, attempt.getUser().getId());
+            cstmt.setInt(2, attempt.getChallenge().getId());
+            cstmt.setInt(3, attempt.isCorrect() ? 1 : 0);
+            cstmt.setString(4, attempt.getSubmittedContent() != null ? attempt.getSubmittedContent() : "");
+            cstmt.setString(5, attempt.getResult() != null ? attempt.getResult().name() : AttemptResult.INCORRECT.name());
+            cstmt.setInt(6, (int) Math.max(0, attempt.getExecutionTimeMs()));
+
+            // Parámetros de salida OUT calculados por PL/SQL
+            cstmt.registerOutParameter(7, Types.NUMERIC);  // p_nuevo_nivel
+            cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nueva_exp
+            cstmt.registerOutParameter(9, Types.NUMERIC);  // p_vidas_restantes
+            cstmt.registerOutParameter(10, Types.NUMERIC); // p_exp_otorgada
+            cstmt.registerOutParameter(11, Types.NUMERIC); // p_id_intento_creado
+
+            cstmt.execute();
+
+            int nuevoNivel = cstmt.getInt(7);
+            int nuevaExp = cstmt.getInt(8);
+            int vidasRestantes = cstmt.getInt(9);
+            int expOtorgada = cstmt.getInt(10);
+            int idIntentoCreado = cstmt.getInt(11);
+
+            attempt.setId(idIntentoCreado);
+            attempt.setEarnedExperience(expOtorgada);
+
+            // Sincronizar el estado del usuario en memoria con los valores calculados por PL/SQL
+            if (attempt.getUser() != null) {
+                attempt.getUser().setLevel(nuevoNivel);
+                attempt.getUser().setExperience(nuevaExp);
+                attempt.getUser().setLives(vidasRestantes);
+            }
+            return attempt;
+        } catch (SQLException ex) {
+            // Si el paquete PL/SQL no ha sido compilado en la BD aún, recurrir a inserción directa
+            return saveWithDirectInsert(attempt);
+        }
+    }
+
+    private Attempt saveWithDirectInsert(Attempt attempt) {
         String sql = "INSERT INTO Intentos ("
                 + "id_usuario, id_reto, codigo_enviado, salida_obtenida, "
                 + "es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento"
@@ -103,7 +151,7 @@ public class OracleAttemptRepository implements AttemptRepository {
                 }
             }
         } catch (SQLException e) {
-            throw new BusinessException("Error al consultar historial de intentos en Oracle: " + e.getMessage(), e);
+            throw new BusinessException("Error al listar intentos por usuario y reto en Oracle: " + e.getMessage(), e);
         }
         return list;
     }
@@ -114,9 +162,8 @@ public class OracleAttemptRepository implements AttemptRepository {
         }
         try {
             return AttemptResult.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException e) {
             return AttemptResult.INCORRECT;
         }
     }
 }
-
