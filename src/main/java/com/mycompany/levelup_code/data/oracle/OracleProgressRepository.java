@@ -7,6 +7,7 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.LessonProgress;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.exception.BusinessException;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,6 +18,7 @@ import java.util.Optional;
 
 /**
  * Implementación Oracle JDBC de {@link ProgressRepository} sobre la tabla {@code Progreso_Leccion}.
+ * Soporta finalización delegada en el procedimiento PL/SQL {@code PKG_GAMIFICACION.SP_COMPLETAR_LECCION}.
  */
 public class OracleProgressRepository implements ProgressRepository {
 
@@ -57,6 +59,29 @@ public class OracleProgressRepository implements ProgressRepository {
     public LessonProgress saveOrUpdate(LessonProgress progress) {
         int userId = progress.getUser().getId();
         int lessonId = progress.getLesson().getId();
+
+        // 1. Si la lección está completada, intentar delegar en el procedimiento PL/SQL
+        if (progress.getStatus() == ProgressStatus.COMPLETED) {
+            String plsql = "{call PKG_GAMIFICACION.SP_COMPLETAR_LECCION(?, ?, ?, ?)}";
+            try (Connection conn = DatabaseConnection.getConnection();
+                 CallableStatement cstmt = conn.prepareCall(plsql)) {
+                cstmt.setInt(1, userId);
+                cstmt.setInt(2, lessonId);
+                cstmt.registerOutParameter(3, Types.NUMERIC); // p_xp_otorgada
+                cstmt.registerOutParameter(4, Types.NUMERIC); // p_nuevo_nivel
+                cstmt.execute();
+
+                int nuevoNivel = cstmt.getInt(4);
+                if (progress.getUser() != null) {
+                    progress.getUser().setLevel(nuevoNivel);
+                }
+                return progress;
+            } catch (SQLException ignored) {
+                // Si el procedimiento PL/SQL no está instalado, continuar con MERGE estándar
+            }
+        }
+
+        // 2. MERGE estándar SQL directo
         String dbState = mapStatusToDb(progress.getStatus());
         Timestamp completedTs = progress.getApprovedAt() != null
                 ? Timestamp.valueOf(progress.getApprovedAt())
@@ -105,13 +130,17 @@ public class OracleProgressRepository implements ProgressRepository {
     }
 
     private String mapStatusToDb(ProgressStatus status) {
-        if (status == ProgressStatus.COMPLETED) {
-            return "COMPLETADA";
+        if (status == null) {
+            return "PENDIENTE";
         }
-        if (status == ProgressStatus.IN_PROGRESS) {
-            return "EN_CURSO";
+        switch (status) {
+            case COMPLETED:
+                return "COMPLETADA";
+            case IN_PROGRESS:
+                return "EN_CURSO";
+            case PENDING:
+            default:
+                return "PENDIENTE";
         }
-        return "PENDIENTE";
     }
 }
-
