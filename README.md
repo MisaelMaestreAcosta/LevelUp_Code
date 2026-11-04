@@ -2,7 +2,7 @@
 
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
-**Asignaturas:** Programación III (Prof. Amilkar Sierra) · Bases de Datos  
+**Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  
 **Líder Técnico:** Misael Andrés Maestre Acosta
 
 ---
