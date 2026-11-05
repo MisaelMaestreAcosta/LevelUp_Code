@@ -92,16 +92,22 @@ public class ChallengeService {
         attempt.setExecutionTimeMs(evaluation.getExecutionTimeMs());
         attempt.setEarnedExperience(firstCorrectAttempt ? challenge.getExpReward() : 0);
 
+        int expBeforeSave = user.getExperience();
         Attempt savedAttempt = attemptRepository.save(attempt);
         if (savedAttempt == null) {
             throw new IllegalStateException("El repositorio no devolvió el intento guardado.");
         }
 
-        if (attempt.getEarnedExperience() > 0) {
-            gamificationService.awardExperience(user, attempt.getEarnedExperience());
-        } else if (attempt.isCorrect()) {
-            // También comprueba logros por retos cuando la recompensa es cero.
-            achievementService.evaluateAndUnlock(user);
+        // Si el procedimiento PL/SQL (PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO) ya actualizó
+        // la experiencia, nivel, actividad diaria y logros en la BD, evitamos duplicar el cálculo en Java.
+        boolean gamificationHandledByDb = user.getExperience() != expBeforeSave;
+        if (!gamificationHandledByDb) {
+            if (savedAttempt.getEarnedExperience() > 0) {
+                gamificationService.awardExperience(user, savedAttempt.getEarnedExperience());
+            } else if (savedAttempt.isCorrect()) {
+                // También comprueba logros por retos cuando la recompensa es cero.
+                achievementService.evaluateAndUnlock(user);
+            }
         }
         return savedAttempt;
     }

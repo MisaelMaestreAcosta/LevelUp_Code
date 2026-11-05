@@ -71,9 +71,18 @@ public class OracleProgressRepository implements ProgressRepository {
                 cstmt.registerOutParameter(4, Types.NUMERIC); // p_nuevo_nivel
                 cstmt.execute();
 
+                int xpOtorgada = cstmt.getInt(3);
                 int nuevoNivel = cstmt.getInt(4);
                 if (progress.getUser() != null) {
+                    if (xpOtorgada > 0) {
+                        progress.getUser().addExperience(xpOtorgada);
+                    }
                     progress.getUser().setLevel(nuevoNivel);
+                    userDAO.findById(userId).ifPresent(fresh -> {
+                        progress.getUser().setExperience(fresh.getExperience());
+                        progress.getUser().setCurrentStreak(fresh.getCurrentStreak());
+                        progress.getUser().setMaxStreak(fresh.getMaxStreak());
+                    });
                 }
                 return progress;
             } catch (SQLException ignored) {

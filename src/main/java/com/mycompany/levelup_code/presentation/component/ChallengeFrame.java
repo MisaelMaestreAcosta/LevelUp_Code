@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
@@ -630,8 +631,8 @@ public class ChallengeFrame extends Stage {
                     summary.getPassedCount(),
                     summary.getTotalCount()));
 
-            persistAttemptIfConnected(code);
-            handleEvaluationOutcome(summary.isAllPassed(), log.toString());
+            Attempt savedAttempt = persistAttemptIfConnected(code);
+            handleEvaluationOutcome(summary.isAllPassed(), log.toString(), savedAttempt);
 
         } else if (activeChallenge instanceof QuizChallenge) {
             QuizChallenge quiz = (QuizChallenge) activeChallenge;
@@ -647,30 +648,33 @@ public class ChallengeFrame extends Stage {
                     ? "> Respuesta verificada: CORRECTA.\n> Concepto dominado con éxito."
                     : "> Respuesta incorrecta.\n> Revisa la teoría de la lección e inténtalo de nuevo.";
 
-            persistAttemptIfConnected(chosenOption);
-            handleEvaluationOutcome(correct, msg);
+            Attempt savedAttempt = persistAttemptIfConnected(chosenOption);
+            handleEvaluationOutcome(correct, msg, savedAttempt);
         }
     }
 
-    private void persistAttemptIfConnected(String submittedPayload) {
+    private Attempt persistAttemptIfConnected(String submittedPayload) {
         if (currentUser == null || currentUser.getId() <= 0
                 || activeChallenge == null || activeChallenge.getId() <= 0) {
-            return;
+            return null;
         }
         AppContext ctx = AppContext.getInstance();
         if (!ctx.isOracleConnected()) {
-            return;
+            return null;
         }
         try {
-            ctx.getChallengeService().submitAttempt(currentUser, activeChallenge.getId(), submittedPayload);
+            return ctx.getChallengeService().submitAttempt(currentUser, activeChallenge.getId(), submittedPayload);
         } catch (Exception ignored) {
+            return null;
         }
     }
 
-    private void handleEvaluationOutcome(boolean success, String consoleMessage) {
+    private void handleEvaluationOutcome(boolean success, String consoleMessage, Attempt savedAttempt) {
         txtConsoleOutput.setText(consoleMessage);
         if (success) {
-            int reward = activeChallenge.getExpReward();
+            int reward = savedAttempt != null
+                    ? savedAttempt.getEarnedExperience()
+                    : activeChallenge.getExpReward();
             if (!xpAwardedForCurrent && currentUser != null && reward > 0) {
                 if (!AppContext.getInstance().isOracleConnected() || currentUser.getId() <= 0) {
                     currentUser.addExperience(reward);
@@ -684,6 +688,9 @@ public class ChallengeFrame extends Stage {
                 lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 16, Theme.HEX_GREEN));
                 lblResultBanner.setText("¡Reto superado! Se acreditaron +" + reward + " XP a tu perfil.");
             } else {
+                if (onSolvedCallback != null) {
+                    onSolvedCallback.run();
+                }
                 lblResultBanner.getStyleClass().setAll("text-success");
                 lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 16, Theme.HEX_GREEN));
                 lblResultBanner.setText("¡Solución correcta! Todos los casos de prueba aprobaron.");
