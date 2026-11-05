@@ -80,6 +80,10 @@ public class OracleAttemptRepository implements AttemptRepository {
                 attempt.getUser().setLevel(nuevoNivel);
                 attempt.getUser().setExperience(nuevaExp);
                 attempt.getUser().setLives(vidasRestantes);
+                userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
+                    attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
+                    attempt.getUser().setMaxStreak(fresh.getMaxStreak());
+                });
             }
             return attempt;
         } catch (SQLException ex) {
