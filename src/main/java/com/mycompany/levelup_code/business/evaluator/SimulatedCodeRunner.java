@@ -2,44 +2,66 @@ package com.mycompany.levelup_code.business.evaluator;
 
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
 
 /**
- * Motor de evaluación dinámica guiado al 100% por los datos de {@code Casos_Prueba} en Oracle.
- * No contiene valores quemados de ningún reto específico: analiza la estructura del código
- * enviado (en Java, Python o C++) y evalúa dinámicamente las ramas condicionales, búsquedas
- * sobre arreglos y expresiones según la {@code entrada} de cada caso de prueba.
+ * Evaluador híbrido de retos de código:
+ * <ul>
+ *   <li>Para <b>Java</b>: compila realmente el código con {@link JavaCompiler} (JDK 21) y ejecuta
+ *       cada caso de prueba en un subproceso JVM aislado con límite de memoria ({@code -Xmx64m})
+ *       y tiempo de reloj estricto.</li>
+ *   <li>Para lenguajes sin compilador/intérprete nativo disponible en el entorno local (ej. Python o C++
+ *       en equipos de demostración): utiliza análisis heurístico de demostración e informa
+ *       explícitamente en el resumen que se trata de una validación simulada.</li>
+ * </ul>
  */
 public class SimulatedCodeRunner implements CodeRunner {
+
+    private static final Pattern PUBLIC_CLASS_DECL = Pattern.compile("(?:public\\s+)?class\\s+([A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern STATIC_METHOD_DECL = Pattern.compile(
+            "public\\s+static\\s+([A-Za-z0-9_<>\\[\\]]+)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^\\)]*)\\)"
+    );
 
     private static final Pattern BLOCK_COMMENTS = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern PY_DOCSTRINGS = Pattern.compile("(\"\"\"|''').*?\\1", Pattern.DOTALL);
     private static final Pattern LINE_COMMENTS = Pattern.compile("(//|#).*$", Pattern.MULTILINE);
 
-    // Captura ramas condicionales en Java/C++: if (... "literal" ...) { ... return "resultado" ... }
     private static final Pattern CLINE_IF_BRANCH = Pattern.compile(
             "if\\s*\\(([^\\{]+)\\)\\s*\\{?\\s*(?:return|System\\.out\\.print(?:ln)?\\s*\\(|std::cout\\s*<<)\\s*\"([^\"]*)\"",
             Pattern.DOTALL
     );
-
-    // Captura ramas condicionales en Python: if/elif ... "literal" ... : return/print("resultado")
     private static final Pattern PY_IF_BRANCH = Pattern.compile(
             "(?:if|elif)\\s+([^:\\n]+):\\s*(?:return|print\\s*\\()\\s*[\"']([^\"']*)[\"']",
             Pattern.DOTALL
     );
-
     private static final Pattern STRING_LITERAL = Pattern.compile("[\"']([^\"']+)[\"']");
     private static final Pattern RETURN_STATEMENT = Pattern.compile(
             "(?:return|print\\s*\\(|System\\.out\\.print(?:ln)?\\s*\\()\\s*\"?([^\"\\n;\\)]+)\"?"
     );
-    private static final Pattern ARRAY_PATTERN = Pattern.compile("\\[([^\\]]+)\\]");
+    private static final Pattern ARRAY_PATTERN = Pattern.compile("\\[([^\\]]*)\\]");
     private static final Pattern TARGET_PATTERN = Pattern.compile("target\\s*=\\s*(-?\\d+)");
 
     @Override
@@ -58,6 +80,257 @@ public class SimulatedCodeRunner implements CodeRunner {
             throw new IOException("El código solo contiene comentarios sin instrucciones ejecutables.");
         }
 
+        int effectiveTimeout = Math.max(1, timeoutSeconds);
+
+        if (canExecuteRealJava(languageName)) {
+            return runIsolatedJava(sourceCode, cleanCode, input, effectiveTimeout);
+        }
+
+        return runSimulatedHeuristic(cleanCode, input, effectiveTimeout);
+    }
+
+    /**
+     * Indica si el lenguaje dado cuenta con ejecución real aislada en este entorno.
+     */
+    public boolean supportsRealIsolatedExecution(String languageName) {
+        return canExecuteRealJava(languageName);
+    }
+
+    private boolean canExecuteRealJava(String languageName) {
+        String lang = languageName != null ? languageName.trim().toLowerCase(Locale.ROOT) : "java";
+        return lang.contains("java") && ToolProvider.getSystemJavaCompiler() != null;
+    }
+
+    private String runIsolatedJava(
+            String rawSourceCode,
+            String cleanCode,
+            String input,
+            int timeoutSeconds) throws IOException, InterruptedException, TimeoutException {
+
+        Matcher classMatcher = PUBLIC_CLASS_DECL.matcher(cleanCode);
+        if (!classMatcher.find()) {
+            throw new IOException("Error de compilación Java: no se encontró una declaración 'class NombreClase'.");
+        }
+        String userClassName = classMatcher.group(1);
+
+        Matcher methodMatcher = STATIC_METHOD_DECL.matcher(cleanCode);
+        String targetMethod = null;
+        String returnType = "void";
+        String paramsSpec = "";
+        while (methodMatcher.find()) {
+            String candidateName = methodMatcher.group(2);
+            if (!"main".equals(candidateName)) {
+                returnType = methodMatcher.group(1).trim();
+                targetMethod = candidateName;
+                paramsSpec = methodMatcher.group(3).trim();
+                break;
+            }
+        }
+
+        Path sandboxDir = Files.createTempDirectory("levelup_jvm_sandbox_");
+        try {
+            Path userFile = sandboxDir.resolve(userClassName + ".java");
+            Files.writeString(userFile, rawSourceCode, StandardCharsets.UTF_8);
+
+            String runnerClassName = "__LevelUpRunnerMain";
+            List<File> filesToCompile = new ArrayList<>();
+            filesToCompile.add(userFile.toFile());
+
+            String normalizedInput = input != null ? input.trim() : "";
+            if (targetMethod != null) {
+                String harnessSource = buildJavaHarnessSource(
+                        runnerClassName, userClassName, targetMethod, returnType, paramsSpec, normalizedInput);
+                Path harnessFile = sandboxDir.resolve(runnerClassName + ".java");
+                Files.writeString(harnessFile, harnessSource, StandardCharsets.UTF_8);
+                filesToCompile.add(harnessFile.toFile());
+            } else {
+                runnerClassName = userClassName;
+            }
+
+            compileJavaFiles(filesToCompile, sandboxDir);
+            return executeJavaSubprocess(sandboxDir, runnerClassName, normalizedInput, timeoutSeconds);
+        } finally {
+            deleteDirectoryQuietly(sandboxDir);
+        }
+    }
+
+    private String buildJavaHarnessSource(
+            String runnerClassName,
+            String userClassName,
+            String methodName,
+            String returnType,
+            String paramsSpec,
+            String normalizedInput) throws IOException {
+
+        String callExpression;
+        String compactParams = paramsSpec.replaceAll("\\s+", " ");
+        if (compactParams.isEmpty()) {
+            callExpression = userClassName + "." + methodName + "()";
+        } else if (compactParams.contains("int[]") && compactParams.contains(",")) {
+            Matcher arrMatcher = ARRAY_PATTERN.matcher(normalizedInput);
+            Matcher targetMatcher = TARGET_PATTERN.matcher(normalizedInput);
+            if (!arrMatcher.find() || !targetMatcher.find()) {
+                throw new IOException("Formato de entrada inválido para (int[], int): " + normalizedInput);
+            }
+            String csv = arrMatcher.group(1).trim();
+            int target = Integer.parseInt(targetMatcher.group(1));
+            callExpression = userClassName + "." + methodName + "(new int[]{" + csv + "}, " + target + ")";
+        } else if (compactParams.startsWith("int ") || "int".equals(compactParams)
+                || compactParams.startsWith("long ") || "long".equals(compactParams)) {
+            String[] parts = normalizedInput.split(",");
+            StringBuilder args = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                if (i > 0) {
+                    args.append(", ");
+                }
+                args.append(Long.parseLong(parts[i].trim()));
+            }
+            callExpression = userClassName + "." + methodName + "(" + args + ")";
+        } else {
+            callExpression = userClassName + "." + methodName + "(\"" + escapeJavaString(normalizedInput) + "\")";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("public final class ").append(runnerClassName).append(" {\n");
+        sb.append("    public static void main(String[] args) throws Exception {\n");
+        if ("void".equals(returnType)) {
+            sb.append("        ").append(callExpression).append(";\n");
+        } else {
+            sb.append("        Object __res = ").append(callExpression).append(";\n");
+            sb.append("        System.out.print(__res == null ? \"\" : String.valueOf(__res));\n");
+        }
+        sb.append("    }\n");
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    private void compileJavaFiles(List<File> files, Path outputDir) throws IOException {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        try (StandardJavaFileManager fileManager =
+                compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
+            Iterable<? extends JavaFileObject> units = fileManager.getJavaFileObjectsFromFiles(files);
+            List<String> options = Arrays.asList("-d", outputDir.toString(), "-encoding", "UTF-8");
+            Boolean ok = compiler.getTask(null, fileManager, diagnostics, options, null, units).call();
+            if (ok == null || !ok) {
+                StringBuilder err = new StringBuilder("Error de compilación Java: ");
+                for (Diagnostic<? extends JavaFileObject> d : diagnostics.getDiagnostics()) {
+                    if (d.getKind() == Diagnostic.Kind.ERROR) {
+                        err.append("Línea ")
+                           .append(d.getLineNumber())
+                           .append(": ")
+                           .append(d.getMessage(Locale.getDefault()))
+                           .append(" ");
+                        break;
+                    }
+                }
+                throw new IOException(err.toString().trim());
+            }
+        }
+    }
+
+    private String executeJavaSubprocess(
+            Path sandboxDir,
+            String mainClass,
+            String stdinPayload,
+            int timeoutSeconds) throws IOException, InterruptedException, TimeoutException {
+
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        ProcessBuilder pb = new ProcessBuilder(
+                javaBin,
+                "-Xmx64m",
+                "-Xss512k",
+                "-XX:+DisableAttachMechanism",
+                "-cp",
+                sandboxDir.toString(),
+                mainClass
+        );
+        pb.directory(sandboxDir.toFile());
+        Process process = pb.start();
+
+        if (stdinPayload != null && !stdinPayload.isEmpty()) {
+            try {
+                process.getOutputStream().write(stdinPayload.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ignored) {
+            }
+        }
+        try {
+            process.getOutputStream().close();
+        } catch (IOException ignored) {
+        }
+
+        ByteArrayOutputStream stdoutBuf = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderrBuf = new ByteArrayOutputStream();
+        Thread outReader = startStreamCollector(process.getInputStream(), stdoutBuf, 16_384);
+        Thread errReader = startStreamCollector(process.getErrorStream(), stderrBuf, 16_384);
+
+        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            outReader.join(200);
+            errReader.join(200);
+            throw new TimeoutException("Tiempo límite excedido (" + timeoutSeconds + "s) en ejecución aislada JVM.");
+        }
+
+        outReader.join(500);
+        errReader.join(500);
+
+        if (process.exitValue() != 0) {
+            String errMsg = stderrBuf.toString(StandardCharsets.UTF_8).trim();
+            throw new IOException("Excepción en tiempo de ejecución: " + (errMsg.isEmpty() ? "código " + process.exitValue() : errMsg));
+        }
+
+        return stdoutBuf.toString(StandardCharsets.UTF_8).trim();
+    }
+
+    private Thread startStreamCollector(InputStream stream, ByteArrayOutputStream target, int maxBytes) {
+        Thread t = new Thread(() -> {
+            byte[] buf = new byte[1024];
+            int total = 0;
+            int read;
+            try {
+                while ((read = stream.read(buf)) != -1) {
+                    int allowed = Math.min(read, maxBytes - total);
+                    if (allowed > 0) {
+                        target.write(buf, 0, allowed);
+                        total += allowed;
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+        return t;
+    }
+
+    private static String escapeJavaString(String raw) {
+        return raw.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r");
+    }
+
+    private static void deleteDirectoryQuietly(Path root) {
+        if (root == null || !Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                }
+            });
+        } catch (IOException ignored) {
+        }
+    }
+
+    private String runSimulatedHeuristic(
+            String cleanCode,
+            String input,
+            int timeoutSeconds) throws IOException, TimeoutException {
+
         if (hasInfiniteLoop(cleanCode)) {
             throw new TimeoutException("Tiempo límite excedido (" + timeoutSeconds + "s): bucle infinito detectado.");
         }
@@ -68,23 +341,17 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         String normalizedInput = input != null ? input.trim() : "";
 
-        // 1. Si la entrada describe un arreglo y un objetivo (ej. "[2, 5, 8, 12], target=12"),
-        //    evalúa dinámicamente la estructura de búsqueda sobre el arreglo de entrada.
         Matcher arrMatcher = ARRAY_PATTERN.matcher(normalizedInput);
         Matcher targetMatcher = TARGET_PATTERN.matcher(normalizedInput);
         if (arrMatcher.find() && targetMatcher.find()) {
             return evaluateArraySearch(cleanCode, arrMatcher.group(1), Integer.parseInt(targetMatcher.group(1)));
         }
 
-        // 2. Evalúa dinámicamente ramas condicionales (if / else if / elif) comparando la
-        //    condición programada por el estudiante contra la entrada del caso de prueba.
         String branchOutput = evaluateConditionalBranches(cleanCode, normalizedInput);
         if (branchOutput != null) {
             return branchOutput;
         }
 
-        // 3. Si la entrada es numérica y el código realiza un cálculo aritmético o iterativo,
-        //    evalúa la expresión sobre el parámetro de entrada.
         if (normalizedInput.matches("-?\\d+(?:\\s*,\\s*-?\\d+)*")) {
             String numericResult = evaluateNumericLogic(cleanCode, normalizedInput);
             if (numericResult != null) {
@@ -92,13 +359,12 @@ public class SimulatedCodeRunner implements CodeRunner {
             }
         }
 
-        // 4. Retorno por defecto (último return fuera de ramas condicionales)
         return extractDefaultReturn(cleanCode);
     }
 
     /**
      * Ejecuta todos los casos de prueba de un {@link CodeChallenge} y devuelve el detalle
-     * individual de cada caso para mostrar el veredicto en la interfaz.
+     * individual junto con el modo real o simulado empleado.
      */
     public ExecutionSummary runAndValidate(CodeChallenge challenge, String sourceCode) {
         long startNanos = System.nanoTime();
@@ -115,6 +381,7 @@ public class SimulatedCodeRunner implements CodeRunner {
             langName = challenge.getLesson().getModule().getLanguage().getName();
         }
 
+        boolean sandboxed = supportsRealIsolatedExecution(langName);
         List<CaseOutcome> outcomes = new ArrayList<>();
         int passed = 0;
 
@@ -141,7 +408,7 @@ public class SimulatedCodeRunner implements CodeRunner {
         }
 
         double seconds = Math.max(0.004, (System.nanoTime() - startNanos) / 1_000_000_000.0);
-        return new ExecutionSummary(passed, cases.size(), seconds, outcomes);
+        return new ExecutionSummary(passed, cases.size(), seconds, outcomes, sandboxed);
     }
 
     private String evaluateConditionalBranches(String cleanCode, String inputValue) {
@@ -150,7 +417,6 @@ public class SimulatedCodeRunner implements CodeRunner {
                 || cleanCode.contains(".lower()")
                 || cleanCode.contains(".upper()");
 
-        // Evaluar ramas estilo Java / C++
         Matcher javaMatcher = CLINE_IF_BRANCH.matcher(cleanCode);
         while (javaMatcher.find()) {
             String condition = javaMatcher.group(1);
@@ -160,7 +426,6 @@ public class SimulatedCodeRunner implements CodeRunner {
             }
         }
 
-        // Evaluar ramas estilo Python
         Matcher pyMatcher = PY_IF_BRANCH.matcher(cleanCode);
         while (pyMatcher.find()) {
             String condition = pyMatcher.group(1);
@@ -246,7 +511,6 @@ public class SimulatedCodeRunner implements CodeRunner {
             }
         }
 
-        // Si el código calcula factorial (bucle con *= o recursión n - 1)
         if ((cleanCode.contains("*=") || (cleanCode.contains("*") && cleanCode.contains("- 1"))) && n >= 0 && n <= 20) {
             long fact = 1;
             for (long i = 2; i <= n; i++) {
@@ -255,7 +519,6 @@ public class SimulatedCodeRunner implements CodeRunner {
             return String.valueOf(fact);
         }
 
-        // Si el código verifica paridad (% 2 == 0)
         if (cleanCode.contains("% 2") || cleanCode.contains("%2")) {
             return (n % 2 == 0) ? "true" : "false";
         }
@@ -356,12 +619,19 @@ public class SimulatedCodeRunner implements CodeRunner {
         private final int totalCount;
         private final double executionTimeSeconds;
         private final List<CaseOutcome> caseOutcomes;
+        private final boolean sandboxedExecution;
 
-        public ExecutionSummary(int passedCount, int totalCount, double executionTimeSeconds, List<CaseOutcome> caseOutcomes) {
+        public ExecutionSummary(
+                int passedCount,
+                int totalCount,
+                double executionTimeSeconds,
+                List<CaseOutcome> caseOutcomes,
+                boolean sandboxedExecution) {
             this.passedCount = passedCount;
             this.totalCount = totalCount;
             this.executionTimeSeconds = executionTimeSeconds;
             this.caseOutcomes = Collections.unmodifiableList(new ArrayList<>(caseOutcomes));
+            this.sandboxedExecution = sandboxedExecution;
         }
 
         public int getPassedCount() {
@@ -378,6 +648,16 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         public List<CaseOutcome> getCaseOutcomes() {
             return caseOutcomes;
+        }
+
+        public boolean isSandboxedExecution() {
+            return sandboxedExecution;
+        }
+
+        public String getExecutionModeDescription() {
+            return sandboxedExecution
+                    ? "Ejecución real aislada en JVM (-Xmx64m)"
+                    : "Validación simulada de demostración (sin compilador nativo externo)";
         }
 
         public boolean isAllPassed() {
