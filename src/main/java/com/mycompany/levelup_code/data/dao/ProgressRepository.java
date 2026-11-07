@@ -19,4 +19,12 @@ public interface ProgressRepository {
      * Guarda un progreso nuevo o actualiza el existente.
      */
     LessonProgress saveOrUpdate(LessonProgress progress);
+
+    /**
+     * Indica si el repositorio aplica de forma atómica la recompensa y gamificación
+     * al completar una lección (ej. mediante PL/SQL).
+     */
+    default boolean managesGamificationTransactionally() {
+        return false;
+    }
 }

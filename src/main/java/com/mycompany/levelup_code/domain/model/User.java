@@ -225,6 +225,13 @@ public class User {
         this.lives = Math.max(0, lives);
     }
 
+    /**
+     * Descuenta una vida disponible al usuario sin bajar de cero.
+     */
+    public void loseLife() {
+        this.lives = Math.max(0, this.lives - 1);
+    }
+
     public LocalDateTime getRegistrationDate() {
         return registrationDate;
     }
