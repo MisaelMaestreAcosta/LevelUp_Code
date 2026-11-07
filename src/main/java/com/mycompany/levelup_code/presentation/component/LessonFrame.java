@@ -4,6 +4,8 @@ import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.User;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -23,6 +25,8 @@ import javafx.stage.Stage;
  * y persistencia en {@code Progreso_Leccion}.
  */
 public class LessonFrame extends Stage {
+
+    private static final Logger LOGGER = Logger.getLogger(LessonFrame.class.getName());
 
     private final User currentUser;
     private final Lesson currentLesson;
@@ -45,8 +49,8 @@ public class LessonFrame extends Stage {
         this.currentUser = user;
         this.currentLesson = lesson;
         this.onProgressCallback = onProgressCallback;
-        markLessonStartedInOracle();
         initComponents();
+        markLessonStartedInOracle();
         switchComparativeSnippet("JAVA");
     }
 
@@ -68,7 +72,15 @@ public class LessonFrame extends Stage {
         if (ctx.isOracleConnected()) {
             try {
                 ctx.getProgressService().startLesson(currentUser, currentLesson.getId());
-            } catch (Exception ignored) {
+                if (onProgressCallback != null) {
+                    onProgressCallback.run();
+                }
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "No se pudo registrar el inicio de la lección #" + currentLesson.getId() + " en Oracle", ex);
+                if (lblStatusInfo != null) {
+                    lblStatusInfo.getStyleClass().setAll("text-warning");
+                    lblStatusInfo.setText("Aviso: No se pudo guardar el estado EN_CURSO en Oracle (" + ex.getMessage() + ").");
+                }
             }
         }
     }
@@ -213,33 +225,48 @@ public class LessonFrame extends Stage {
         btnMarkComplete.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 14, Theme.HEX_GREEN));
         btnMarkComplete.setGraphicTextGap(6);
         btnMarkComplete.setOnAction(e -> {
-            if (!lessonCompleted) {
+            if (lessonCompleted) {
+                return;
+            }
+            AppContext ctx = AppContext.getInstance();
+            boolean shouldSaveInOracle = ctx.isOracleConnected()
+                    && currentUser != null && currentUser.getId() > 0
+                    && currentLesson != null && currentLesson.getId() > 0;
+
+            if (shouldSaveInOracle) {
+                try {
+                    ctx.getProgressService().startLesson(currentUser, currentLesson.getId());
+                    ctx.getProgressService().completeLesson(currentUser, currentLesson.getId());
+                    lessonCompleted = true;
+                    btnMarkComplete.setDisable(true);
+                    btnMarkComplete.setText("Lección Completada");
+                    if (onProgressCallback != null) {
+                        onProgressCallback.run();
+                    }
+                    lblStatusInfo.getStyleClass().setAll("text-success");
+                    lblStatusInfo.setText("¡Lección aprobada y guardada en Oracle! Estado COMPLETADA en Progreso_Leccion.");
+                } catch (Exception ex) {
+                    LOGGER.log(Level.SEVERE, "Error al guardar finalización de lección #" + currentLesson.getId() + " en Oracle", ex);
+                    btnMarkComplete.setText("Reintentar Guardado en Oracle");
+                    String cause = ex.getMessage() != null && !ex.getMessage().isBlank()
+                            ? ex.getMessage()
+                            : ex.getClass().getSimpleName();
+                    lblStatusInfo.getStyleClass().setAll("text-danger");
+                    lblStatusInfo.setText("No se pudo guardar en Oracle: " + cause + ". Reintenta el guardado.");
+                }
+            } else {
                 lessonCompleted = true;
                 btnMarkComplete.setDisable(true);
-                btnMarkComplete.setText("Lección Completada");
-
-                AppContext ctx = AppContext.getInstance();
-                boolean persistedInOracle = false;
-                if (ctx.isOracleConnected() && currentUser != null && currentUser.getId() > 0
-                        && currentLesson != null && currentLesson.getId() > 0) {
-                    try {
-                        ctx.getProgressService().startLesson(currentUser, currentLesson.getId());
-                        ctx.getProgressService().completeLesson(currentUser, currentLesson.getId());
-                        persistedInOracle = true;
-                    } catch (Exception ignored) {
-                    }
-                }
-
-                if (!persistedInOracle && currentUser != null && reward > 0) {
+                btnMarkComplete.setText("Lección Completada (Local)");
+                if (currentUser != null && reward > 0) {
                     currentUser.addExperience(reward);
                     currentUser.setLevel(Math.max(1, 1 + currentUser.getTotalExp() / 300));
                 }
-
                 if (onProgressCallback != null) {
                     onProgressCallback.run();
                 }
                 lblStatusInfo.getStyleClass().setAll("text-success");
-                lblStatusInfo.setText("¡Lección aprobada! Estado actualizado a COMPLETADA en Progreso_Leccion (+" + reward + " XP).");
+                lblStatusInfo.setText("Lección completada localmente (modo demostración sin Oracle, +" + reward + " XP).");
             }
         });
 

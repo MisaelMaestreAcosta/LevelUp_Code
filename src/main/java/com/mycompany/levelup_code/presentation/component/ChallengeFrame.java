@@ -12,7 +12,12 @@ import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -35,10 +40,15 @@ import javafx.stage.Stage;
  */
 public class ChallengeFrame extends Stage {
 
+    private static final Logger LOGGER = Logger.getLogger(ChallengeFrame.class.getName());
+    private static final Pattern JAVA_CLASS_PATTERN = Pattern.compile("(?:public\\s+)?class\\s+([A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern JAVA_METHOD_PATTERN = Pattern.compile(
+            "public\\s+static\\s+[A-Za-z0-9_<>\\[\\]]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^\\)]*)\\)");
+
     private final User currentUser;
     private final List<Challenge> availableChallenges;
     private final Runnable onSolvedCallback;
-    private final SimulatedCodeRunner codeRunner = new SimulatedCodeRunner();
+    private final SimulatedCodeRunner codeRunner = AppContext.getInstance().getCodeRunner();
 
     private Challenge activeChallenge;
     private boolean xpAwardedForCurrent = false;
@@ -47,10 +57,12 @@ public class ChallengeFrame extends Stage {
     private Label lblChallengeTitle;
     private Label lblStatement;
     private Label badgeType;
+    private Label badgeExecutionMode;
     private Label badgeReward;
     private StackPane centerCardPane;
     private VBox codeEditorCard;
     private VBox quizCard;
+    private Button btnSubmit;
 
     // Editor de código y numeración de líneas
     private TextArea txtEditor;
@@ -199,12 +211,13 @@ public class ChallengeFrame extends Stage {
         lblChallengeTitle.setGraphicTextGap(8);
 
         badgeType = Theme.createPillBadge("CÓDIGO", "badge-indigo");
+        badgeExecutionMode = Theme.createPillBadge("EJECUCIÓN AISLADA JVM", "badge-green");
         badgeReward = Theme.createPillBadge("+60 XP", "badge-amber");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        topRow.getChildren().addAll(lblChallengeTitle, badgeType, badgeReward, spacer);
+        topRow.getChildren().addAll(lblChallengeTitle, badgeType, badgeExecutionMode, badgeReward, spacer);
 
         if (availableChallenges.size() > 1) {
             HBox switcher = new HBox(8);
@@ -403,7 +416,7 @@ public class ChallengeFrame extends Stage {
         btnClose.getStyleClass().add("btn-secondary");
         btnClose.setOnAction(e -> close());
 
-        Button btnSubmit = new Button("Ejecutar y Validar Solución");
+        btnSubmit = new Button("Ejecutar y Validar Solución");
         btnSubmit.getStyleClass().add("btn-success");
         btnSubmit.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
         btnSubmit.setGraphicTextGap(6);
@@ -413,10 +426,23 @@ public class ChallengeFrame extends Stage {
         return bottomBar;
     }
 
+    private String resolveChallengeLanguageName(Challenge challenge) {
+        if (challenge != null && challenge.getLesson() != null
+                && challenge.getLesson().getModule() != null
+                && challenge.getLesson().getModule().getLanguage() != null
+                && challenge.getLesson().getModule().getLanguage().getName() != null) {
+            return challenge.getLesson().getModule().getLanguage().getName();
+        }
+        return "Java";
+    }
+
     private void loadChallengeIntoView(Challenge challenge) {
         this.activeChallenge = challenge;
         this.xpAwardedForCurrent = false;
         this.selectedQuizIndex = -1;
+        if (btnSubmit != null) {
+            btnSubmit.setText("Ejecutar y Validar Solución");
+        }
 
         lblChallengeTitle.setText(challenge.getTitle());
         lblStatement.setText(challenge.getDescription());
@@ -429,6 +455,16 @@ public class ChallengeFrame extends Stage {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
             badgeType.setText("RETO DE CÓDIGO · LÍMITE " + codeChallenge.getTimeLimitSeconds() + "S");
             badgeType.getStyleClass().setAll("badge-indigo");
+
+            String langName = resolveChallengeLanguageName(codeChallenge);
+            boolean realJvm = codeRunner.supportsRealIsolatedExecution(langName);
+            badgeExecutionMode.setText(realJvm
+                    ? "EJECUCIÓN REAL AISLADA JVM"
+                    : "MODO DEMO SIMULADO (" + langName.toUpperCase(Locale.ROOT) + ")");
+            badgeExecutionMode.getStyleClass().setAll(realJvm ? "badge-green" : "badge-amber");
+            badgeExecutionMode.setVisible(true);
+            badgeExecutionMode.setManaged(true);
+
             centerCardPane.getChildren().setAll(codeEditorCard);
             String initial = codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "";
             txtEditor.setText(initial);
@@ -443,6 +479,10 @@ public class ChallengeFrame extends Stage {
             QuizChallenge quizChallenge = (QuizChallenge) challenge;
             badgeType.setText("QUIZ DE SELECCIÓN");
             badgeType.getStyleClass().setAll("badge-violet");
+            badgeExecutionMode.setText("VALIDACIÓN EXACTA");
+            badgeExecutionMode.getStyleClass().setAll("badge-cyan");
+            badgeExecutionMode.setVisible(true);
+            badgeExecutionMode.setManaged(true);
             centerCardPane.getChildren().setAll(quizCard);
             populateQuizOptions(quizChallenge);
 
@@ -456,7 +496,12 @@ public class ChallengeFrame extends Stage {
         }
 
         txtConsoleOutput.getStyleClass().setAll("console-output");
-        txtConsoleOutput.setText("> Reto cargado: " + challenge.getTitle() + "\n> Esperando envío del estudiante...");
+        String modeNote = (challenge instanceof CodeChallenge)
+                ? (codeRunner.supportsRealIsolatedExecution(resolveChallengeLanguageName(challenge))
+                        ? "> Motor activo: Compilación real JavaCompiler + subproceso JVM aislado (-Xmx64m)."
+                        : "> Aviso: Este lenguaje se evalúa en modo simulación académica de demostración (sin compilador nativo externo).")
+                : "> Motor activo: Verificación conceptual de selección única.";
+        txtConsoleOutput.setText("> Reto cargado: " + challenge.getTitle() + "\n" + modeNote + "\n> Esperando envío del estudiante...");
         lblExecutionMetrics.setText("Tiempo: -- ms");
     }
 
@@ -536,35 +581,73 @@ public class ChallengeFrame extends Stage {
         }
         CodeChallenge codeChallenge = (CodeChallenge) activeChallenge;
         String template = codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "";
+        String lang = resolveChallengeLanguageName(codeChallenge).toLowerCase(Locale.ROOT);
         List<TestCase> cases = codeChallenge.getTestCases();
 
+        boolean isPython = lang.contains("python") || template.contains("def ");
+        boolean isCpp = lang.contains("c++") || lang.contains("cpp") || template.contains("#include");
         boolean isBinarySearch = !cases.isEmpty() && cases.get(0).getInput().contains("target");
+
         if (isBinarySearch) {
-            txtEditor.setText(
-                    "#include <vector>\n\n"
-                    + "int binarySearch(const std::vector<int>& arr, int target) {\n"
-                    + "    int lo = 0;\n"
-                    + "    int hi = static_cast<int>(arr.size()) - 1;\n"
-                    + "    while (lo <= hi) {\n"
-                    + "        int mid = lo + (hi - lo) / 2;\n"
-                    + "        if (arr[mid] == target) return mid;\n"
-                    + "        if (arr[mid] < target) lo = mid + 1;\n"
-                    + "        else hi = mid - 1;\n"
-                    + "    }\n"
-                    + "    return -1;\n"
-                    + "}"
-            );
+            if (isPython) {
+                txtEditor.setText(
+                        "def binary_search(arr: list[int], target: int) -> int:\n"
+                        + "    low, high = 0, len(arr) - 1\n"
+                        + "    while low <= high:\n"
+                        + "        mid = (low + high) // 2\n"
+                        + "        if arr[mid] == target:\n"
+                        + "            return mid\n"
+                        + "        elif arr[mid] < target:\n"
+                        + "            low = mid + 1\n"
+                        + "        else:\n"
+                        + "            high = mid - 1\n"
+                        + "    return -1\n"
+                );
+            } else if (isCpp) {
+                txtEditor.setText(
+                        "#include <vector>\n\n"
+                        + "int binarySearch(const std::vector<int>& arr, int target) {\n"
+                        + "    int lo = 0;\n"
+                        + "    int hi = static_cast<int>(arr.size()) - 1;\n"
+                        + "    while (lo <= hi) {\n"
+                        + "        int mid = lo + (hi - lo) / 2;\n"
+                        + "        if (arr[mid] == target) return mid;\n"
+                        + "        if (arr[mid] < target) lo = mid + 1;\n"
+                        + "        else hi = mid - 1;\n"
+                        + "    }\n"
+                        + "    return -1;\n"
+                        + "}"
+                );
+            } else {
+                String className = extractJavaClassName(template, "BinarySearchSolver");
+                String methodName = extractJavaMethodName(template, "binarySearch");
+                txtEditor.setText(
+                        "public class " + className + " {\n"
+                        + "    public static int " + methodName + "(int[] arr, int target) {\n"
+                        + "        int low = 0;\n"
+                        + "        int high = arr.length - 1;\n"
+                        + "        while (low <= high) {\n"
+                        + "            int mid = low + (high - low) / 2;\n"
+                        + "            if (arr[mid] == target) return mid;\n"
+                        + "            if (arr[mid] < target) low = mid + 1;\n"
+                        + "            else high = mid - 1;\n"
+                        + "        }\n"
+                        + "        return -1;\n"
+                        + "    }\n"
+                        + "}"
+                );
+            }
             return;
         }
 
-        if (template.contains("def ")) {
+        if (isPython) {
             StringBuilder py = new StringBuilder();
             py.append("def emitir_sonido(tipo: str) -> str:\n");
             py.append("    clave = tipo.strip().lower()\n");
             for (TestCase tc : cases) {
                 if (!tc.isHidden()) {
                     py.append("    if clave == \"")
-                            .append(tc.getInput().trim().toLowerCase())
+                            .append(tc.getInput().trim().toLowerCase(Locale.ROOT))
                             .append("\":\n        return \"")
                             .append(tc.getExpectedOutput())
                             .append("\"\n");
@@ -575,9 +658,29 @@ public class ChallengeFrame extends Stage {
             return;
         }
 
+        if (isCpp) {
+            StringBuilder cpp = new StringBuilder();
+            cpp.append("#include <string>\n\n");
+            cpp.append("std::string emitirSonido(const std::string& input) {\n");
+            for (TestCase tc : cases) {
+                if (!tc.isHidden()) {
+                    cpp.append("    if (input == \"")
+                            .append(tc.getInput().trim())
+                            .append("\") return \"")
+                            .append(tc.getExpectedOutput())
+                            .append("\";\n");
+                }
+            }
+            cpp.append("    return \"\";\n}\n");
+            txtEditor.setText(cpp.toString());
+            return;
+        }
+
+        String className = extractJavaClassName(template, "Solution");
+        String methodName = extractJavaMethodName(template, "solve");
         StringBuilder javaSol = new StringBuilder();
-        javaSol.append("public class Solution {\n");
-        javaSol.append("    public static String solve(String input) {\n");
+        javaSol.append("public class ").append(className).append(" {\n");
+        javaSol.append("    public static String ").append(methodName).append("(String input) {\n");
         for (TestCase tc : cases) {
             if (!tc.isHidden()) {
                 javaSol.append("        if (\"")
@@ -595,6 +698,22 @@ public class ChallengeFrame extends Stage {
         txtEditor.setText(javaSol.toString());
     }
 
+    private static String extractJavaClassName(String template, String fallback) {
+        Matcher m = JAVA_CLASS_PATTERN.matcher(template);
+        return m.find() ? m.group(1) : fallback;
+    }
+
+    private static String extractJavaMethodName(String template, String fallback) {
+        Matcher m = JAVA_METHOD_PATTERN.matcher(template);
+        while (m.find()) {
+            String candidate = m.group(1);
+            if (!"main".equals(candidate)) {
+                return candidate;
+            }
+        }
+        return fallback;
+    }
+
     private void evaluateSubmission() {
         if (activeChallenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) activeChallenge;
@@ -604,7 +723,8 @@ public class ChallengeFrame extends Stage {
             List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
 
             StringBuilder log = new StringBuilder();
-            log.append("> Ejecutando motor dinámico contra ")
+            log.append("> [").append(summary.getExecutionModeDescription()).append("]\n");
+            log.append("> Validando contra ")
                     .append(outcomes.size())
                     .append(" casos de prueba (Casos_Prueba)...\n");
 
@@ -631,8 +751,8 @@ public class ChallengeFrame extends Stage {
                     summary.getPassedCount(),
                     summary.getTotalCount()));
 
-            Attempt savedAttempt = persistAttemptIfConnected(code);
-            handleEvaluationOutcome(summary.isAllPassed(), log.toString(), savedAttempt);
+            PersistenceOutcome persistence = persistAttemptIfConnected(code, summary.isAllPassed());
+            handleEvaluationOutcome(summary.isAllPassed(), summary.isSandboxedExecution(), log.toString(), persistence);
 
         } else if (activeChallenge instanceof QuizChallenge) {
             QuizChallenge quiz = (QuizChallenge) activeChallenge;
@@ -648,35 +768,86 @@ public class ChallengeFrame extends Stage {
                     ? "> Respuesta verificada: CORRECTA.\n> Concepto dominado con éxito."
                     : "> Respuesta incorrecta.\n> Revisa la teoría de la lección e inténtalo de nuevo.";
 
-            Attempt savedAttempt = persistAttemptIfConnected(chosenOption);
-            handleEvaluationOutcome(correct, msg, savedAttempt);
+            PersistenceOutcome persistence = persistAttemptIfConnected(chosenOption, correct);
+            handleEvaluationOutcome(correct, true, msg, persistence);
         }
     }
 
-    private Attempt persistAttemptIfConnected(String submittedPayload) {
-        if (currentUser == null || currentUser.getId() <= 0
-                || activeChallenge == null || activeChallenge.getId() <= 0) {
-            return null;
-        }
+    private PersistenceOutcome persistAttemptIfConnected(String submittedPayload, boolean localSuccess) {
         AppContext ctx = AppContext.getInstance();
-        if (!ctx.isOracleConnected()) {
-            return null;
+        boolean shouldSaveToOracle = ctx.isOracleConnected()
+                && currentUser != null && currentUser.getId() > 0
+                && activeChallenge != null && activeChallenge.getId() > 0;
+
+        if (!shouldSaveToOracle) {
+            if (!localSuccess && currentUser != null) {
+                currentUser.loseLife();
+            }
+            return PersistenceOutcome.localOnly();
         }
+
         try {
-            return ctx.getChallengeService().submitAttempt(currentUser, activeChallenge.getId(), submittedPayload);
-        } catch (Exception ignored) {
-            return null;
+            Attempt saved = ctx.getChallengeService().submitAttempt(currentUser, activeChallenge.getId(), submittedPayload);
+            return PersistenceOutcome.saved(saved);
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Error al persistir intento del reto #" + activeChallenge.getId() + " en Oracle", ex);
+            String causeMsg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                    ? ex.getMessage()
+                    : ex.getClass().getSimpleName();
+            return PersistenceOutcome.failed(causeMsg);
         }
     }
 
-    private void handleEvaluationOutcome(boolean success, String consoleMessage, Attempt savedAttempt) {
-        txtConsoleOutput.setText(consoleMessage);
-        if (success) {
-            int reward = savedAttempt != null
-                    ? savedAttempt.getEarnedExperience()
+    private void handleEvaluationOutcome(
+            boolean localSuccess,
+            boolean sandboxedValidation,
+            String consoleMessage,
+            PersistenceOutcome persistence) {
+
+        StringBuilder fullConsole = new StringBuilder(consoleMessage);
+
+        if (persistence.attemptedOracleSave && !persistence.savedToOracle) {
+            fullConsole.append("\n[ERROR DE GUARDADO EN ORACLE] ").append(persistence.errorMessage).append("\n")
+                    .append("> El intento NO fue persistido en la base de datos. Puedes volver a presionar el botón para reintentar.");
+            txtConsoleOutput.setText(fullConsole.toString());
+            btnSubmit.setText("Reintentar Envío y Guardado");
+
+            if (localSuccess) {
+                lblResultBanner.getStyleClass().setAll("text-warning");
+                lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.BOLT, 16, Theme.HEX_AMBER));
+                lblResultBanner.setText("Aprobado localmente, pero NO guardado en Oracle: " + persistence.errorMessage);
+            } else {
+                lblResultBanner.getStyleClass().setAll("text-danger");
+                lblResultBanner.setText("Intento fallido y error al registrar en Oracle: " + persistence.errorMessage);
+            }
+            return;
+        }
+
+        btnSubmit.setText("Ejecutar y Validar Solución");
+        boolean effectiveSuccess = persistence.savedToOracle && persistence.attempt != null
+                ? persistence.attempt.isCorrect()
+                : localSuccess;
+
+        if (persistence.savedToOracle) {
+            fullConsole.append("> Persistencia: Intento #")
+                    .append(persistence.attempt != null ? persistence.attempt.getId() : 0)
+                    .append(" guardado transaccionalmente en Oracle (Intentos).\n");
+        } else {
+            fullConsole.append("> Persistencia: Evaluado en modo local sin conexión a Oracle.\n");
+        }
+        txtConsoleOutput.setText(fullConsole.toString());
+
+        if (effectiveSuccess) {
+            int reward = persistence.savedToOracle && persistence.attempt != null
+                    ? persistence.attempt.getEarnedExperience()
                     : activeChallenge.getExpReward();
+
+            String modeQualifier = sandboxedValidation
+                    ? ""
+                    : " (validación simulada de demostración)";
+
             if (!xpAwardedForCurrent && currentUser != null && reward > 0) {
-                if (!AppContext.getInstance().isOracleConnected() || currentUser.getId() <= 0) {
+                if (!persistence.savedToOracle) {
                     currentUser.addExperience(reward);
                     currentUser.setLevel(Math.max(1, 1 + currentUser.getTotalExp() / 300));
                 }
@@ -686,18 +857,57 @@ public class ChallengeFrame extends Stage {
                 }
                 lblResultBanner.getStyleClass().setAll("text-success");
                 lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 16, Theme.HEX_GREEN));
-                lblResultBanner.setText("¡Reto superado! Se acreditaron +" + reward + " XP a tu perfil.");
+                String statusPrefix = persistence.savedToOracle
+                        ? "¡Aprobado y guardado en Oracle!"
+                        : "¡Aprobado localmente (modo demo)!";
+                lblResultBanner.setText(statusPrefix + modeQualifier + " Se acreditaron +" + reward + " XP.");
             } else {
                 if (onSolvedCallback != null) {
                     onSolvedCallback.run();
                 }
                 lblResultBanner.getStyleClass().setAll("text-success");
                 lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.CHECK, 16, Theme.HEX_GREEN));
-                lblResultBanner.setText("¡Solución correcta! Todos los casos de prueba aprobaron.");
+                String statusPrefix = persistence.savedToOracle
+                        ? "¡Solución aprobada y guardada en Oracle!"
+                        : "¡Solución aprobada localmente!";
+                lblResultBanner.setText(statusPrefix + modeQualifier);
             }
         } else {
+            if (onSolvedCallback != null) {
+                onSolvedCallback.run();
+            }
             lblResultBanner.getStyleClass().setAll("text-danger");
-            lblResultBanner.setText("Algunos casos fallaron. Revisa la consola o usa 'Insertar Solución Modelo'.");
+            String saveSuffix = persistence.savedToOracle
+                    ? " (intento registrado en Oracle; se descontó 1 vida)."
+                    : " (modo local; revisa la consola e inténtalo de nuevo).";
+            lblResultBanner.setText("Algunos casos fallaron" + saveSuffix);
+        }
+    }
+
+    private static final class PersistenceOutcome {
+
+        final boolean attemptedOracleSave;
+        final boolean savedToOracle;
+        final Attempt attempt;
+        final String errorMessage;
+
+        private PersistenceOutcome(boolean attemptedOracleSave, boolean savedToOracle, Attempt attempt, String errorMessage) {
+            this.attemptedOracleSave = attemptedOracleSave;
+            this.savedToOracle = savedToOracle;
+            this.attempt = attempt;
+            this.errorMessage = errorMessage;
+        }
+
+        static PersistenceOutcome localOnly() {
+            return new PersistenceOutcome(false, false, null, null);
+        }
+
+        static PersistenceOutcome saved(Attempt attempt) {
+            return new PersistenceOutcome(true, true, attempt, null);
+        }
+
+        static PersistenceOutcome failed(String errorMessage) {
+            return new PersistenceOutcome(true, false, null, errorMessage);
         }
     }
 }
