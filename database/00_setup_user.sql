@@ -4,17 +4,23 @@
 --   ALTER SESSION SET CONTAINER = XEPDB1;
 -- =============================================================================
 
--- 1. Crear el usuario del esquema (ajustar contraseña según requerimiento local)
-CREATE USER LEVELUP_ADMIN IDENTIFIED BY "password123"
+-- 1. Crear el usuario del esquema con cuota acotada en el tablespace USERS.
+-- IMPORTANTE: Reemplaza la contraseña local antes de ejecutar y regístrala en db.properties.
+DEFINE levelup_db_password = "Cambiar_Clave_Local_2026"
+
+CREATE USER LEVELUP_ADMIN IDENTIFIED BY "&levelup_db_password"
     DEFAULT TABLESPACE USERS
     TEMPORARY TABLESPACE TEMP
-    QUOTA UNLIMITED ON USERS;
+    QUOTA 100M ON USERS;
 
--- 2. Asignar únicamente los privilegios estrictamente necesarios (Principio de Menor Privilegio)
--- NOTA DE SEGURIDAD: NO utilizar 'GRANT DBA'. Solo se conceden roles de conectividad y recursos.
-GRANT CONNECT, RESOURCE TO LEVELUP_ADMIN;
-GRANT CREATE VIEW TO LEVELUP_ADMIN;
-GRANT UNLIMITED TABLESPACE TO LEVELUP_ADMIN;
+-- 2. Principio de Menor Privilegio: conceder únicamente permisos específicos del esquema
+-- (Sin GRANT DBA, sin RESOURCE heredado y sin UNLIMITED TABLESPACE).
+GRANT CREATE SESSION   TO LEVELUP_ADMIN;
+GRANT CREATE TABLE     TO LEVELUP_ADMIN;
+GRANT CREATE VIEW      TO LEVELUP_ADMIN;
+GRANT CREATE SEQUENCE  TO LEVELUP_ADMIN;
+GRANT CREATE PROCEDURE TO LEVELUP_ADMIN;
+GRANT CREATE TRIGGER   TO LEVELUP_ADMIN;
 
 -- =============================================================================
 -- Paso siguiente:
