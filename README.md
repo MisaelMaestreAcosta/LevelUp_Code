@@ -23,35 +23,41 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    ```sql
    ALTER SESSION SET CONTAINER = XEPDB1;
    ```
-2. Ejecuta el script de creación de usuario con privilegios mínimos seguros:
-   - [`database/00_setup_user.sql`](database/00_setup_user.sql)
+2. Ejecuta el script de creación de usuario con privilegios mínimos explícitos y cuota acotada (`100M`):
+   - [`database/00_setup_user.sql`](database/00_setup_user.sql) *(solicita la contraseña local mediante `&levelup_db_password`)*
 3. Crea una nueva conexión en SQL Developer con el usuario creado (`LEVELUP_ADMIN`) y ejecuta en orden:
    - [`database/01_schema.sql`](database/01_schema.sql) (crea las 18 tablas normalizadas)
-   - [`database/02_seed.sql`](database/02_seed.sql) (datos iniciales de roles, lenguajes, módulos, retos y logros)
+   - [`database/02_seed.sql`](database/02_seed.sql) (catálogo limpio de despliegue: roles, lenguajes, módulos, lecciones, retos y logros)
+   - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
-### 2. Pruebas Unitarias de PL/SQL en Oracle SQL Developer
-Para demostrar el funcionamiento de la lógica de negocio en base de datos al docente:
-1. Abre [`database/04_test_plsql.sql`](database/04_test_plsql.sql) en SQL Developer o DBeaver.
+### 2. Pruebas de PL/SQL en Oracle SQL Developer
+Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:
+1. Abre [`database/04_test_plsql.sql`](database/04_test_plsql.sql) en SQL Developer o DBeaver (requiere haber cargado los datos de prueba de `02b_seed_demo_users.sql`).
 2. Asegúrate de tener activa la salida de consola (`SET SERVEROUTPUT ON;`).
-3. Ejecuta el bloque anónimo completo para correr las 8 pruebas unitarias automatizadas con reporte visual de resultados (`[PASS]`).
+3. Ejecuta el bloque anónimo completo: valida funciones y procedimientos y revierte todos los cambios al final mediante `ROLLBACK TO sp_inicio_pruebas`.
 
-### 3. Configuración de Credenciales de la Aplicación
+### 3. Configuración Obligatoria de Credenciales Locales
+La aplicación no incluye credenciales por defecto en el código fuente. Configúralas mediante `db.properties` o variables de entorno (`DB_URL`, `DB_USER`, `DB_PASSWORD`):
 1. Copia la plantilla de configuración:
    ```bash
    cp src/main/resources/db.properties.example src/main/resources/db.properties
    ```
-2. Abre `src/main/resources/db.properties` y verifica la URL, usuario y contraseña de tu instancia local.  
-   *(Nota: `db.properties` se encuentra ignorado en Git para prevenir fuga accidental de credenciales).*
+2. Edita `src/main/resources/db.properties` con el usuario y contraseña definidos al ejecutar `00_setup_user.sql`.  
+   *(Nota: `db.properties` está ignorado en Git para prevenir exposición de credenciales).*
 
-### 4. Compilación y Ejecución de la Aplicación
+### 4. Compilación Reproducible, Pruebas Automatizadas y Ejecución (Maven Wrapper)
 
-```bash
-# Compilar el proyecto con Java 21 LTS
-mvn clean compile
+El repositorio incluye **Maven Wrapper** (`mvnw` / `mvnw.cmd`), por lo que no requiere tener `mvn` instalado globalmente en el `PATH`:
 
-# Ejecutar la aplicación de escritorio en JavaFX 21 + CSS
-mvn exec:java
+```powershell
+# En Windows (PowerShell / CMD):
+.\mvnw.cmd clean test
+.\mvnw.cmd javafx:run
+
+# En Linux / macOS:
+./mvnw clean test
+./mvnw javafx:run
 ```
 
 ---
