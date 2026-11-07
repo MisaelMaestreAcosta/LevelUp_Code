@@ -21,6 +21,11 @@ public class OracleUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> findById(int id) {
+        return userDAO.findById(id);
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return userDAO.findByEmail(email);
     }

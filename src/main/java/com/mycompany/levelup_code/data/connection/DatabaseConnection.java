@@ -16,8 +16,7 @@ public final class DatabaseConnection {
 
     private static final String DEFAULT_URL = "jdbc:oracle:thin:@//localhost:1521/XEPDB1";
     private static final String FALLBACK_URL = "jdbc:oracle:thin:@localhost:1521:xe";
-    private static final String DEFAULT_USER = "level_up_admin";
-    private static final String DEFAULT_PASSWORD = "password123";
+    private static final String PLACEHOLDER_PASSWORD = "tu_contraseña_aqui";
 
     private static final String URL;
     private static final String ALT_URL;
@@ -31,13 +30,13 @@ public final class DatabaseConnection {
                 props.load(in);
             }
         } catch (IOException ignored) {
-            // Se usan los valores por defecto si no se puede leer el archivo
+            // Si no existe db.properties se consultan las variables de entorno
         }
 
         URL = resolveSetting("DB_URL", props.getProperty("db.url"), DEFAULT_URL);
         ALT_URL = props.getProperty("db.fallback.url", FALLBACK_URL);
-        USER = resolveSetting("DB_USER", props.getProperty("db.user"), DEFAULT_USER);
-        PASSWORD = resolveSetting("DB_PASSWORD", props.getProperty("db.password"), DEFAULT_PASSWORD);
+        USER = resolveSetting("DB_USER", props.getProperty("db.user"), "");
+        PASSWORD = resolveSetting("DB_PASSWORD", props.getProperty("db.password"), "");
 
         try {
             Class.forName("oracle.jdbc.OracleDriver");
@@ -70,6 +69,11 @@ public final class DatabaseConnection {
      * y, en caso de fallo de servicio, la URL alternativa (SID xe).
      */
     public static Connection getConnection() throws SQLException {
+        if (USER.isEmpty() || PASSWORD.isEmpty() || PLACEHOLDER_PASSWORD.equals(PASSWORD)) {
+            throw new SQLException(
+                    "Credenciales de Oracle no configuradas. Cree src/main/resources/db.properties "
+                    + "a partir de db.properties.example o defina DB_USER y DB_PASSWORD.");
+        }
         try {
             return DriverManager.getConnection(URL, USER, PASSWORD);
         } catch (SQLException primaryEx) {

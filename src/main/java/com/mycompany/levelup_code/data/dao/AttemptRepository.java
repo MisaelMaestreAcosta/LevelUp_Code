@@ -14,4 +14,12 @@ public interface AttemptRepository {
 
     /** Devuelve los intentos del usuario para el reto, en orden cronológico. */
     List<Attempt> findByUserAndChallenge(int userId, int challengeId);
+
+    /**
+     * Indica si el repositorio aplica de forma atómica las reglas de gamificación
+     * (XP, nivel, racha, vidas y logros) al guardar un intento (ej. mediante PL/SQL).
+     */
+    default boolean managesGamificationTransactionally() {
+        return false;
+    }
 }

@@ -104,14 +104,10 @@ public class ProgressService {
         progress.setStatus(ProgressStatus.COMPLETED);
         progress.setApprovedAt(LocalDateTime.now());
 
-        int expBeforeSave = user.getExperience();
         LessonProgress savedProgress =
                 progressRepository.saveOrUpdate(progress);
 
-        // Si el procedimiento PL/SQL (PKG_GAMIFICACION.SP_COMPLETAR_LECCION) ya otorgó la XP
-        // en la base de datos y sincronizó al usuario, evitamos duplicar la recompensa en Java.
-        boolean gamificationHandledByDb = user.getExperience() != expBeforeSave;
-        if (!gamificationHandledByDb && lesson.getExpReward() > 0) {
+        if (!progressRepository.managesGamificationTransactionally() && lesson.getExpReward() > 0) {
             gamificationService.awardExperience(
                     user, lesson.getExpReward()
             );

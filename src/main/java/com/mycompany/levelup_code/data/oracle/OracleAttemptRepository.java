@@ -20,13 +20,18 @@ import java.util.List;
 
 /**
  * Implementación Oracle JDBC de {@link AttemptRepository} sobre la tabla {@code Intentos}.
- * Soporta ejecución transaccional delegada en PL/SQL ({@code PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO})
- * con fallback a inserción SQL directa.
+ * Ejecuta como flujo transaccional único el procedimiento PL/SQL
+ * {@code PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO} confirmando la transacción desde el cliente.
  */
 public class OracleAttemptRepository implements AttemptRepository {
 
     private final OracleChallengeRepository challengeRepository = new OracleChallengeRepository();
     private final UserDAO userDAO = new UserDAO();
+
+    @Override
+    public boolean managesGamificationTransactionally() {
+        return true;
+    }
 
     @Override
     public boolean hasSuccessfulAttempt(int userId, int challengeId) {
@@ -45,79 +50,56 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public Attempt save(Attempt attempt) {
-        // 1. Intentar registrar mediante el procedimiento almacenado PL/SQL en Oracle
         String plsql = "{call PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
-        try (Connection conn = DatabaseConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(plsql)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try (CallableStatement cstmt = conn.prepareCall(plsql)) {
+                cstmt.setInt(1, attempt.getUser().getId());
+                cstmt.setInt(2, attempt.getChallenge().getId());
+                cstmt.setInt(3, attempt.isCorrect() ? 1 : 0);
+                cstmt.setString(4, attempt.getSubmittedContent() != null ? attempt.getSubmittedContent() : "");
+                cstmt.setString(5, attempt.getResult() != null ? attempt.getResult().name() : AttemptResult.INCORRECT.name());
+                cstmt.setInt(6, (int) Math.max(0, attempt.getExecutionTimeMs()));
 
-            cstmt.setInt(1, attempt.getUser().getId());
-            cstmt.setInt(2, attempt.getChallenge().getId());
-            cstmt.setInt(3, attempt.isCorrect() ? 1 : 0);
-            cstmt.setString(4, attempt.getSubmittedContent() != null ? attempt.getSubmittedContent() : "");
-            cstmt.setString(5, attempt.getResult() != null ? attempt.getResult().name() : AttemptResult.INCORRECT.name());
-            cstmt.setInt(6, (int) Math.max(0, attempt.getExecutionTimeMs()));
+                cstmt.registerOutParameter(7, Types.NUMERIC);  // p_nuevo_nivel
+                cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nueva_exp
+                cstmt.registerOutParameter(9, Types.NUMERIC);  // p_vidas_restantes
+                cstmt.registerOutParameter(10, Types.NUMERIC); // p_exp_otorgada
+                cstmt.registerOutParameter(11, Types.NUMERIC); // p_id_intento_creado
 
-            // Parámetros de salida OUT calculados por PL/SQL
-            cstmt.registerOutParameter(7, Types.NUMERIC);  // p_nuevo_nivel
-            cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nueva_exp
-            cstmt.registerOutParameter(9, Types.NUMERIC);  // p_vidas_restantes
-            cstmt.registerOutParameter(10, Types.NUMERIC); // p_exp_otorgada
-            cstmt.registerOutParameter(11, Types.NUMERIC); // p_id_intento_creado
+                cstmt.execute();
 
-            cstmt.execute();
+                int nuevoNivel = cstmt.getInt(7);
+                int nuevaExp = cstmt.getInt(8);
+                int vidasRestantes = cstmt.getInt(9);
+                int expOtorgada = cstmt.getInt(10);
+                int idIntentoCreado = cstmt.getInt(11);
 
-            int nuevoNivel = cstmt.getInt(7);
-            int nuevaExp = cstmt.getInt(8);
-            int vidasRestantes = cstmt.getInt(9);
-            int expOtorgada = cstmt.getInt(10);
-            int idIntentoCreado = cstmt.getInt(11);
+                conn.commit();
 
-            attempt.setId(idIntentoCreado);
-            attempt.setEarnedExperience(expOtorgada);
+                attempt.setId(idIntentoCreado);
+                attempt.setEarnedExperience(expOtorgada);
 
-            // Sincronizar el estado del usuario en memoria con los valores calculados por PL/SQL
-            if (attempt.getUser() != null) {
-                attempt.getUser().setLevel(nuevoNivel);
-                attempt.getUser().setExperience(nuevaExp);
-                attempt.getUser().setLives(vidasRestantes);
-                userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
-                    attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
-                    attempt.getUser().setMaxStreak(fresh.getMaxStreak());
-                });
-            }
-            return attempt;
-        } catch (SQLException ex) {
-            // Si el paquete PL/SQL no ha sido compilado en la BD aún, recurrir a inserción directa
-            return saveWithDirectInsert(attempt);
-        }
-    }
-
-    private Attempt saveWithDirectInsert(Attempt attempt) {
-        String sql = "INSERT INTO Intentos ("
-                + "id_usuario, id_reto, codigo_enviado, salida_obtenida, "
-                + "es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento"
-                + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, new String[]{"ID_INTENTO"})) {
-            stmt.setInt(1, attempt.getUser().getId());
-            stmt.setInt(2, attempt.getChallenge().getId());
-            stmt.setString(3, attempt.getSubmittedContent());
-            stmt.setString(4, attempt.getResult() != null ? attempt.getResult().name() : AttemptResult.INCORRECT.name());
-            stmt.setInt(5, attempt.isCorrect() ? 1 : 0);
-            stmt.setLong(6, Math.max(0, attempt.getExecutionTimeMs()));
-            stmt.setInt(7, Math.max(0, attempt.getEarnedExperience()));
-            LocalDateTime when = attempt.getAttemptDate() != null ? attempt.getAttemptDate() : LocalDateTime.now();
-            stmt.setTimestamp(8, Timestamp.valueOf(when));
-
-            stmt.executeUpdate();
-            try (ResultSet rs = stmt.getGeneratedKeys()) {
-                if (rs.next()) {
-                    attempt.setId(rs.getInt(1));
+                if (attempt.getUser() != null) {
+                    attempt.getUser().setLevel(nuevoNivel);
+                    attempt.getUser().setExperience(nuevaExp);
+                    attempt.getUser().setLives(vidasRestantes);
+                    userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
+                        attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
+                        attempt.getUser().setMaxStreak(fresh.getMaxStreak());
+                    });
                 }
+                return attempt;
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
             }
-            return attempt;
         } catch (SQLException e) {
-            throw new BusinessException("Error al guardar intento en Oracle: " + e.getMessage(), e);
+            throw new BusinessException(
+                    "Error al procesar el intento en PKG_GAMIFICACION (verifica que 03_plsql_gamificacion.sql esté compilado): "
+                    + e.getMessage(), e);
         }
     }
 

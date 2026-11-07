@@ -74,6 +74,15 @@ public class GamificationService {
         achievementService.evaluateAndUnlock(user);
     }
 
+    /** Descuenta una vida ante un intento fallido respetando el límite inferior de cero. */
+    public void penalizeFailedAttempt(User user) {
+        if (user == null || user.getId() <= 0) {
+            throw new IllegalArgumentException("El usuario debe ser válido.");
+        }
+        user.setLives(Math.max(0, user.getLives() - 1));
+        userRepository.update(user);
+    }
+
     /** Continúa la racha si hubo actividad ayer; si no, la inicia de nuevo. */
     private void updateStreak(User user, LocalDate today) {
         LocalDate yesterday = today.minusDays(1);

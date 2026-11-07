@@ -3,11 +3,17 @@ package com.mycompany.levelup_code.data.dao;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.UserAchievement;
 import com.mycompany.levelup_code.domain.model.UserStats;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 /** Contrato de consulta y registro de logros para la capa de negocio. */
 public interface AchievementRepository {
+
+    /** Devuelve el catálogo completo de logros definidos en la plataforma. */
+    default List<Achievement> findAllCatalog() {
+        return Collections.emptyList();
+    }
 
     /** Obtiene las estadísticas actuales del usuario para evaluar criterios. */
     Optional<UserStats> findStatsByUserId(int userId);

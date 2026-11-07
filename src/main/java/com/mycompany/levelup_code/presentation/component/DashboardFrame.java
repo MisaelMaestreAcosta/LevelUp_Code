@@ -7,27 +7,25 @@ import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.CourseModule;
-import com.mycompany.levelup_code.domain.model.DailyActivity;
 import com.mycompany.levelup_code.domain.model.ExperienceAchievement;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
-import com.mycompany.levelup_code.domain.model.LessonProgress;
-import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.StreakAchievement;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
-import com.mycompany.levelup_code.domain.model.UserAchievement;
+import com.mycompany.levelup_code.presentation.controller.DashboardController;
+import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -59,12 +57,16 @@ import javafx.stage.Stage;
  */
 public class DashboardFrame {
 
+    private static final Logger LOGGER = Logger.getLogger(DashboardFrame.class.getName());
+
     private final Stage stage;
     private final User currentUser;
     private final boolean oracleConnected;
+    private final DashboardController controller;
 
     private String activeLanguageKey = "JAVA";
     private int solvedChallengesCount = 0;
+    private int lastKnownOfflineExp = 0;
 
     private final List<Lesson> javaLessons = new ArrayList<>();
     private final List<Lesson> pythonLessons = new ArrayList<>();
@@ -106,6 +108,7 @@ public class DashboardFrame {
 
     // Árbol de habilidades y cursos
     private Label lblLessonsHeader;
+    private Label lblCourseStatus;
     private VBox lessonsListBox;
 
     // Comparador de 3 lenguajes
@@ -139,15 +142,18 @@ public class DashboardFrame {
 
     public DashboardFrame(Stage targetStage, User user) {
         this.stage = targetStage != null ? targetStage : new Stage();
-        this.currentUser = user != null ? user : createDefaultStudent();
-        this.oracleConnected = AppContext.getInstance().isOracleConnected();
+        this.currentUser = user != null ? user : DemoSeedCatalog.createDefaultStudent();
+        AppContext ctx = AppContext.getInstance();
+        this.oracleConnected = ctx.isOracleConnected();
+        this.controller = new DashboardController(this.currentUser, ctx);
+        this.lastKnownOfflineExp = this.currentUser.getTotalExp();
 
-        this.enrolledLanguages.add("JAVA");
-        this.enrolledLanguages.add("PYTHON");
-        loadEnrollmentsFromOracle();
         loadDomainDataFromOracleOrSeed();
+        loadEnrollmentsFromOracle();
         loadAchievementsFromOracleOrSeed();
         loadActivityHistoryFromOracle();
+        this.solvedChallengesCount = this.controller.syncTelemetryAndGetSolvedChallenges(0);
+
         initUi();
         populateLessonsForLanguage("JAVA");
         loadComparisonTopic("POLYMORPHISM");
@@ -172,21 +178,11 @@ public class DashboardFrame {
         }
     }
 
-    private static User createDefaultStudent() {
-        User u = new User();
-        u.setId(1);
-        u.setUsername("Estudiante");
-        u.setEmail("estudiante@levelup.edu.co");
-        u.setExperience(1450);
-        u.setLevel(5);
-        u.setCurrentStreak(7);
-        u.setMaxStreak(12);
-        return u;
-    }
-
     private void loadEnrollmentsFromOracle() {
-        this.enrolledLanguages.add("JAVA");
-        this.enrolledLanguages.add("PYTHON");
+        this.enrolledLanguages.clear();
+        this.enrolledLanguages.addAll(
+                controller.loadEnrolledLanguageKeys(javaLangModel, pythonLangModel, cppLangModel)
+        );
     }
 
     private void loadDomainDataFromOracleOrSeed() {
@@ -195,147 +191,41 @@ public class DashboardFrame {
         cppLessons.clear();
         allLessonsForAdmin.clear();
 
-        if (oracleConnected) {
-            try {
-                List<Language> languages = AppContext.getInstance().getContentService().listActiveLanguages();
-                for (Language lang : languages) {
-                    String name = lang.getName() != null ? lang.getName().toLowerCase() : "";
-                    List<Lesson> targetList;
-                    if (name.contains("python")) {
-                        pythonLangModel = lang;
-                        targetList = pythonLessons;
-                    } else if (name.contains("c++") || name.contains("cpp")) {
-                        cppLangModel = lang;
-                        targetList = cppLessons;
-                    } else {
-                        javaLangModel = lang;
-                        targetList = javaLessons;
-                    }
-                    if (lang.getModules() != null) {
-                        for (CourseModule mod : lang.getModules()) {
-                            if (mod.getLessons() != null) {
-                                for (Lesson lesson : mod.getLessons()) {
-                                    targetList.add(lesson);
-                                    allLessonsForAdmin.add(lesson);
-                                }
-                            }
+        List<Language> languages = controller.loadLanguages();
+        for (Language lang : languages) {
+            String name = lang.getName() != null ? lang.getName().toLowerCase(Locale.ROOT) : "";
+            List<Lesson> targetList;
+            if (name.contains("python")) {
+                pythonLangModel = lang;
+                targetList = pythonLessons;
+            } else if (name.contains("c++") || name.contains("cpp")) {
+                cppLangModel = lang;
+                targetList = cppLessons;
+            } else {
+                javaLangModel = lang;
+                targetList = javaLessons;
+            }
+            if (lang.getModules() != null) {
+                for (CourseModule mod : lang.getModules()) {
+                    if (mod.getLessons() != null) {
+                        for (Lesson lesson : mod.getLessons()) {
+                            targetList.add(lesson);
+                            allLessonsForAdmin.add(lesson);
                         }
                     }
                 }
-                if (!javaLessons.isEmpty() || !pythonLessons.isEmpty() || !cppLessons.isEmpty()) {
-                    return;
-                }
-            } catch (Exception ignored) {
             }
         }
-
-        // Respaldo local en memoria
-        javaLangModel = new Language(1, "Java", "Java 21 LTS — POO, Interfaces, Colecciones y Concurrencia.", true);
-        pythonLangModel = new Language(2, "Python", "Python 3.12 — Tipado dinámico, ABC y estructuras expresivas.", true);
-        cppLangModel = new Language(3, "C++", "ISO C++ 20 — Control determinista de memoria, punteros y STL.", true);
-
-        CourseModule javaMod = new CourseModule(1, "Arquitectura Orientada a Objetos y Colecciones", "Abstracción, herencia y estructuras lineales", 1, javaLangModel);
-        Lesson jLesson1 = new Lesson(1, "Herencia, Clases Abstractas y Despacho Polimórfico",
-                "En Java, una clase abstracta define el contrato común para sus subclases y delega la implementación mediante métodos abstractos.",
-                1, 60, javaMod);
-        CodeChallenge jCode = new CodeChallenge(101, "Polimorfismo: Despacho Dinámico de Sonidos",
-                "Implementa emitirSonido(String tipo) para que retorne \"Guau\" cuando reciba \"Perro\" y \"Miau\" cuando reciba \"Gato\".",
-                jLesson1, 60,
-                "public class AnimalSoundSolver {\n    public static String emitirSonido(String tipo) {\n        if (\"Perro\".equalsIgnoreCase(tipo)) {\n            return \"Guau\";\n        }\n        return \"\";\n    }\n}",
-                2);
-        jCode.addTestCase(new TestCase(1, jCode, "Perro", "Guau", false));
-        jCode.addTestCase(new TestCase(2, jCode, "Gato", "Miau", false));
-        jLesson1.addChallenge(jCode);
-
-        QuizChallenge jQuiz = new QuizChallenge(102, "Quiz Conceptual: Enlace Dinámico en POO",
-                "¿Qué mecanismo permite que una referencia de tipo superclase invoque la implementación sobrescrita (@Override) en tiempo de ejecución?",
-                jLesson1, 40,
-                Arrays.asList(
-                        "Sobrecarga estática en tiempo de compilación (Overloading)",
-                        "Enlace dinámico en tiempo de ejecución mediante tabla virtual (vtable)",
-                        "Conversión implícita de tipos primitivos en la pila",
-                        "Duplicación de constructores en la clase base"
-                ),
-                "Enlace dinámico en tiempo de ejecución mediante tabla virtual (vtable)"
-        );
-        jLesson1.addChallenge(jQuiz);
-
-        Lesson jLesson2 = new Lesson(2, "Búsqueda Binaria O(log n) libre de desbordamiento",
-                "El cálculo seguro del punto medio utiliza low + (high - low) / 2 para evitar desbordamiento aritmético.",
-                2, 75, javaMod);
-        jLesson2.addChallenge(jCode);
-
-        Lesson jLesson3 = new Lesson(3, "Estructuras Dinámicas en el Heap: ArrayList<T>",
-                "ArrayList redimensiona su arreglo interno con costo amortizado O(1) al insertar al final.",
-                3, 80, javaMod);
-        jLesson3.addChallenge(jQuiz);
-
-        javaLessons.addAll(Arrays.asList(jLesson1, jLesson2, jLesson3));
-        allLessonsForAdmin.addAll(javaLessons);
-
-        CourseModule pyMod = new CourseModule(2, "Protocolos, Listas y Expresividad Algorítmica", "Duck Typing, abc.ABC y búsqueda eficiente", 1, pythonLangModel);
-        Lesson pyLesson1 = new Lesson(4, "Protocolos Abstractos (abc.ABC) y Duck Typing",
-                "En Python, las clases base abstractas se definen heredando de abc.ABC y decorando métodos con @abstractmethod.",
-                1, 60, pyMod);
-        pyLesson1.addChallenge(jCode);
-        pythonLessons.add(pyLesson1);
-        allLessonsForAdmin.add(pyLesson1);
-
-        CourseModule cppMod = new CourseModule(3, "Memoria, Referencias y Contenedores STL", "RAII y std::vector", 1, cppLangModel);
-        Lesson cppLesson1 = new Lesson(7, "Funciones Virtuales Puras (= 0) y Tabla Virtual (vtable)",
-                "En C++, el polimorfismo dinámico se activa declarando el método base como virtual.",
-                1, 60, cppMod);
-        cppLesson1.addChallenge(jCode);
-        cppLessons.add(cppLesson1);
-        allLessonsForAdmin.add(cppLesson1);
     }
 
     private void loadAchievementsFromOracleOrSeed() {
         achievementsCatalog.clear();
-        if (oracleConnected) {
-            try {
-                List<Achievement> fromDb = AppContext.getInstance()
-                        .getOracleAchievementRepository().findAllCatalog();
-                if (!fromDb.isEmpty()) {
-                    achievementsCatalog.addAll(fromDb);
-                    return;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        achievementsCatalog.add(new StreakAchievement(1, "Constancia de Acero", "Mantén una racha activa de 3 días seguidos practicando.", "FLAME", 3));
-        achievementsCatalog.add(new StreakAchievement(2, "Hábito Algorítmico", "Alcanza una racha continua de 7 días de estudio.", "FLAME", 7));
-        achievementsCatalog.add(new ExperienceAchievement(3, "Explorador Políglota", "Acumula tus primeros 1,000 puntos de experiencia (XP).", "BOLT", 1000));
-        achievementsCatalog.add(new ExperienceAchievement(4, "Arquitecto Senior", "Supera la barrera de los 1,500 XP resolviendo lecciones y retos.", "TROPHY", 1500));
-        achievementsCatalog.add(new ChallengeCountAchievement(5, "Domador de Casos de Prueba", "Resuelve exitosamente 5 retos de código o quiz.", "CODE", 5));
-        achievementsCatalog.add(new StreakAchievement(6, "Leyenda del Semestre", "Alcanza una racha histórica de 14 días consecutivos.", "SHIELD", 14));
+        achievementsCatalog.addAll(controller.loadAchievementsCatalog());
     }
 
     private void loadActivityHistoryFromOracle() {
         activityByDate.clear();
-        if (oracleConnected && currentUser.getId() > 0) {
-            try {
-                List<DailyActivity> recent = AppContext.getInstance()
-                        .getOracleActivityRepository().findRecentByUser(currentUser.getId(), 14);
-                for (DailyActivity da : recent) {
-                    if (da.getActivityDate() != null) {
-                        activityByDate.put(da.getActivityDate(), da.getExperienceGained());
-                    }
-                }
-                if (!activityByDate.isEmpty()) {
-                    return;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        LocalDate today = LocalDate.now();
-        int[] sampleXp = {60, 0, 120, 0, 80, 0, 0, 120, 180, 90, 210, 150, 240, 160};
-        for (int i = 0; i < sampleXp.length; i++) {
-            LocalDate d = today.minusDays(sampleXp.length - 1 - i);
-            if (sampleXp[i] > 0) {
-                activityByDate.put(d, sampleXp[i]);
-            }
-        }
+        activityByDate.putAll(controller.loadRecentActivityHistory());
     }
 
     private void initUi() {
@@ -655,6 +545,11 @@ public class DashboardFrame {
         lessonsWrapper.getStyleClass().add("surface-card");
         VBox.setVgrow(lessonsWrapper, Priority.ALWAYS);
 
+        lblCourseStatus = new Label(oracleConnected
+                ? "Inscripciones sincronizadas con la tabla Inscripciones en Oracle."
+                : "Modo demostración local sin conexión a Oracle.");
+        lblCourseStatus.getStyleClass().add("muted-text");
+
         HBox listHeader = new HBox(10);
         listHeader.setAlignment(Pos.CENTER_LEFT);
         lblLessonsHeader = new Label("ÁRBOL DE HABILIDADES Y PROGRESO · JAVA");
@@ -662,7 +557,7 @@ public class DashboardFrame {
         Region sp = new Region();
         HBox.setHgrow(sp, Priority.ALWAYS);
         Label badgeHint = Theme.createPillBadge("Nodos conectados con Progreso_Leccion", "badge-green");
-        listHeader.getChildren().addAll(lblLessonsHeader, sp, badgeHint);
+        listHeader.getChildren().addAll(lblLessonsHeader, sp, lblCourseStatus, badgeHint);
 
         lessonsListBox = new VBox(12);
         ScrollPane scroll = new ScrollPane(lessonsListBox);
@@ -716,11 +611,14 @@ public class DashboardFrame {
         btnEnroll.getStyleClass().add(btnStyleClass);
         btnEnroll.setOnAction(e -> {
             if (!enrolledLanguages.contains(langKey)) {
-                enrolledLanguages.add(langKey);
-                persistEnrollmentInOracle(langKey);
-                enrollBadge.setText("INSCRITO ✓");
-                enrollBadge.getStyleClass().setAll("badge-green");
-                btnEnroll.setText("Abrir Ruta");
+                if (persistEnrollmentInOracle(langKey)) {
+                    enrolledLanguages.add(langKey);
+                    enrollBadge.setText("INSCRITO ✓");
+                    enrollBadge.getStyleClass().setAll("badge-green");
+                    btnEnroll.setText("Abrir Ruta");
+                } else {
+                    return;
+                }
             }
             populateLessonsForLanguage(langKey);
         });
@@ -730,17 +628,26 @@ public class DashboardFrame {
         return card;
     }
 
-    private void persistEnrollmentInOracle(String langKey) {
+    private boolean persistEnrollmentInOracle(String langKey) {
         if (!oracleConnected || currentUser.getId() <= 0) {
-            return;
+            return true;
         }
+        Language targetLang = "PYTHON".equals(langKey) ? pythonLangModel
+                : ("CPP".equals(langKey) ? cppLangModel : javaLangModel);
         try {
-            List<Lesson> list = "PYTHON".equals(langKey) ? pythonLessons
-                    : ("CPP".equals(langKey) ? cppLessons : javaLessons);
-            if (!list.isEmpty() && list.get(0).getId() > 0) {
-                AppContext.getInstance().getProgressService().startLesson(currentUser, list.get(0).getId());
+            controller.enrollInLanguage(targetLang);
+            if (lblCourseStatus != null) {
+                lblCourseStatus.getStyleClass().setAll("text-success");
+                lblCourseStatus.setText("Inscripción guardada en tabla Inscripciones (" + langKey + ").");
             }
-        } catch (Exception ignored) {
+            return true;
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Error al guardar inscripción de lenguaje " + langKey + " en Oracle", ex);
+            if (lblCourseStatus != null) {
+                lblCourseStatus.getStyleClass().setAll("text-danger");
+                lblCourseStatus.setText("Error al guardar inscripción en Oracle: " + ex.getMessage());
+            }
+            return false;
         }
     }
 
@@ -771,22 +678,7 @@ public class DashboardFrame {
     }
 
     private ProgressStatus resolveLessonProgressStatus(Lesson lesson, int indexInList) {
-        if (oracleConnected && currentUser.getId() > 0 && lesson.getId() > 0) {
-            try {
-                Optional<LessonProgress> lp = AppContext.getInstance()
-                        .getProgressRepository().findByUserAndLesson(currentUser.getId(), lesson.getId());
-                if (lp.isPresent() && lp.get().getStatus() != null) {
-                    return lp.get().getStatus();
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        if (indexInList == 0) {
-            return ProgressStatus.COMPLETED;
-        } else if (indexInList == 1) {
-            return ProgressStatus.IN_PROGRESS;
-        }
-        return ProgressStatus.PENDING;
+        return controller.resolveLessonProgressStatus(lesson, indexInList);
     }
 
     private HBox createSkillNodeRow(int orderNum, final Lesson lesson, ProgressStatus status) {
@@ -850,7 +742,7 @@ public class DashboardFrame {
 
         Button btnTheory = new Button("Estudiar Teoría");
         btnTheory.getStyleClass().add("btn-secondary");
-        btnTheory.setOnAction(e -> new LessonFrame(currentUser, lesson, this::onChallengeOrLessonCompleted).show());
+        btnTheory.setOnAction(e -> new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show());
 
         Button btnSolve = new Button("Resolver Reto");
         btnSolve.getStyleClass().add("btn-primary");
@@ -1140,33 +1032,17 @@ public class DashboardFrame {
         }
         achievementsGrid.getChildren().clear();
 
-        Set<Integer> unlockedIds = new HashSet<>();
-        if (oracleConnected && currentUser.getId() > 0) {
-            try {
-                List<UserAchievement> unlockedFromDb = AppContext.getInstance()
-                        .getOracleAchievementRepository().findUnlockedByUser(currentUser.getId());
-                for (UserAchievement ua : unlockedFromDb) {
-                    if (ua.getAchievement() != null) {
-                        unlockedIds.add(ua.getAchievement().getId());
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-        }
+        Set<Integer> unlockedIds = controller.resolveUnlockedAchievementIds(
+                achievementsCatalog,
+                solvedChallengesCount
+        );
 
         int unlockedCount = 0;
         for (int i = 0; i < achievementsCatalog.size(); i++) {
             Achievement ach = achievementsCatalog.get(i);
-            boolean unlocked = unlockedIds.contains(ach.getId()) || isAchievementSatisfied(ach);
+            boolean unlocked = unlockedIds.contains(ach.getId());
             if (unlocked) {
                 unlockedCount++;
-                if (oracleConnected && currentUser.getId() > 0 && !unlockedIds.contains(ach.getId())) {
-                    try {
-                        AppContext.getInstance().getOracleAchievementRepository()
-                                .saveIfNotUnlocked(new UserAchievement(0, currentUser, ach, LocalDateTime.now()));
-                    } catch (Exception ignored) {
-                    }
-                }
             }
             int col = i % 2;
             int row = i / 2;
@@ -1174,21 +1050,6 @@ public class DashboardFrame {
         }
 
         lblAchievementsSummary.setText("Desbloqueados: " + unlockedCount + " de " + achievementsCatalog.size() + " logros");
-    }
-
-    private boolean isAchievementSatisfied(Achievement ach) {
-        if (ach instanceof StreakAchievement) {
-            return Math.max(currentUser.getCurrentStreak(), currentUser.getMaxStreak())
-                    >= ((StreakAchievement) ach).getRequiredDays();
-        }
-        if (ach instanceof ExperienceAchievement) {
-            return currentUser.getTotalExp() >= ((ExperienceAchievement) ach).getRequiredExp();
-        }
-        if (ach instanceof ChallengeCountAchievement) {
-            int effectiveSolved = Math.max(solvedChallengesCount, currentUser.getTotalExp() / 250);
-            return effectiveSolved >= ((ChallengeCountAchievement) ach).getRequiredChallenges();
-        }
-        return false;
     }
 
     private HBox createAchievementCard(Achievement ach, boolean unlocked) {
@@ -1385,10 +1246,13 @@ public class DashboardFrame {
         String title = txtAdminTitle.getText() != null ? txtAdminTitle.getText().trim() : "";
         String statement = txtAdminStatement.getText() != null ? txtAdminStatement.getText().trim() : "";
         String template = txtAdminTemplate.getText() != null ? txtAdminTemplate.getText() : "";
-        int reward = 80;
+        int reward;
         try {
             reward = Integer.parseInt(txtAdminReward.getText().trim());
-        } catch (Exception ignored) {
+        } catch (NumberFormatException ex) {
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("La recompensa XP debe ser un número entero válido.");
+            return;
         }
 
         CodeChallenge newCh = new CodeChallenge(
@@ -1403,28 +1267,22 @@ public class DashboardFrame {
         newCh.addTestCase(new TestCase(1, newCh, txtAdminCase1In.getText().trim(), txtAdminCase1Out.getText().trim(), false));
         newCh.addTestCase(new TestCase(2, newCh, txtAdminCase2In.getText().trim(), txtAdminCase2Out.getText().trim(), false));
 
-        if (oracleConnected && targetLesson != null && targetLesson.getId() > 0) {
-            try {
-                Challenge saved = AppContext.getInstance().getContentService().createChallenge(currentUser, newCh);
+        try {
+            Challenge saved = controller.createAdminChallenge(targetLesson, newCh);
+            if (targetLesson != null) {
                 targetLesson.addChallenge(saved);
-                lblAdminStatus.getStyleClass().setAll("text-success");
-                lblAdminStatus.setText("¡Reto #" + saved.getId() + " guardado en Retos, Reto_Codigo y Casos_Prueba en Oracle!");
-                populateLessonsForLanguage(activeLanguageKey);
-                new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
-                return;
-            } catch (Exception ex) {
-                lblAdminStatus.getStyleClass().setAll("text-danger");
-                lblAdminStatus.setText("Aviso: " + ex.getMessage());
-                return;
             }
+            lblAdminStatus.getStyleClass().setAll("text-success");
+            lblAdminStatus.setText(oracleConnected && saved.getId() > 0
+                    ? "¡Reto #" + saved.getId() + " guardado en Retos, Reto_Codigo y Casos_Prueba en Oracle!"
+                    : "Reto creado localmente (modo demostración sin Oracle) y abierto en el evaluador.");
+            populateLessonsForLanguage(activeLanguageKey);
+            new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", ex);
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("Error al guardar el reto: " + ex.getMessage());
         }
-
-        if (targetLesson != null) {
-            targetLesson.addChallenge(newCh);
-        }
-        lblAdminStatus.getStyleClass().setAll("text-success");
-        lblAdminStatus.setText("Reto creado y abierto en el evaluador dinámico.");
-        new ChallengeFrame(currentUser, newCh, this::onChallengeOrLessonCompleted).show();
     }
 
     private void switchWorkspaceView(String cardKey) {
@@ -1463,8 +1321,22 @@ public class DashboardFrame {
         }
     }
 
+    private void onLessonStateChanged() {
+        this.lastKnownOfflineExp = currentUser.getTotalExp();
+        refreshAllDashboardState();
+    }
+
     private void onChallengeOrLessonCompleted() {
-        solvedChallengesCount++;
+        if (!oracleConnected && currentUser.getTotalExp() > lastKnownOfflineExp) {
+            solvedChallengesCount++;
+        }
+        this.lastKnownOfflineExp = currentUser.getTotalExp();
+        refreshAllDashboardState();
+    }
+
+    private void refreshAllDashboardState() {
+        this.solvedChallengesCount = controller.syncTelemetryAndGetSolvedChallenges(this.solvedChallengesCount);
+        this.lastKnownOfflineExp = currentUser.getTotalExp();
         loadActivityHistoryFromOracle();
         rebuildHeatmapCells();
         refreshGamificationTelemetry();
@@ -1486,13 +1358,14 @@ public class DashboardFrame {
 
         lblExpVal.setText(exp + " XP");
         lblExpSub.setText(solvedChallengesCount > 0
-                ? solvedChallengesCount + " actividades completadas en esta sesión"
-                : "Sincronizado con tabla Usuarios");
+                ? solvedChallengesCount + " retos aprobados verificados"
+                : (oracleConnected ? "Sincronizado con tabla Usuarios" : "Modo demostración local"));
 
         lblStreakVal.setText(currentUser.getCurrentStreak() + " Días");
         badgeMaxStreak.setText("Máx: " + currentUser.getMaxStreak() + "d");
 
         lblLivesVal.setText(currentUser.getLives() + " / 5");
+        lblLivesSub.setText(currentUser.getLives() > 0 ? "Energía lista" : "Sin vidas disponibles");
         livesProgressBar.setProgress(currentUser.getLives() / 5.0);
     }
 }

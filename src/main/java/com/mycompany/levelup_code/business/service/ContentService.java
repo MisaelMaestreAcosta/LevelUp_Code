@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.business.service;
 
 import com.mycompany.levelup_code.data.dao.ContentRepository;
+import com.mycompany.levelup_code.data.dao.UserRepository;
 
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
@@ -20,18 +21,27 @@ public class ContentService {
     // Abstracción usada para consultar y guardar contenido.
     // La implementación concreta la proporcionará la capa DAO.
     private final ContentRepository contentRepository;
+    private final UserRepository userRepository;
 
     /**
      * Recibe el repositorio requerido por este servicio.
      * Falla de inmediato si no se proporciona.
      */
     public ContentService(ContentRepository contentRepository) {
+        this(contentRepository, null);
+    }
+
+    /**
+     * Constructor con verificación de identidad contra el repositorio de usuarios.
+     */
+    public ContentService(ContentRepository contentRepository, UserRepository userRepository) {
         if (contentRepository == null) {
             throw new IllegalArgumentException(
                     "El repositorio de contenido es obligatorio."
             );
         }
         this.contentRepository = contentRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -175,6 +185,22 @@ public class ContentService {
             throw new SecurityException(
                     "Se requiere el rol de administrador."
             );
+        }
+        if (userRepository != null) {
+            if (user.getId() <= 0) {
+                throw new SecurityException(
+                        "El administrador debe ser una cuenta autenticada y persistida."
+                );
+            }
+            User persisted = userRepository.findById(user.getId())
+                    .orElseThrow(() -> new SecurityException(
+                            "No se encontró la cuenta de administrador en la base de datos."
+                    ));
+            if (!persisted.isAdministrator()) {
+                throw new SecurityException(
+                        "La cuenta autenticada no tiene privilegios vigentes de administrador."
+                );
+            }
         }
     }
 

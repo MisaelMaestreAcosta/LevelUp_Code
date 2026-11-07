@@ -58,6 +58,9 @@ public class ChallengeService {
      */
     public Attempt submitAttempt(User user, int challengeId, String submission) {
         validateSubmission(user, challengeId, submission);
+        if (!attemptRepository.managesGamificationTransactionally() && user.getLives() <= 0) {
+            throw new IllegalStateException("El usuario no dispone de vidas suficientes para enviar intentos.");
+        }
 
         Optional<Challenge> challengeResult = challengeRepository.findById(challengeId);
         if (challengeResult == null) {
@@ -92,21 +95,20 @@ public class ChallengeService {
         attempt.setExecutionTimeMs(evaluation.getExecutionTimeMs());
         attempt.setEarnedExperience(firstCorrectAttempt ? challenge.getExpReward() : 0);
 
-        int expBeforeSave = user.getExperience();
         Attempt savedAttempt = attemptRepository.save(attempt);
         if (savedAttempt == null) {
             throw new IllegalStateException("El repositorio no devolvió el intento guardado.");
         }
 
-        // Si el procedimiento PL/SQL (PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO) ya actualizó
-        // la experiencia, nivel, actividad diaria y logros en la BD, evitamos duplicar el cálculo en Java.
-        boolean gamificationHandledByDb = user.getExperience() != expBeforeSave;
-        if (!gamificationHandledByDb) {
-            if (savedAttempt.getEarnedExperience() > 0) {
-                gamificationService.awardExperience(user, savedAttempt.getEarnedExperience());
-            } else if (savedAttempt.isCorrect()) {
-                // También comprueba logros por retos cuando la recompensa es cero.
-                achievementService.evaluateAndUnlock(user);
+        if (!attemptRepository.managesGamificationTransactionally()) {
+            if (savedAttempt.isCorrect()) {
+                if (savedAttempt.getEarnedExperience() > 0) {
+                    gamificationService.awardExperience(user, savedAttempt.getEarnedExperience());
+                } else {
+                    achievementService.evaluateAndUnlock(user);
+                }
+            } else {
+                gamificationService.penalizeFailedAttempt(user);
             }
         }
         return savedAttempt;

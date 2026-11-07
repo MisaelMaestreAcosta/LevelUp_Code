@@ -1,8 +1,9 @@
 -- =============================================================================
--- LEVELUP CODE - DATOS SEMILLA INICIALES (18 TABLAS - ORACLE SQL)
--- Incluye roles, cuentas con hash PBKDF2-HMAC-SHA256 (120k iteraciones),
--- lenguajes (Java, Python, C++), módulos y lecciones espejo por orden_secuencia
--- para aprendizaje comparativo, retos de código y quiz, casos de prueba y logros.
+-- LEVELUP CODE - CATÁLOGO BASE DE DESPLIEGUE (ROLES, CURSOS, RETOS Y LOGROS)
+-- Incluye roles, lenguajes (Java, Python, C++), módulos y lecciones espejo por
+-- orden_secuencia, retos de código y quiz, casos de prueba y catálogo de logros.
+-- NOTA: Las cuentas e historiales de demostración están aislados en
+--       02b_seed_demo_users.sql para mantener limpio un despliegue normal.
 -- Ejecutar después de 01_schema.sql en la conexión: LEVELUP_ADMIN
 -- =============================================================================
 
@@ -15,46 +16,7 @@ VALUES (1, 'Estudiante', 'Acceso al catálogo de lenguajes, lecciones comparativ
 INSERT INTO Roles (id_rol, nombre_rol, descripcion)
 VALUES (2, 'Administrador', 'Gestión integral de roles, lenguajes, módulos, lecciones, retos y logros.');
 
--- 2. USUARIOS (Hashes PBKDF2-HMAC-SHA256 verificables por UserService)
--- Contraseña Estudiante: estudiante123
-INSERT INTO Usuarios (
-    id_usuario, id_rol, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido,
-    correo_electronico, password_hash, exp_total, nivel, racha_actual, racha_maxima, vidas,
-    fecha_registro, ultima_actividad
-) VALUES (
-    1, 1, 'Estudiante', NULL, 'Demo', NULL,
-    'estudiante@levelup.edu.co',
-    'pbkdf2$120000$bGV2ZWx1cF9zYWx0X2VzdA==$TOjMDjzOMgsZXV8tIgJomSIbraYhQBpZLYJkU1BIQBc=',
-    1450, 5, 7, 12, 5,
-    TRUNC(SYSDATE) - 30, SYSTIMESTAMP
-);
-
--- Contraseña Admin: admin12345
-INSERT INTO Usuarios (
-    id_usuario, id_rol, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido,
-    correo_electronico, password_hash, exp_total, nivel, racha_actual, racha_maxima, vidas,
-    fecha_registro, ultima_actividad
-) VALUES (
-    2, 2, 'Admin', NULL, 'Sistema', NULL,
-    'admin@levelup.edu.co',
-    'pbkdf2$120000$bGV2ZWx1cF9zYWx0X2FkbQ==$hw4HnfeGWlcKrVXVi9gBxfnc5k8+TsaFjpyqESnXSOY=',
-    4200, 10, 21, 30, 5,
-    TRUNC(SYSDATE) - 60, SYSTIMESTAMP
-);
-
--- 3. ACTIVIDAD_DIARIA (Últimos 14 días para alimentar el mapa de calor y racha)
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 13, 60);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 11, 120);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 9, 80);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 6, 120);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 5, 180);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 4, 90);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 3, 210);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 2, 150);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE) - 1, 240);
-INSERT INTO Actividad_Diaria (id_usuario, fecha, exp_ganada) VALUES (1, TRUNC(SYSDATE), 160);
-
--- 4. LENGUAJES
+-- 2. LENGUAJES
 INSERT INTO Lenguajes (id_lenguaje, nombre, descripcion, icono_url, activo)
 VALUES (1, 'Java', 'POO, Jerarquías ES-UN, Principios SOLID y Colecciones Tipadas en JVM (Java 21 LTS).', 'java-icon', 1);
 
@@ -64,12 +26,7 @@ VALUES (2, 'Python', 'Estructuras Dinámicas, Comprensiones, Tipado Gradual y Al
 INSERT INTO Lenguajes (id_lenguaje, nombre, descripcion, icono_url, activo)
 VALUES (3, 'C++', 'Gestión Determinista de Memoria (RAII), Referencias Constantes y STL (ISO C++ 20).', 'cpp-icon', 1);
 
--- 5. INSCRIPCIONES
-INSERT INTO Inscripciones (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (1, 1, TRUNC(SYSDATE) - 25);
-INSERT INTO Inscripciones (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (1, 2, TRUNC(SYSDATE) - 18);
-INSERT INTO Inscripciones (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (1, 3, TRUNC(SYSDATE) - 10);
-
--- 6. MODULOS (Alineados por orden_secuencia entre los 3 lenguajes)
+-- 3. MODULOS (Alineados por orden_secuencia entre los 3 lenguajes)
 INSERT INTO Modulos (id_modulo, id_lenguaje, nombre_modulo, descripcion, orden_secuencia)
 VALUES (1, 1, 'Fundamentos Comparativos y POO en Java', 'Herencia, polimorfismo, colecciones y búsqueda algorítmica en JVM.', 1);
 
@@ -163,23 +120,7 @@ VALUES (
     3, 80
 );
 
--- 8. PROGRESO_LECCION
-INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
-VALUES (1, 1, 'COMPLETADA', SYSTIMESTAMP - INTERVAL '3' DAY);
-
-INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
-VALUES (1, 2, 'EN_CURSO', NULL);
-
-INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
-VALUES (1, 3, 'PENDIENTE', NULL);
-
-INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
-VALUES (1, 4, 'COMPLETADA', SYSTIMESTAMP - INTERVAL '1' DAY);
-
-INSERT INTO Progreso_Leccion (id_usuario, id_leccion, estado, fecha_completado)
-VALUES (1, 7, 'EN_CURSO', NULL);
-
--- 9. RETOS (Especializados en Reto_Codigo y Reto_Quiz)
+-- 5. RETOS (Especializados en Reto_Codigo y Reto_Quiz)
 INSERT INTO Retos (id_reto, id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia)
 VALUES (
     101, 1,
@@ -310,7 +251,7 @@ VALUES (8, 105, 'Perro', 'Guau', 0);
 INSERT INTO Casos_Prueba (id_caso, id_reto, entrada, salida_esperada, es_oculto)
 VALUES (9, 105, 'Gato', 'Miau', 0);
 
--- 12. RETO_QUIZ
+-- 8. RETO_QUIZ
 INSERT INTO Reto_Quiz (id_reto, opciones, respuesta_correcta)
 VALUES (
     102,
@@ -318,18 +259,7 @@ VALUES (
     'Enlace dinámico en tiempo de ejecución mediante tabla virtual (vtable)'
 );
 
--- 13. INTENTOS
-INSERT INTO Intentos (
-    id_intento, id_usuario, id_reto, codigo_enviado, salida_obtenida,
-    es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento
-) VALUES (
-    1, 1, 102,
-    'Enlace dinámico en tiempo de ejecución mediante tabla virtual (vtable)',
-    'CORRECT',
-    1, 3, 40, SYSTIMESTAMP - INTERVAL '2' DAY
-);
-
--- 14. LOGROS
+-- 9. LOGROS
 INSERT INTO Logros (id_logro, nombre_insignia, descripcion, tipo_condicion)
 VALUES (1, 'Constancia de Acero', 'Mantén una racha activa de 3 días seguidos practicando.', 'RACHA');
 
@@ -348,38 +278,25 @@ VALUES (5, 'Domador de Casos de Prueba', 'Resuelve exitosamente 5 retos de códi
 INSERT INTO Logros (id_logro, nombre_insignia, descripcion, tipo_condicion)
 VALUES (6, 'Leyenda del Semestre', 'Alcanza una racha histórica de 14 días consecutivos.', 'RACHA');
 
--- 15. LOGRO_RACHA
+-- 10. LOGRO_RACHA
 INSERT INTO Logro_Racha (id_logro, dias_requeridos) VALUES (1, 3);
 INSERT INTO Logro_Racha (id_logro, dias_requeridos) VALUES (2, 7);
 INSERT INTO Logro_Racha (id_logro, dias_requeridos) VALUES (6, 14);
 
--- 16. LOGRO_EXP
+-- 11. LOGRO_EXP
 INSERT INTO Logro_EXP (id_logro, exp_requerida) VALUES (3, 1000);
 INSERT INTO Logro_EXP (id_logro, exp_requerida) VALUES (4, 1500);
 
--- 17. LOGRO_RETOS
+-- 12. LOGRO_RETOS
 INSERT INTO Logro_Retos (id_logro, retos_requeridos) VALUES (5, 5);
 
--- 18. USUARIO_LOGRO
-INSERT INTO Usuario_Logro (id_usuario, id_logro, fecha_desbloqueado)
-VALUES (1, 1, SYSTIMESTAMP - INTERVAL '4' DAY);
-
-INSERT INTO Usuario_Logro (id_usuario, id_logro, fecha_desbloqueado)
-VALUES (1, 2, SYSTIMESTAMP - INTERVAL '1' DAY);
-
-INSERT INTO Usuario_Logro (id_usuario, id_logro, fecha_desbloqueado)
-VALUES (1, 3, SYSTIMESTAMP - INTERVAL '2' DAY);
-
--- Sincronizar secuencias IDENTITY después de inserciones con ID explícito
-ALTER TABLE Roles            MODIFY id_rol      GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Usuarios         MODIFY id_usuario  GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Actividad_Diaria MODIFY id_actividad GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Lenguajes        MODIFY id_lenguaje GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Modulos          MODIFY id_modulo   GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Lecciones        MODIFY id_leccion  GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Retos            MODIFY id_reto     GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Casos_Prueba     MODIFY id_caso     GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Intentos         MODIFY id_intento  GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
-ALTER TABLE Logros           MODIFY id_logro    GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+-- Sincronizar secuencias IDENTITY del catálogo después de inserciones con ID explícito
+ALTER TABLE Roles        MODIFY id_rol      GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+ALTER TABLE Lenguajes    MODIFY id_lenguaje GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+ALTER TABLE Modulos      MODIFY id_modulo   GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+ALTER TABLE Lecciones    MODIFY id_leccion  GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+ALTER TABLE Retos        MODIFY id_reto     GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+ALTER TABLE Casos_Prueba MODIFY id_caso     GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
+ALTER TABLE Logros       MODIFY id_logro    GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE);
 
 COMMIT;
