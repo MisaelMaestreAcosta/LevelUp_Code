@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -31,6 +33,8 @@ import javafx.stage.Stage;
  * conectada a Oracle 18c XE mediante {@link AppContext}.
  */
 public class LoginFrame {
+
+    private static final Logger LOGGER = Logger.getLogger(LoginFrame.class.getName());
 
     private final Stage stage;
     private final AuthController authController;
@@ -259,7 +263,7 @@ public class LoginFrame {
         VBox emailBox = new VBox(6);
         Label lblEmail = new Label("CORREO ELECTRÓNICO");
         lblEmail.getStyleClass().add("section-caption");
-        txtEmail = new TextField("estudiante@levelup.edu.co");
+        txtEmail = new TextField(oracleConnected ? "" : "estudiante@levelup.edu.co");
         txtEmail.setPromptText("usuario@levelup.edu.co");
         txtEmail.getStyleClass().add("input-field");
         emailBox.getChildren().addAll(lblEmail, txtEmail);
@@ -269,7 +273,7 @@ public class LoginFrame {
         Label lblPassword = new Label("CONTRASEÑA");
         lblPassword.getStyleClass().add("section-caption");
         txtPassword = new PasswordField();
-        txtPassword.setText("estudiante123");
+        txtPassword.setText(oracleConnected ? "" : "estudiante123");
         txtPassword.setPromptText("Mínimo 8 caracteres");
         txtPassword.getStyleClass().add("input-field");
         txtPassword.setOnAction(e -> handlePrimaryAction());
@@ -288,42 +292,45 @@ public class LoginFrame {
         btnSubmit.setMaxWidth(Double.MAX_VALUE);
         btnSubmit.setOnAction(e -> handlePrimaryAction());
 
-        // Sección de acceso rápido con 1 clic
-        VBox quickCard = new VBox(10);
-        quickCard.getStyleClass().add("surface-card");
-        VBox.setMargin(quickCard, new Insets(8, 0, 0, 0));
-
-        HBox quickHeader = Theme.createSectionHeader(
-                "Acceso Rápido con 1 Clic",
-                oracleConnected ? "Cuentas Semilla Oracle" : "Cuentas Demo",
-                "badge-indigo"
-        );
-
-        HBox quickButtons = new HBox(10);
-        Button btnQuickStudent = new Button("Estudiante · Nivel 5");
-        btnQuickStudent.getStyleClass().add("btn-secondary");
-        btnQuickStudent.setGraphic(Theme.createIcon(Theme.IconKind.USER, 14, Theme.HEX_INDIGO));
-        btnQuickStudent.setGraphicTextGap(6);
-        btnQuickStudent.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(btnQuickStudent, Priority.ALWAYS);
-        btnQuickStudent.setOnAction(e -> quickLoginAs("estudiante@levelup.edu.co", "estudiante123", false));
-
-        Button btnQuickAdmin = new Button("Administrador · Gestión CRUD");
-        btnQuickAdmin.getStyleClass().add("btn-secondary");
-        btnQuickAdmin.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 14, Theme.HEX_GREEN));
-        btnQuickAdmin.setGraphicTextGap(6);
-        btnQuickAdmin.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(btnQuickAdmin, Priority.ALWAYS);
-        btnQuickAdmin.setOnAction(e -> quickLoginAs("admin@levelup.edu.co", "admin12345", true));
-
-        quickButtons.getChildren().addAll(btnQuickStudent, btnQuickAdmin);
-        quickCard.getChildren().addAll(quickHeader, quickButtons);
-
         formColumn.getChildren().addAll(
                 modeSwitch, lblFormTitle, lblFormSubtitle,
                 usernameRow, emailBox, passBox,
-                lblFeedback, btnSubmit, quickCard
+                lblFeedback, btnSubmit
         );
+
+        // El acceso rápido de demostración se restringe estrictamente al modo sin Oracle
+        if (!oracleConnected) {
+            VBox quickCard = new VBox(10);
+            quickCard.getStyleClass().add("surface-card");
+            VBox.setMargin(quickCard, new Insets(8, 0, 0, 0));
+
+            HBox quickHeader = Theme.createSectionHeader(
+                    "Acceso Rápido con 1 Clic",
+                    "Solo Modo Demo Local",
+                    "badge-amber"
+            );
+
+            HBox quickButtons = new HBox(10);
+            Button btnQuickStudent = new Button("Estudiante Demo · Nivel 5");
+            btnQuickStudent.getStyleClass().add("btn-secondary");
+            btnQuickStudent.setGraphic(Theme.createIcon(Theme.IconKind.USER, 14, Theme.HEX_INDIGO));
+            btnQuickStudent.setGraphicTextGap(6);
+            btnQuickStudent.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(btnQuickStudent, Priority.ALWAYS);
+            btnQuickStudent.setOnAction(e -> quickLoginAs("estudiante@levelup.edu.co", "estudiante123"));
+
+            Button btnQuickAdmin = new Button("Administrador Demo · Local");
+            btnQuickAdmin.getStyleClass().add("btn-secondary");
+            btnQuickAdmin.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 14, Theme.HEX_GREEN));
+            btnQuickAdmin.setGraphicTextGap(6);
+            btnQuickAdmin.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(btnQuickAdmin, Priority.ALWAYS);
+            btnQuickAdmin.setOnAction(e -> quickLoginAs("admin@levelup.edu.co", "admin12345"));
+
+            quickButtons.getChildren().addAll(btnQuickStudent, btnQuickAdmin);
+            quickCard.getChildren().addAll(quickHeader, quickButtons);
+            formColumn.getChildren().add(quickCard);
+        }
         return formColumn;
     }
 
@@ -348,8 +355,12 @@ public class LoginFrame {
             lblFormTitle.setText("Bienvenido de nuevo");
             lblFormSubtitle.setText("Ingresa tus credenciales para retomar tu racha y módulos activos.");
             btnSubmit.setText("Ingresar al Espacio de Trabajo");
-            txtEmail.setText("estudiante@levelup.edu.co");
-            txtPassword.setText("estudiante123");
+            if (!oracleConnected) {
+                txtEmail.setText("estudiante@levelup.edu.co");
+                txtPassword.setText("estudiante123");
+            } else {
+                txtPassword.setText("");
+            }
         }
     }
 
@@ -432,15 +443,23 @@ public class LoginFrame {
                     showFeedback("¡Sesión verificada! Cargando cursos y telemetría...", false);
                     openDashboard(authResult.get());
                 } else {
-                    showFeedback("Credenciales incorrectas. Verifica tu correo o usa un perfil rápido.", true);
+                    String hint = oracleConnected
+                            ? "Credenciales incorrectas. Verifica tu correo electrónico y contraseña."
+                            : "Credenciales incorrectas. Verifica tu correo o usa un perfil de demostración local.";
+                    showFeedback(hint, true);
                 }
             }
         } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Error durante la autenticación o registro de usuario", ex);
             showFeedback(ex.getMessage(), true);
         }
     }
 
-    private void quickLoginAs(String email, String password, boolean isAdmin) {
+    private void quickLoginAs(String email, String password) {
+        if (oracleConnected) {
+            showFeedback("El acceso rápido está deshabilitado con Oracle activo. Inicia sesión con credenciales verificadas.", true);
+            return;
+        }
         setAuthMode(false);
         txtEmail.setText(email);
         txtPassword.setText(password);
@@ -448,25 +467,13 @@ public class LoginFrame {
             Optional<User> res = authController.login(email, password);
             if (res.isPresent()) {
                 openDashboard(res.get());
-                return;
+            } else {
+                showFeedback("No se pudo autenticar la cuenta de demostración solicitada.", true);
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Fallo en inicio rápido de demostración local", ex);
+            showFeedback("Error al iniciar sesión local: " + ex.getMessage(), true);
         }
-
-        User fallbackUser = new User();
-        fallbackUser.setId(isAdmin ? 2 : 1);
-        fallbackUser.setUsername(isAdmin ? "Admin" : "Estudiante");
-        fallbackUser.setEmail(email);
-        fallbackUser.setRole(new Role(
-                isAdmin ? 2 : 1,
-                isAdmin ? "Administrador" : "Estudiante",
-                isAdmin ? "Gestión CRUD" : "Estudiante"
-        ));
-        fallbackUser.setExperience(isAdmin ? 4200 : 1450);
-        fallbackUser.setLevel(isAdmin ? 10 : 5);
-        fallbackUser.setCurrentStreak(isAdmin ? 21 : 7);
-        fallbackUser.setMaxStreak(isAdmin ? 30 : 12);
-        openDashboard(fallbackUser);
     }
 
     private void showFeedback(String message, boolean isError) {
@@ -485,7 +492,13 @@ public class LoginFrame {
     private static final class InMemoryAuthRepository implements UserRepository {
 
         private final Map<String, User> byEmail = new HashMap<>();
+        private final Map<Integer, User> byId = new HashMap<>();
         private int sequence = 1;
+
+        @Override
+        public synchronized Optional<User> findById(int id) {
+            return Optional.ofNullable(byId.get(id));
+        }
 
         @Override
         public synchronized Optional<User> findByEmail(String email) {
@@ -500,6 +513,7 @@ public class LoginFrame {
             if (user.getId() <= 0) {
                 user.setId(sequence++);
             }
+            byId.put(user.getId(), user);
             if (user.getEmail() != null) {
                 byEmail.put(user.getEmail().trim().toLowerCase(Locale.ROOT), user);
             }
