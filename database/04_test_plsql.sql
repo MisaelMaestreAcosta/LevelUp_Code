@@ -34,6 +34,12 @@ DECLARE
     v_id_intento       NUMBER;
     v_vidas_rest       NUMBER;
 
+    -- Estado inicial y posterior al ROLLBACK para verificar aislamiento transaccional
+    v_exp_inicial      NUMBER := 0;
+    v_vidas_iniciales  NUMBER := 0;
+    v_exp_post         NUMBER := 0;
+    v_vidas_post       NUMBER := 0;
+
     -- Contadores de pruebas
     v_total_pruebas    NUMBER := 0;
     v_pruebas_exito    NUMBER := 0;
@@ -67,6 +73,12 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('================================================================================');
     DBMS_OUTPUT.PUT_LINE('Fecha de ejecución: ' || TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS'));
     DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');
+
+    -- Capturar estado previo del estudiante #1 antes de iniciar las pruebas
+    SELECT exp_total, vidas
+    INTO v_exp_inicial, v_vidas_iniciales
+    FROM Usuarios
+    WHERE id_usuario = 1;
 
     -- Punto de restauración para dejar la base de datos intacta tras las pruebas
     SAVEPOINT sp_inicio_pruebas;
@@ -238,10 +250,24 @@ BEGIN
     -- Deshacer cambios de la prueba para mantener la base de datos en su estado inicial
     ROLLBACK TO sp_inicio_pruebas;
 
+    -- Verificar que el ROLLBACK restauró exactamente los datos previos del estudiante #1
+    SELECT exp_total, vidas
+    INTO v_exp_post, v_vidas_post
+    FROM Usuarios
+    WHERE id_usuario = 1;
+
+    DBMS_OUTPUT.PUT_LINE('');
+    DBMS_OUTPUT.PUT_LINE('9. VERIFICACIÓN DE AISLAMIENTO TRANSACCIONAL (SAVEPOINT / ROLLBACK)');
+    DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');
+    REGISTRAR_TEST('Restauración íntegra tras ROLLBACK',
+                   v_exp_post = v_exp_inicial AND v_vidas_post = v_vidas_iniciales,
+                   'XP inicial/final: ' || v_exp_inicial || '/' || v_exp_post
+                   || ' | Vidas: ' || v_vidas_iniciales || '/' || v_vidas_post);
+
     DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');
     DBMS_OUTPUT.PUT_LINE('RESUMEN DE PRUEBAS PL/SQL: ' || v_pruebas_exito || ' de ' || v_total_pruebas || ' pruebas superadas.');
     IF v_pruebas_exito = v_total_pruebas THEN
-        DBMS_OUTPUT.PUT_LINE('ESTADO FINAL: [APROBADO] — Todos los objetos y procedimientos operan al 100%.');
+        DBMS_OUTPUT.PUT_LINE('ESTADO FINAL: [APROBADO] — Todos los objetos operan al 100% sin alterar datos.');
     ELSE
         DBMS_OUTPUT.PUT_LINE('ESTADO FINAL: [REVISAR] — Algunas pruebas fallaron.');
     END IF;
@@ -249,7 +275,12 @@ BEGIN
 
 EXCEPTION
     WHEN OTHERS THEN
-        ROLLBACK TO sp_inicio_pruebas;
+        BEGIN
+            ROLLBACK TO sp_inicio_pruebas;
+        EXCEPTION
+            WHEN OTHERS THEN
+                ROLLBACK;
+        END;
         DBMS_OUTPUT.PUT_LINE('ERROR CRÍTICO NO CONTROLADO EN EL BLOQUE ANÓNIMO: ' || SQLERRM);
 END;
 /

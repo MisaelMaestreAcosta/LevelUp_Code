@@ -312,6 +312,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         v_ya_aprobado_antes  NUMBER := 0;
         v_id_intento         NUMBER;
     BEGIN
+        SAVEPOINT sp_proc_intento;
+
         -- 1. Validar parámetros requeridos
         IF p_id_usuario IS NULL OR p_id_reto IS NULL THEN
             RAISE_APPLICATION_ERROR(-20001, 'Los identificadores de usuario y reto son obligatorios.');
@@ -409,11 +411,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
                 ultima_actividad = SYSTIMESTAMP
             WHERE id_usuario = p_id_usuario;
         END IF;
-
-        COMMIT;
+        -- El control transaccional (COMMIT / ROLLBACK) pertenece al llamador (JDBC o bloque de prueba).
     EXCEPTION
         WHEN OTHERS THEN
-            ROLLBACK;
+            ROLLBACK TO sp_proc_intento;
             RAISE;
     END SP_REGISTRAR_INTENTO_RETO;
 
@@ -432,6 +433,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         v_racha         NUMBER := 0;
         v_racha_max     NUMBER := 0;
     BEGIN
+        SAVEPOINT sp_proc_leccion;
+
         IF p_id_usuario IS NULL OR p_id_leccion IS NULL THEN
             RAISE_APPLICATION_ERROR(-20010, 'Usuario y lección son requeridos.');
         END IF;
@@ -504,14 +507,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         WHERE id_usuario = p_id_usuario;
 
         EVALUAR_LOGROS_USUARIO(p_id_usuario, v_exp_usuario, v_racha);
-
-        COMMIT;
+        -- El control transaccional (COMMIT / ROLLBACK) pertenece al llamador.
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            ROLLBACK;
+            ROLLBACK TO sp_proc_leccion;
             RAISE_APPLICATION_ERROR(-20011, 'Lección o usuario no encontrado en la base de datos.');
         WHEN OTHERS THEN
-            ROLLBACK;
+            ROLLBACK TO sp_proc_leccion;
             RAISE;
     END SP_COMPLETAR_LECCION;
 
@@ -523,6 +525,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         p_vidas_restauradas   OUT NUMBER
     ) IS
     BEGIN
+        SAVEPOINT sp_proc_vidas;
+
         IF p_id_usuario IS NULL THEN
             RAISE_APPLICATION_ERROR(-20020, 'El ID de usuario es obligatorio.');
         END IF;
@@ -537,10 +541,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         END IF;
 
         p_vidas_restauradas := C_VIDAS_MAXIMAS;
-        COMMIT;
     EXCEPTION
         WHEN OTHERS THEN
-            ROLLBACK;
+            ROLLBACK TO sp_proc_vidas;
             RAISE;
     END SP_RECUPERAR_VIDAS;
 
