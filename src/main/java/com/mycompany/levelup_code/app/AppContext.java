@@ -7,6 +7,7 @@ import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.business.service.AchievementService;
 import com.mycompany.levelup_code.business.service.ChallengeService;
 import com.mycompany.levelup_code.business.service.ContentService;
+import com.mycompany.levelup_code.business.service.EnrollmentService;
 import com.mycompany.levelup_code.business.service.GamificationService;
 import com.mycompany.levelup_code.business.service.LevelPolicy;
 import com.mycompany.levelup_code.business.service.ProgressService;
@@ -18,6 +19,7 @@ import com.mycompany.levelup_code.data.dao.ActivityRepository;
 import com.mycompany.levelup_code.data.dao.AttemptRepository;
 import com.mycompany.levelup_code.data.dao.ChallengeRepository;
 import com.mycompany.levelup_code.data.dao.ContentRepository;
+import com.mycompany.levelup_code.data.dao.EnrollmentRepository;
 import com.mycompany.levelup_code.data.dao.ProgressRepository;
 import com.mycompany.levelup_code.data.dao.UserRepository;
 import com.mycompany.levelup_code.data.oracle.OracleAchievementRepository;
@@ -25,6 +27,7 @@ import com.mycompany.levelup_code.data.oracle.OracleActivityRepository;
 import com.mycompany.levelup_code.data.oracle.OracleAttemptRepository;
 import com.mycompany.levelup_code.data.oracle.OracleChallengeRepository;
 import com.mycompany.levelup_code.data.oracle.OracleContentRepository;
+import com.mycompany.levelup_code.data.oracle.OracleEnrollmentRepository;
 import com.mycompany.levelup_code.data.oracle.OracleProgressRepository;
 import com.mycompany.levelup_code.data.oracle.OracleUserRepository;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
@@ -47,11 +50,13 @@ public final class AppContext {
     private final ChallengeRepository challengeRepository;
     private final AttemptRepository attemptRepository;
     private final ProgressRepository progressRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final ActivityRepository activityRepository;
     private final AchievementRepository achievementRepository;
 
     private final UserService userService;
     private final ContentService contentService;
+    private final EnrollmentService enrollmentService;
     private final AchievementService achievementService;
     private final GamificationService gamificationService;
     private final ProgressService progressService;
@@ -65,6 +70,7 @@ public final class AppContext {
         this.challengeRepository = new OracleChallengeRepository();
         this.attemptRepository = new OracleAttemptRepository();
         this.progressRepository = new OracleProgressRepository();
+        this.enrollmentRepository = new OracleEnrollmentRepository();
         this.activityRepository = new OracleActivityRepository();
         this.achievementRepository = new OracleAchievementRepository();
 
@@ -73,7 +79,8 @@ public final class AppContext {
         this.codeRunner = new SimulatedCodeRunner();
 
         this.userService = new UserService(userRepository, studentRole);
-        this.contentService = new ContentService(contentRepository);
+        this.contentService = new ContentService(contentRepository, oracleConnected ? userRepository : null);
+        this.enrollmentService = new EnrollmentService(enrollmentRepository, contentRepository);
         this.achievementService = new AchievementService(achievementRepository);
         this.gamificationService = new GamificationService(
                 userRepository, activityRepository, levelPolicy, achievementService);
@@ -112,6 +119,14 @@ public final class AppContext {
         return contentService;
     }
 
+    public EnrollmentService getEnrollmentService() {
+        return enrollmentService;
+    }
+
+    public UserRepository getUserRepository() {
+        return userRepository;
+    }
+
     public AchievementService getAchievementService() {
         return achievementService;
     }
@@ -138,6 +153,18 @@ public final class AppContext {
 
     public ProgressRepository getProgressRepository() {
         return progressRepository;
+    }
+
+    public EnrollmentRepository getEnrollmentRepository() {
+        return enrollmentRepository;
+    }
+
+    public ActivityRepository getActivityRepository() {
+        return activityRepository;
+    }
+
+    public AchievementRepository getAchievementRepository() {
+        return achievementRepository;
     }
 
     public OracleActivityRepository getOracleActivityRepository() {
