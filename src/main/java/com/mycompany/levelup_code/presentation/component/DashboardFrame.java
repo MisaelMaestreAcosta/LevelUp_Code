@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
+import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -110,15 +111,16 @@ public class DashboardFrame {
     private Label lblLessonsHeader;
     private Label lblCourseStatus;
     private VBox lessonsListBox;
+    private final Map<String, ProgressBar> courseProgressBars = new HashMap<>();
+    private final Map<String, Label> courseProgressLabels = new HashMap<>();
 
-    // Comparador de 3 lenguajes
+    // Comparador de 3 lenguajes (6 tópicos curriculares)
     private TextArea txtCompareJava;
     private TextArea txtComparePython;
     private TextArea txtCompareCpp;
     private Label lblCompareSummary;
-    private Button btnTopicPolymorphism;
-    private Button btnTopicBinarySearch;
-    private Button btnTopicCollections;
+    private final List<Button> comparatorTopicButtons = new ArrayList<>();
+    private int activeComparatorLessonIndex = 0;
 
     // Logros e insignias
     private GridPane achievementsGrid;
@@ -156,6 +158,7 @@ public class DashboardFrame {
 
         initUi();
         populateLessonsForLanguage("JAVA");
+        refreshCourseProgressBars();
         loadComparisonTopic("POLYMORPHISM");
         refreshAchievementsGrid();
         refreshGamificationTelemetry();
@@ -578,7 +581,7 @@ public class DashboardFrame {
             String btnStyleClass,
             int lessonCount
     ) {
-        VBox card = new VBox(10);
+        VBox card = new VBox(8);
         card.getStyleClass().add(cardStyleClass);
 
         HBox topRow = new HBox(8);
@@ -600,9 +603,18 @@ public class DashboardFrame {
         lblDesc.getStyleClass().add("muted-text");
         lblDesc.setWrapText(true);
 
+        ProgressBar langProgress = new ProgressBar(0.0);
+        langProgress.getStyleClass().add("progress-bar-green");
+        langProgress.setMaxWidth(Double.MAX_VALUE);
+        courseProgressBars.put(langKey, langProgress);
+
+        Label lblProgressInfo = new Label("0 / " + lessonCount + " completadas (0%)");
+        lblProgressInfo.getStyleClass().add("muted-text");
+        courseProgressLabels.put(langKey, lblProgressInfo);
+
         HBox bottomRow = new HBox(8);
         bottomRow.setAlignment(Pos.CENTER_LEFT);
-        Label badgeCount = Theme.createPillBadge(lessonCount + " Lecciones", "badge-indigo");
+        Label badgeCount = Theme.createPillBadge(lessonCount + " Lecciones · 3 Módulos", "badge-indigo");
 
         Region sp2 = new Region();
         HBox.setHgrow(sp2, Priority.ALWAYS);
@@ -623,9 +635,35 @@ public class DashboardFrame {
             populateLessonsForLanguage(langKey);
         });
 
+        card.setOnMouseClicked(e -> populateLessonsForLanguage(langKey));
         bottomRow.getChildren().addAll(badgeCount, sp2, btnEnroll);
-        card.getChildren().addAll(topRow, lblDesc, bottomRow);
+        card.getChildren().addAll(topRow, lblDesc, langProgress, lblProgressInfo, bottomRow);
         return card;
+    }
+
+    private void refreshCourseProgressBars() {
+        updateSingleCourseProgress("JAVA", javaLessons);
+        updateSingleCourseProgress("PYTHON", pythonLessons);
+        updateSingleCourseProgress("CPP", cppLessons);
+    }
+
+    private void updateSingleCourseProgress(String langKey, List<Lesson> lessons) {
+        ProgressBar bar = courseProgressBars.get(langKey);
+        Label label = courseProgressLabels.get(langKey);
+        if (bar == null || label == null) {
+            return;
+        }
+        int total = lessons != null ? lessons.size() : 0;
+        int completed = 0;
+        for (int i = 0; i < total; i++) {
+            if (resolveLessonProgressStatus(lessons.get(i), i) == ProgressStatus.COMPLETED) {
+                completed++;
+            }
+        }
+        double ratio = total > 0 ? (double) completed / total : 0.0;
+        int pct = (int) Math.round(ratio * 100.0);
+        bar.setProgress(ratio);
+        label.setText(completed + " / " + total + " lecciones completadas (" + pct + "%)");
     }
 
     private boolean persistEnrollmentInOracle(String langKey) {
@@ -670,11 +708,44 @@ public class DashboardFrame {
 
         lblLessonsHeader.setText("ÁRBOL DE HABILIDADES Y PROGRESO (PROGRESO_LECCION) · " + langLabel);
 
+        String lastModuleTitle = "";
         for (int i = 0; i < selectedList.size(); i++) {
             Lesson lesson = selectedList.get(i);
+            CourseModule module = lesson.getModule();
+            String modTitle = (module != null && module.getTitle() != null)
+                    ? module.getTitle()
+                    : "Módulo Curricular";
+            if (!modTitle.equals(lastModuleTitle)) {
+                lastModuleTitle = modTitle;
+                String modDesc = (module != null && module.getDescription() != null)
+                        ? module.getDescription()
+                        : "";
+                lessonsListBox.getChildren().add(createModuleHeaderRow(modTitle, modDesc));
+            }
             ProgressStatus status = resolveLessonProgressStatus(lesson, i);
             lessonsListBox.getChildren().add(createSkillNodeRow(i + 1, lesson, status));
         }
+        Theme.playFadeIn(lessonsListBox);
+    }
+
+    private HBox createModuleHeaderRow(String moduleTitle, String moduleDescription) {
+        HBox header = new HBox(12);
+        header.getStyleClass().add("module-header-card");
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label lblModTitle = new Label(moduleTitle);
+        lblModTitle.getStyleClass().add("card-title");
+        lblModTitle.setGraphic(Theme.createIcon(Theme.IconKind.SPARK, 15, Theme.HEX_INDIGO));
+        lblModTitle.setGraphicTextGap(8);
+
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+
+        Label lblModDesc = new Label(moduleDescription);
+        lblModDesc.getStyleClass().add("muted-text");
+
+        header.getChildren().addAll(lblModTitle, sp, lblModDesc);
+        return header;
     }
 
     private ProgressStatus resolveLessonProgressStatus(Lesson lesson, int indexInList) {
@@ -743,16 +814,23 @@ public class DashboardFrame {
         Button btnTheory = new Button("Estudiar Teoría");
         btnTheory.getStyleClass().add("btn-secondary");
         btnTheory.setOnAction(e -> new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show());
+        actions.getChildren().add(btnTheory);
 
-        Button btnSolve = new Button("Resolver Reto");
-        btnSolve.getStyleClass().add("btn-primary");
-        btnSolve.setOnAction(e -> {
-            Challenge ch = (lesson.getChallenges() != null && !lesson.getChallenges().isEmpty())
-                    ? lesson.getChallenges().get(0) : null;
-            new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
-        });
-
-        actions.getChildren().addAll(btnTheory, btnSolve);
+        List<Challenge> lessonChallenges = lesson.getChallenges();
+        if (lessonChallenges != null && !lessonChallenges.isEmpty()) {
+            for (final Challenge ch : lessonChallenges) {
+                boolean isQuiz = ch.getType() == ChallengeType.QUIZ;
+                Button btnChallenge = new Button(isQuiz ? "Reto Quiz" : "Reto Código");
+                btnChallenge.getStyleClass().add(isQuiz ? "btn-ghost" : "btn-primary");
+                btnChallenge.setOnAction(e -> new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show());
+                actions.getChildren().add(btnChallenge);
+            }
+        } else {
+            Button btnSolve = new Button("Resolver Reto");
+            btnSolve.getStyleClass().add("btn-primary");
+            btnSolve.setOnAction(e -> new ChallengeFrame(currentUser, null, this::onChallengeOrLessonCompleted).show());
+            actions.getChildren().add(btnSolve);
+        }
 
         row.getChildren().addAll(
                 Theme.createIcon(iconKind, 20, iconHex),
@@ -765,27 +843,43 @@ public class DashboardFrame {
     private VBox buildComparatorWorkspaceView() {
         VBox view = new VBox(14);
 
-        HBox topToolbar = new HBox(12);
+        VBox topToolbar = new VBox(10);
         topToolbar.getStyleClass().add("surface-card");
-        topToolbar.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblTitle = new Label("Comparador Espejo Sincronizado (Java · Python · C++)");
+        HBox titleRow = new HBox(12);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        Label lblTitle = new Label("Comparador Espejo Sincronizado · 6 Tópicos Curriculares (Java · Python · C++)");
         lblTitle.getStyleClass().add("page-title");
         lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.CODE, 20, Theme.HEX_CYAN));
         lblTitle.setGraphicTextGap(8);
-
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label badgeTopics = Theme.createPillBadge("6 Tópicos Interactivos", "badge-cyan");
+        titleRow.getChildren().addAll(lblTitle, spacer, badgeTopics);
 
-        btnTopicPolymorphism = new Button("1. Polimorfismo y Clases Abstractas");
-        btnTopicBinarySearch = new Button("2. Búsqueda Binaria O(log n)");
-        btnTopicCollections = new Button("3. Memoria y Colecciones Dinámicas");
+        HBox topicsRow = new HBox(8);
+        topicsRow.setAlignment(Pos.CENTER_LEFT);
+        comparatorTopicButtons.clear();
 
-        btnTopicPolymorphism.setOnAction(e -> loadComparisonTopic("POLYMORPHISM"));
-        btnTopicBinarySearch.setOnAction(e -> loadComparisonTopic("BINARY_SEARCH"));
-        btnTopicCollections.setOnAction(e -> loadComparisonTopic("COLLECTIONS"));
+        String[][] topics = {
+            {"POLYMORPHISM", "1. Polimorfismo POO"},
+            {"INTERFACES", "2. Contratos SOLID / Dunder"},
+            {"BINARY_SEARCH", "3. Búsqueda Binaria O(log n)"},
+            {"TWO_POINTERS", "4. Dos Punteros y Slicing"},
+            {"COLLECTIONS", "5. Colecciones Dinámicas"},
+            {"HASH_SETS", "6. Tablas Hash O(1)"}
+        };
 
-        topToolbar.getChildren().addAll(lblTitle, spacer, btnTopicPolymorphism, btnTopicBinarySearch, btnTopicCollections);
+        for (final String[] topic : topics) {
+            Button btnTopic = new Button(topic[1]);
+            btnTopic.getStyleClass().add("btn-secondary");
+            btnTopic.setUserData(topic[0]);
+            btnTopic.setOnAction(e -> loadComparisonTopic(topic[0]));
+            comparatorTopicButtons.add(btnTopic);
+            topicsRow.getChildren().add(btnTopic);
+        }
+
+        topToolbar.getChildren().addAll(titleRow, topicsRow);
 
         txtCompareJava = createComparisonTextArea();
         txtComparePython = createComparisonTextArea();
@@ -814,10 +908,14 @@ public class DashboardFrame {
         lblCompareSummary.setGraphicTextGap(10);
         HBox.setHgrow(lblCompareSummary, Priority.ALWAYS);
 
-        Button btnPractice = new Button("Practicar este Algoritmo");
+        Button btnPractice = new Button("Practicar este Tópico en el Evaluador");
         btnPractice.getStyleClass().add("btn-primary");
         btnPractice.setOnAction(e -> {
-            Lesson l = !javaLessons.isEmpty() ? javaLessons.get(0) : null;
+            List<Lesson> targetList = "PYTHON".equals(activeLanguageKey) ? pythonLessons
+                    : ("CPP".equals(activeLanguageKey) ? cppLessons : javaLessons);
+            Lesson l = (!targetList.isEmpty())
+                    ? targetList.get(Math.min(activeComparatorLessonIndex, targetList.size() - 1))
+                    : null;
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
             new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
@@ -854,135 +952,39 @@ public class DashboardFrame {
     }
 
     private void loadComparisonTopic(String topicKey) {
-        boolean isPoly = "POLYMORPHISM".equals(topicKey);
-        boolean isBin = "BINARY_SEARCH".equals(topicKey);
-        boolean isCol = "COLLECTIONS".equals(topicKey);
-
-        btnTopicPolymorphism.getStyleClass().setAll(isPoly ? "btn-primary" : "btn-secondary");
-        btnTopicBinarySearch.getStyleClass().setAll(isBin ? "btn-primary" : "btn-secondary");
-        btnTopicCollections.getStyleClass().setAll(isCol ? "btn-primary" : "btn-secondary");
-
-        if (isPoly) {
-            txtCompareJava.setText(
-                    "// Java 21: métodos virtuales por defecto\n"
-                    + "public abstract class Animal {\n"
-                    + "    public abstract String emitirSonido();\n"
-                    + "}\n\n"
-                    + "public class Perro extends Animal {\n"
-                    + "    @Override\n"
-                    + "    public String emitirSonido() {\n"
-                    + "        return \"Guau\";\n"
-                    + "    }\n"
-                    + "}"
-            );
-            txtComparePython.setText(
-                    "# Python 3.12: protocolo ABC y decorador\n"
-                    + "from abc import ABC, abstractmethod\n\n"
-                    + "class Animal(ABC):\n"
-                    + "    @abstractmethod\n"
-                    + "    def emitir_sonido(self) -> str:\n"
-                    + "        ...\n\n"
-                    + "class Perro(Animal):\n"
-                    + "    def emitir_sonido(self) -> str:\n"
-                    + "        return \"Guau\""
-            );
-            txtCompareCpp.setText(
-                    "// C++ 20: función virtual pura (= 0)\n"
-                    + "#include <string>\n\n"
-                    + "class Animal {\n"
-                    + "public:\n"
-                    + "    virtual ~Animal() = default;\n"
-                    + "    virtual std::string emitirSonido() const = 0;\n"
-                    + "};\n\n"
-                    + "class Perro : public Animal {\n"
-                    + "public:\n"
-                    + "    std::string emitirSonido() const override {\n"
-                    + "        return \"Guau\";\n"
-                    + "    }\n"
-                    + "};"
-            );
-            lblCompareSummary.setText(
-                    "Análisis Comparativo: Java enlaza métodos dinámicamente por defecto (@Override); "
-                    + "Python valida contratos mediante abc.ABC; y C++ requiere 'virtual ... = 0' junto con destructor virtual."
-            );
-        } else if (isBin) {
-            txtCompareJava.setText(
-                    "// Java 21: prevención de overflow con (high - low) / 2\n"
-                    + "public static int binarySearch(int[] arr, int target) {\n"
-                    + "    int low = 0, high = arr.length - 1;\n"
-                    + "    while (low <= high) {\n"
-                    + "        int mid = low + (high - low) / 2;\n"
-                    + "        if (arr[mid] == target) return mid;\n"
-                    + "        if (arr[mid] < target) low = mid + 1;\n"
-                    + "        else high = mid - 1;\n"
-                    + "    }\n"
-                    + "    return -1;\n"
-                    + "}"
-            );
-            txtComparePython.setText(
-                    "# Python 3.12: enteros de precisión arbitraria y división //\n"
-                    + "def binary_search(arr: list[int], target: int) -> int:\n"
-                    + "    low, high = 0, len(arr) - 1\n"
-                    + "    while low <= high:\n"
-                    + "        mid = (low + high) // 2\n"
-                    + "        if arr[mid] == target:\n"
-                    + "            return mid\n"
-                    + "        elif arr[mid] < target:\n"
-                    + "            low = mid + 1\n"
-                    + "        else:\n"
-                    + "            high = mid - 1\n"
-                    + "    return -1"
-            );
-            txtCompareCpp.setText(
-                    "// C++ 20: paso por referencia constante (sin copia)\n"
-                    + "#include <vector>\n\n"
-                    + "int binarySearch(const std::vector<int>& arr, int target) {\n"
-                    + "    int low = 0;\n"
-                    + "    int high = static_cast<int>(arr.size()) - 1;\n"
-                    + "    while (low <= high) {\n"
-                    + "        int mid = low + (high - low) / 2;\n"
-                    + "        if (arr[mid] == target) return mid;\n"
-                    + "        if (arr[mid] < target) low = mid + 1;\n"
-                    + "        else high = mid - 1;\n"
-                    + "    }\n"
-                    + "    return -1;\n"
-                    + "}"
-            );
-            lblCompareSummary.setText(
-                    "Análisis Comparativo: En Java y C++ los enteros de 32 bits pueden desbordar con (low + high) / 2; "
-                    + "en Python los int tienen precisión ilimitada y usan división entera explícita (//)."
-            );
-        } else {
-            txtCompareJava.setText(
-                    "// Java 21: ArrayList<Integer> con autoboxing en Heap\n"
-                    + "import java.util.ArrayList;\n"
-                    + "import java.util.List;\n\n"
-                    + "List<Integer> numeros = new ArrayList<>();\n"
-                    + "numeros.add(10);\n"
-                    + "numeros.add(20);\n"
-                    + "int primero = numeros.get(0);"
-            );
-            txtComparePython.setText(
-                    "# Python 3.12: list dinámica respaldada por arreglo de punteros\n"
-                    + "numeros: list[int] = []\n"
-                    + "numeros.append(10)\n"
-                    + "numeros.append(20)\n"
-                    + "primero = numeros[0]"
-            );
-            txtCompareCpp.setText(
-                    "// C++ 20: std::vector<int> contiguo en memoria con RAII\n"
-                    + "#include <vector>\n\n"
-                    + "std::vector<int> numeros;\n"
-                    + "numeros.reserve(16);\n"
-                    + "numeros.push_back(10);\n"
-                    + "numeros.push_back(20);\n"
-                    + "int primero = numeros[0];"
-            );
-            lblCompareSummary.setText(
-                    "Análisis Comparativo: std::vector<int> en C++ almacena valores primitivos contiguos sin recolector de basura (RAII), "
-                    + "mientras que Java ArrayList<Integer> y Python list almacenan referencias a objetos en el Heap."
-            );
+        for (Button btn : comparatorTopicButtons) {
+            boolean active = topicKey.equals(btn.getUserData());
+            btn.getStyleClass().setAll(active ? "btn-primary" : "btn-secondary");
         }
+
+        int lessonIdx = 0;
+        if ("INTERFACES".equals(topicKey)) {
+            lessonIdx = 1;
+        } else if ("BINARY_SEARCH".equals(topicKey)) {
+            lessonIdx = 2;
+        } else if ("TWO_POINTERS".equals(topicKey)) {
+            lessonIdx = 3;
+        } else if ("COLLECTIONS".equals(topicKey)) {
+            lessonIdx = 4;
+        } else if ("HASH_SETS".equals(topicKey)) {
+            lessonIdx = 5;
+        }
+        this.activeComparatorLessonIndex = lessonIdx;
+
+        Lesson sampleLesson = (!javaLessons.isEmpty() && lessonIdx < javaLessons.size())
+                ? javaLessons.get(lessonIdx)
+                : null;
+        String[] javaSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "JAVA");
+        String[] pySnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "PYTHON");
+        String[] cppSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "CPP");
+
+        txtCompareJava.setText(javaSnippet[0]);
+        txtComparePython.setText(pySnippet[0]);
+        txtCompareCpp.setText(cppSnippet[0]);
+        lblCompareSummary.setText("Análisis Comparativo · " + javaSnippet[1] + " | " + pySnippet[1] + " | " + cppSnippet[1]);
+        Theme.playFadeIn(txtCompareJava);
+        Theme.playFadeIn(txtComparePython);
+        Theme.playFadeIn(txtCompareCpp);
     }
 
     private VBox buildAchievementsWorkspaceView() {
@@ -1341,6 +1343,7 @@ public class DashboardFrame {
         rebuildHeatmapCells();
         refreshGamificationTelemetry();
         populateLessonsForLanguage(activeLanguageKey);
+        refreshCourseProgressBars();
         refreshAchievementsGrid();
     }
 
