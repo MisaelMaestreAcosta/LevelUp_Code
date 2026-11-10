@@ -29,6 +29,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.concurrent.Task;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.TilePane;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -137,6 +142,19 @@ public class DashboardFrame {
     private TextField txtAdminCase2In;
     private TextField txtAdminCase2Out;
     private Label lblAdminStatus;
+    private Button btnAdminSave;
+    private TextField lessonSearch;
+    private CheckBox hideCompleted;
+    private Label lessonResults;
+    private Label continueSummary;
+    private Button continueButton;
+    private Label syncStatus;
+    private final Map<String, VBox> languageCards = new HashMap<>();
+    private Map<Lesson, ProgressStatus> lessonStatuses = Map.of();
+    private Set<Integer> unlockedAchievementIds = Set.of();
+    private boolean refreshing;
+    private boolean refreshPending;
+    private boolean disposed;
 
     public DashboardFrame(User user) {
         this(new Stage(), user);
@@ -150,22 +168,92 @@ public class DashboardFrame {
         this.controller = new DashboardController(this.currentUser, ctx);
         this.lastKnownOfflineExp = this.currentUser.getTotalExp();
 
-        loadDomainDataFromOracleOrSeed();
-        loadEnrollmentsFromOracle();
-        loadAchievementsFromOracleOrSeed();
-        loadActivityHistoryFromOracle();
-        this.solvedChallengesCount = this.controller.syncTelemetryAndGetSolvedChallenges(0);
-
-        initUi();
-        populateLessonsForLanguage("JAVA");
-        refreshCourseProgressBars();
-        loadComparisonTopic("POLYMORPHISM");
-        refreshAchievementsGrid();
-        refreshGamificationTelemetry();
+        showLoadingScreen();
     }
 
     public Stage getStage() {
         return stage;
+    }
+
+    private void showLoadingScreen() {
+        stage.setTitle("LevelUp Code · Tu espacio de aprendizaje");
+        stage.setMinWidth(900);
+        stage.setMinHeight(640);
+        Label message = new Label("Preparando tus cursos y tu progreso…");
+        message.getStyleClass().add("card-title");
+        ProgressIndicator indicator = new ProgressIndicator();
+        indicator.setMaxSize(36, 36);
+        Button retry = new Button("Volver a intentar");
+        retry.getStyleClass().add("btn-primary");
+        retry.setVisible(false);
+        retry.setManaged(false);
+        retry.setOnAction(e -> showLoadingScreen());
+        VBox loading = new VBox(18, indicator, message, retry);
+        loading.setAlignment(Pos.CENTER);
+        Scene scene = new Scene(loading, 1260, 780);
+        Theme.applyCss(scene);
+        stage.setScene(scene);
+        Task<DashboardState> task = new Task<>() {
+            @Override protected DashboardState call() {
+                loadDomainDataFromOracleOrSeed();
+                loadEnrollmentsFromOracle();
+                loadAchievementsFromOracleOrSeed();
+                return fetchDashboardState(0);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            if (disposed || stage.getScene() != scene) return;
+            applyDashboardState(task.getValue());
+            initUi();
+            populateLessonsForLanguage("JAVA");
+            refreshCourseProgressBars();
+            loadComparisonTopic("POLYMORPHISM");
+            refreshAchievementsGrid();
+            refreshGamificationTelemetry();
+        });
+        task.setOnFailed(e -> {
+            LOGGER.log(Level.WARNING, "Unable to load dashboard", task.getException());
+            indicator.setVisible(false);
+            message.setText("No pudimos cargar tus cursos. Comprueba la conexión e inténtalo de nuevo.");
+            message.setWrapText(true);
+            retry.setVisible(true);
+            retry.setManaged(true);
+        });
+        startTask(task, "dashboard-load");
+    }
+
+    private record DashboardState(int solved, Map<LocalDate, Integer> activity,
+            Map<Lesson, ProgressStatus> progress, Set<Integer> achievements) { }
+
+    private DashboardState fetchDashboardState(int offlineSolved) {
+        int solved = controller.syncTelemetryAndGetSolvedChallenges(offlineSolved);
+        Map<Lesson, ProgressStatus> progress = new HashMap<>();
+        for (List<Lesson> lessons : List.of(javaLessons, pythonLessons, cppLessons)) {
+            for (int i = 0; i < lessons.size(); i++) {
+                Lesson lesson = lessons.get(i);
+                ProgressStatus status = LessonFrame.isLocallyCompleted(currentUser, lesson)
+                        ? ProgressStatus.COMPLETED
+                        : controller.resolveLessonProgressStatus(lesson, i);
+                progress.put(lesson, status);
+            }
+        }
+        return new DashboardState(solved, controller.loadRecentActivityHistory(), progress,
+                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved));
+    }
+
+    private void applyDashboardState(DashboardState state) {
+        solvedChallengesCount = state.solved();
+        activityByDate.clear();
+        activityByDate.putAll(state.activity());
+        lessonStatuses = state.progress();
+        unlockedAchievementIds = state.achievements();
+        lastKnownOfflineExp = currentUser.getTotalExp();
+    }
+
+    private static void startTask(Task<?> task, String name) {
+        Thread thread = new Thread(task, name);
+        thread.setDaemon(true);
+        thread.start();
     }
 
     public void show() {
@@ -232,9 +320,10 @@ public class DashboardFrame {
     }
 
     private void initUi() {
-        stage.setTitle("LevelUp Code — Espacio de Trabajo y Telemetría (JavaFX + CSS)");
-        stage.setMinWidth(1140);
-        stage.setMinHeight(720);
+        stage.setTitle("LevelUp Code · Tu espacio de aprendizaje");
+        stage.setMinWidth(900);
+        stage.setMinHeight(640);
+        stage.setOnCloseRequest(event -> disposed = true);
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-shell");
@@ -244,7 +333,7 @@ public class DashboardFrame {
         VBox centerShell = new VBox(16);
         centerShell.setPadding(new Insets(18, 22, 18, 22));
 
-        HBox topTelemetry = buildTopTelemetryBar();
+        TilePane topTelemetry = buildTopTelemetryBar();
 
         workspaceContainer = new StackPane();
         VBox.setVgrow(workspaceContainer, Priority.ALWAYS);
@@ -257,8 +346,15 @@ public class DashboardFrame {
         }
 
         workspaceContainer.getChildren().setAll(coursesView);
-        centerShell.getChildren().addAll(topTelemetry, workspaceContainer);
-        root.setCenter(centerShell);
+        syncStatus = new Label(oracleConnected ? "Tu progreso se guarda automáticamente."
+                : "Modo de prueba · Los cambios duran esta sesión.");
+        syncStatus.getStyleClass().add("muted-text");
+        centerShell.getChildren().addAll(syncStatus, topTelemetry, workspaceContainer);
+        centerShell.setMinWidth(0);
+        ScrollPane centerScroll = new ScrollPane(centerShell);
+        centerScroll.setFitToWidth(true);
+        centerScroll.getStyleClass().add("scroll-pane-clean");
+        root.setCenter(centerScroll);
 
         Scene scene = new Scene(root, 1260, 780);
         Theme.applyCss(scene);
@@ -268,7 +364,8 @@ public class DashboardFrame {
     private BorderPane buildLeftSidebar() {
         BorderPane sidebar = new BorderPane();
         sidebar.getStyleClass().add("sidebar");
-        sidebar.setPrefWidth(258);
+        sidebar.setPrefWidth(212);
+        sidebar.setMinWidth(212);
 
         VBox navColumn = new VBox(8);
 
@@ -277,20 +374,20 @@ public class DashboardFrame {
         lblBrand.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 20, Theme.HEX_INDIGO));
         lblBrand.setGraphicTextGap(8);
 
-        Label lblSub = new Label("Plataforma Políglota");
+        Label lblSub = new Label("Aprende. Practica. Avanza.");
         lblSub.getStyleClass().add("muted-text");
         VBox.setMargin(lblSub, new Insets(0, 0, 14, 0));
 
         Label lblNavSection = new Label("NAVEGACIÓN PRINCIPAL");
         lblNavSection.getStyleClass().add("section-caption");
 
-        navCoursesBtn = new Button("Rutas y Árbol de Nodos");
+        navCoursesBtn = new Button("Mis cursos");
         navCoursesBtn.getStyleClass().add("nav-btn-active");
         navCoursesBtn.setGraphic(Theme.createIcon(Theme.IconKind.BOOK, 16, Theme.HEX_WHITE));
         navCoursesBtn.setGraphicTextGap(10);
         navCoursesBtn.setMaxWidth(Double.MAX_VALUE);
 
-        navComparatorBtn = new Button("Comparador 3 Lenguajes");
+        navComparatorBtn = new Button("Comparar lenguajes");
         navComparatorBtn.getStyleClass().add("nav-btn");
         navComparatorBtn.setGraphic(Theme.createIcon(Theme.IconKind.CODE, 16, Theme.HEX_CYAN));
         navComparatorBtn.setGraphicTextGap(10);
@@ -303,7 +400,7 @@ public class DashboardFrame {
         navAchievementsBtn.setMaxWidth(Double.MAX_VALUE);
 
         if (currentUser != null && currentUser.isAdministrator()) {
-            navAdminBtn = new Button("Gestión de Retos (Oracle)");
+            navAdminBtn = new Button("Crear un reto");
             navAdminBtn.getStyleClass().add("nav-btn");
             navAdminBtn.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 16, Theme.HEX_GREEN));
             navAdminBtn.setGraphicTextGap(10);
@@ -311,7 +408,7 @@ public class DashboardFrame {
             navAdminBtn.setOnAction(e -> switchWorkspaceView("ADMIN"));
         }
 
-        Button btnQuickLab = new Button("Abrir Laboratorio de Retos");
+        Button btnQuickLab = new Button("Practicar un reto");
         btnQuickLab.getStyleClass().add("btn-ghost-green");
         btnQuickLab.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_GREEN));
         btnQuickLab.setGraphicTextGap(8);
@@ -325,7 +422,7 @@ public class DashboardFrame {
             switchWorkspaceView("ACHIEVEMENTS");
         });
         btnQuickLab.setOnAction(e -> {
-            Lesson l = !javaLessons.isEmpty() ? javaLessons.get(0) : null;
+            Lesson l = nextLesson();
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
             new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
@@ -363,7 +460,7 @@ public class DashboardFrame {
                 userTextCol
         );
 
-        String connLabel = oracleConnected ? "ORACLE 18C XE · ACTIVO" : "MEMORIA LOCAL";
+        String connLabel = oracleConnected ? "CONECTADO" : "MODO DE PRUEBA";
         String connClass = oracleConnected ? "badge-green" : "badge-amber";
         Label badgeConn = Theme.createPillBadge(connLabel, connClass);
 
@@ -373,6 +470,7 @@ public class DashboardFrame {
         btnLogout.setGraphicTextGap(8);
         btnLogout.setMaxWidth(Double.MAX_VALUE);
         btnLogout.setOnAction(e -> {
+            disposed = true;
             LoginFrame loginFrame = new LoginFrame(stage);
             loginFrame.show();
         });
@@ -383,8 +481,12 @@ public class DashboardFrame {
         return sidebar;
     }
 
-    private HBox buildTopTelemetryBar() {
-        HBox telemetryBar = new HBox(14);
+    private TilePane buildTopTelemetryBar() {
+        TilePane telemetryBar = new TilePane(12, 12);
+        telemetryBar.setPrefColumns(4);
+        telemetryBar.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(180, (telemetryBar.getWidth() - (telemetryBar.getWidth() >= 900 ? 36 : 12))
+                        / (telemetryBar.getWidth() >= 900 ? 4 : 2)), telemetryBar.widthProperty()));
 
         // 1. Nivel y barra de progreso
         VBox cardLevel = new VBox(6);
@@ -407,12 +509,13 @@ public class DashboardFrame {
         HBox.setHgrow(sp1b, Priority.ALWAYS);
         lblLevelSub = new Label();
         lblLevelSub.getStyleClass().add("muted-text");
-        lvlMid.getChildren().addAll(lblLevelVal, sp1b, lblLevelSub);
+        lvlMid.getChildren().add(lblLevelVal);
+        lblLevelSub.setWrapText(true);
 
         levelProgressBar = new ProgressBar(0.5);
         levelProgressBar.getStyleClass().add("progress-bar-indigo");
         levelProgressBar.setMaxWidth(Double.MAX_VALUE);
-        cardLevel.getChildren().addAll(lvlTop, lvlMid, levelProgressBar);
+        cardLevel.getChildren().addAll(lvlTop, lvlMid, lblLevelSub, levelProgressBar);
 
         // 2. Experiencia Total
         VBox cardExp = new VBox(6);
@@ -429,7 +532,8 @@ public class DashboardFrame {
 
         lblExpVal = new Label(currentUser.getTotalExp() + " XP");
         lblExpVal.getStyleClass().add("metric-value");
-        lblExpSub = new Label("Sincronizado con tabla Usuarios");
+        lblExpSub = new Label("Cada paso cuenta");
+        lblExpSub.setWrapText(true);
         lblExpSub.getStyleClass().add("muted-text");
         cardExp.getChildren().addAll(expTop, lblExpVal, lblExpSub);
 
@@ -440,7 +544,7 @@ public class DashboardFrame {
 
         HBox strTop = new HBox(8);
         strTop.setAlignment(Pos.CENTER_LEFT);
-        Label lblStrCap = new Label("RACHA Y ACTIVIDAD (14 DÍAS)");
+        Label lblStrCap = new Label("RACHA · ÚLTIMOS 14 DÍAS");
         lblStrCap.getStyleClass().add("section-caption");
         Region sp3 = new Region();
         HBox.setHgrow(sp3, Priority.ALWAYS);
@@ -482,14 +586,18 @@ public class DashboardFrame {
         HBox.setHgrow(sp4b, Priority.ALWAYS);
         lblLivesSub = new Label("Energía lista");
         lblLivesSub.getStyleClass().add("muted-text");
-        livMid.getChildren().addAll(lblLivesVal, sp4b, lblLivesSub);
+        livMid.getChildren().add(lblLivesVal);
 
         livesProgressBar = new ProgressBar(currentUser.getLives() / 5.0);
         livesProgressBar.getStyleClass().add("progress-bar-rose");
         livesProgressBar.setMaxWidth(Double.MAX_VALUE);
-        cardLives.getChildren().addAll(livTop, livMid, livesProgressBar);
+        cardLives.getChildren().addAll(livTop, livMid, lblLivesSub, livesProgressBar);
 
         telemetryBar.getChildren().addAll(cardLevel, cardExp, cardStreak, cardLives);
+        for (Node card : telemetryBar.getChildren()) {
+            ((Region) card).setMinWidth(0);
+            ((Region) card).setMaxWidth(Double.MAX_VALUE);
+        }
         return telemetryBar;
     }
 
@@ -510,7 +618,7 @@ public class DashboardFrame {
             String styleClass = xp <= 0 ? "heatmap-cell-0"
                     : (xp <= 70 ? "heatmap-cell-1" : (xp <= 150 ? "heatmap-cell-2" : "heatmap-cell-3"));
             cell.getStyleClass().add(styleClass);
-            Tooltip.install(cell, new Tooltip(day.format(fmt) + ": +" + xp + " XP (Actividad_Diaria)"));
+            Tooltip.install(cell, new Tooltip(day.format(fmt) + ": +" + xp + " XP"));
             heatmapGridBox.getChildren().add(cell);
         }
     }
@@ -519,24 +627,28 @@ public class DashboardFrame {
         VBox view = new VBox(16);
 
         HBox secHeader = Theme.createSectionHeader(
-                "Rutas de Especialización Multilenguaje (Inscripciones)",
-                "3 Lenguajes Activos", "badge-indigo"
+                "¿Qué quieres aprender hoy?",
+                "3 lenguajes", "badge-indigo"
         );
 
-        HBox langGrid = new HBox(16);
+        TilePane langGrid = new TilePane(12, 12);
+        langGrid.setPrefColumns(3);
+        langGrid.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(200, (langGrid.getWidth() - (langGrid.getWidth() >= 840 ? 24 : 0))
+                        / (langGrid.getWidth() >= 840 ? 3 : 1)), langGrid.widthProperty()));
         Node cardJava = createLanguageCard(
                 "JAVA", "Java 21 LTS",
-                "POO, Clases Abstractas, Interfaces y Colecciones en JVM.",
+                "Construye aplicaciones con clases, interfaces y colecciones.",
                 "lang-card-java", "btn-java", javaLessons.size()
         );
         Node cardPython = createLanguageCard(
                 "PYTHON", "Python 3.12",
-                "Protocolos ABC, Comprensión de Listas y Búsqueda Binaria.",
+                "Resuelve problemas con una sintaxis clara y directa.",
                 "lang-card-python", "btn-python", pythonLessons.size()
         );
         Node cardCpp = createLanguageCard(
                 "CPP", "ISO C++ 20",
-                "Funciones Virtuales Puras, Memoria RAII y STL std::vector.",
+                "Aprende rendimiento, memoria y estructuras de datos.",
                 "lang-card-cpp", "btn-cpp", cppLessons.size()
         );
         HBox.setHgrow(cardJava, Priority.ALWAYS);
@@ -548,28 +660,56 @@ public class DashboardFrame {
         lessonsWrapper.getStyleClass().add("surface-card");
         VBox.setVgrow(lessonsWrapper, Priority.ALWAYS);
 
-        lblCourseStatus = new Label(oracleConnected
-                ? "Inscripciones sincronizadas con la tabla Inscripciones en Oracle."
-                : "Modo demostración local sin conexión a Oracle.");
+        lblCourseStatus = new Label("Elige un curso y avanza a tu ritmo.");
         lblCourseStatus.getStyleClass().add("muted-text");
+        lblCourseStatus.setWrapText(true);
 
         HBox listHeader = new HBox(10);
         listHeader.setAlignment(Pos.CENTER_LEFT);
-        lblLessonsHeader = new Label("ÁRBOL DE HABILIDADES Y PROGRESO · JAVA");
+        lblLessonsHeader = new Label("LECCIONES · JAVA");
         lblLessonsHeader.getStyleClass().add("section-caption");
         Region sp = new Region();
         HBox.setHgrow(sp, Priority.ALWAYS);
-        Label badgeHint = Theme.createPillBadge("Nodos conectados con Progreso_Leccion", "badge-green");
-        listHeader.getChildren().addAll(lblLessonsHeader, sp, lblCourseStatus, badgeHint);
+        lessonResults = new Label();
+        lessonResults.getStyleClass().add("muted-text");
+        listHeader.getChildren().addAll(lblLessonsHeader, sp, lessonResults);
+
+        lessonSearch = new TextField();
+        lessonSearch.setPromptText("Buscar una lección o un módulo…");
+        lessonSearch.setAccessibleText("Buscar lecciones en el curso seleccionado");
+        lessonSearch.getStyleClass().add("input-field");
+        lessonSearch.setPrefWidth(300);
+        lessonSearch.textProperty().addListener((obs, old, value) -> populateLessonsForLanguage(activeLanguageKey));
+        hideCompleted = new CheckBox("Solo por completar");
+        hideCompleted.setOnAction(e -> populateLessonsForLanguage(activeLanguageKey));
+        Button clear = new Button("Limpiar filtros");
+        clear.getStyleClass().add("btn-ghost");
+        clear.setOnAction(e -> { hideCompleted.setSelected(false); lessonSearch.clear(); populateLessonsForLanguage(activeLanguageKey); });
+        FlowPane filters = new FlowPane(12, 10, lessonSearch, hideCompleted, clear);
+        filters.setAlignment(Pos.CENTER_LEFT);
+
+        continueSummary = new Label();
+        continueSummary.setWrapText(true);
+        continueSummary.getStyleClass().add("card-title");
+        continueButton = new Button("Continuar aprendiendo");
+        continueButton.getStyleClass().add("btn-primary");
+        continueButton.setOnAction(e -> {
+            Lesson lesson = nextLesson();
+            if (lesson != null) new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show();
+        });
+        VBox resume = new VBox(10, continueSummary, continueButton);
+        resume.getStyleClass().add("resume-card");
 
         lessonsListBox = new VBox(12);
         ScrollPane scroll = new ScrollPane(lessonsListBox);
         scroll.setFitToWidth(true);
+        scroll.setMinHeight(310);
+        scroll.setPrefHeight(430);
         scroll.getStyleClass().add("scroll-pane-clean");
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
-        lessonsWrapper.getChildren().addAll(listHeader, scroll);
-        view.getChildren().addAll(secHeader, langGrid, lessonsWrapper);
+        lessonsWrapper.getChildren().addAll(listHeader, lblCourseStatus, filters, scroll);
+        view.getChildren().addAll(secHeader, resume, langGrid, lessonsWrapper);
         return view;
     }
 
@@ -583,6 +723,9 @@ public class DashboardFrame {
     ) {
         VBox card = new VBox(8);
         card.getStyleClass().add(cardStyleClass);
+        card.setMinWidth(0);
+        card.setMaxWidth(Double.MAX_VALUE);
+        languageCards.put(langKey, card);
 
         HBox topRow = new HBox(8);
         topRow.setAlignment(Pos.CENTER_LEFT);
@@ -612,31 +755,48 @@ public class DashboardFrame {
         lblProgressInfo.getStyleClass().add("muted-text");
         courseProgressLabels.put(langKey, lblProgressInfo);
 
-        HBox bottomRow = new HBox(8);
+        FlowPane bottomRow = new FlowPane(8, 8);
         bottomRow.setAlignment(Pos.CENTER_LEFT);
-        Label badgeCount = Theme.createPillBadge(lessonCount + " Lecciones · 3 Módulos", "badge-indigo");
+        Label badgeCount = Theme.createPillBadge(lessonCount + " lecciones", "badge-indigo");
 
-        Region sp2 = new Region();
-        HBox.setHgrow(sp2, Priority.ALWAYS);
-
-        final Button btnEnroll = new Button(isEnrolled ? "Abrir Ruta" : "Inscribirme");
+        final Button btnEnroll = new Button(isEnrolled ? "Ver lecciones" : "Empezar curso");
         btnEnroll.getStyleClass().add(btnStyleClass);
+        btnEnroll.setAccessibleText((isEnrolled ? "Ver lecciones de " : "Empezar curso de ") + title);
         btnEnroll.setOnAction(e -> {
             if (!enrolledLanguages.contains(langKey)) {
-                if (persistEnrollmentInOracle(langKey)) {
+                btnEnroll.setDisable(true);
+                btnEnroll.setText("Inscribiendo…");
+                Language target = "PYTHON".equals(langKey) ? pythonLangModel
+                        : "CPP".equals(langKey) ? cppLangModel : javaLangModel;
+                Task<Void> enroll = new Task<>() {
+                    @Override protected Void call() {
+                        if (oracleConnected && currentUser.getId() > 0) controller.enrollInLanguage(target);
+                        return null;
+                    }
+                };
+                enroll.setOnSucceeded(done -> {
+                    if (disposed) return;
                     enrolledLanguages.add(langKey);
                     enrollBadge.setText("INSCRITO ✓");
                     enrollBadge.getStyleClass().setAll("badge-green");
-                    btnEnroll.setText("Abrir Ruta");
-                } else {
-                    return;
-                }
+                    btnEnroll.setText("Ver lecciones");
+                    btnEnroll.setDisable(false);
+                    lblCourseStatus.setText("¡Ya puedes empezar! Selecciona una lección.");
+                    populateLessonsForLanguage(langKey);
+                });
+                enroll.setOnFailed(failed -> {
+                    LOGGER.log(Level.WARNING, "Enrollment failed", enroll.getException());
+                    btnEnroll.setDisable(false);
+                    btnEnroll.setText("Reintentar inscripción");
+                    lblCourseStatus.setText("No pudimos inscribirte. Comprueba la conexión y vuelve a intentarlo.");
+                });
+                startTask(enroll, "course-enrollment");
+                return;
             }
             populateLessonsForLanguage(langKey);
         });
 
-        card.setOnMouseClicked(e -> populateLessonsForLanguage(langKey));
-        bottomRow.getChildren().addAll(badgeCount, sp2, btnEnroll);
+        bottomRow.getChildren().addAll(badgeCount, btnEnroll);
         card.getChildren().addAll(topRow, lblDesc, langProgress, lblProgressInfo, bottomRow);
         return card;
     }
@@ -706,7 +866,18 @@ public class DashboardFrame {
             langLabel = "JAVA 21 LTS";
         }
 
-        lblLessonsHeader.setText("ÁRBOL DE HABILIDADES Y PROGRESO (PROGRESO_LECCION) · " + langLabel);
+        lblLessonsHeader.setText("LECCIONES · " + langLabel);
+        languageCards.forEach((key, card) -> {
+            card.getStyleClass().remove("course-selected");
+            if (key.equals(langKey)) card.getStyleClass().add("course-selected");
+        });
+        Lesson next = nextLesson();
+        continueSummary.setText(next == null ? "Este curso aún no tiene lecciones."
+                : (selectedList.stream().allMatch(l -> resolveLessonProgressStatus(l, 0) == ProgressStatus.COMPLETED)
+                        ? "¡Curso completado! Puedes repasar: " : "Tu siguiente paso: ") + next.getTitle());
+        continueButton.setDisable(next == null);
+        String query = lessonSearch.getText().strip().toLowerCase(Locale.ROOT);
+        int shown = 0;
 
         String lastModuleTitle = "";
         for (int i = 0; i < selectedList.size(); i++) {
@@ -715,6 +886,10 @@ public class DashboardFrame {
             String modTitle = (module != null && module.getTitle() != null)
                     ? module.getTitle()
                     : "Módulo Curricular";
+            ProgressStatus status = resolveLessonProgressStatus(lesson, i);
+            if (hideCompleted.isSelected() && status == ProgressStatus.COMPLETED) continue;
+            if (!(lesson.getTitle() + " " + modTitle).toLowerCase(Locale.ROOT).contains(query)) continue;
+            shown++;
             if (!modTitle.equals(lastModuleTitle)) {
                 lastModuleTitle = modTitle;
                 String modDesc = (module != null && module.getDescription() != null)
@@ -722,10 +897,30 @@ public class DashboardFrame {
                         : "";
                 lessonsListBox.getChildren().add(createModuleHeaderRow(modTitle, modDesc));
             }
-            ProgressStatus status = resolveLessonProgressStatus(lesson, i);
             lessonsListBox.getChildren().add(createSkillNodeRow(i + 1, lesson, status));
         }
+        lessonResults.setText(shown + " de " + selectedList.size() + " lecciones");
+        if (shown == 0) {
+            Label empty = new Label(selectedList.isEmpty() ? "Pronto encontrarás lecciones aquí."
+                    : "No hay lecciones con estos filtros. Prueba otra búsqueda o limpia los filtros.");
+            empty.setWrapText(true);
+            empty.getStyleClass().add("empty-state");
+            lessonsListBox.getChildren().add(empty);
+        }
         Theme.playFadeIn(lessonsListBox);
+    }
+
+    private List<Lesson> selectedLessons() {
+        return "PYTHON".equals(activeLanguageKey) ? pythonLessons
+                : "CPP".equals(activeLanguageKey) ? cppLessons : javaLessons;
+    }
+
+    private Lesson nextLesson() {
+        List<Lesson> lessons = selectedLessons();
+        return lessons.stream().filter(l -> resolveLessonProgressStatus(l, 0) == ProgressStatus.IN_PROGRESS)
+                .findFirst().orElseGet(() -> lessons.stream()
+                        .filter(l -> resolveLessonProgressStatus(l, 0) != ProgressStatus.COMPLETED)
+                        .findFirst().orElse(lessons.isEmpty() ? null : lessons.get(0)));
     }
 
     private HBox createModuleHeaderRow(String moduleTitle, String moduleDescription) {
@@ -735,6 +930,7 @@ public class DashboardFrame {
 
         Label lblModTitle = new Label(moduleTitle);
         lblModTitle.getStyleClass().add("card-title");
+        lblModTitle.setWrapText(true);
         lblModTitle.setGraphic(Theme.createIcon(Theme.IconKind.SPARK, 15, Theme.HEX_INDIGO));
         lblModTitle.setGraphicTextGap(8);
 
@@ -743,13 +939,14 @@ public class DashboardFrame {
 
         Label lblModDesc = new Label(moduleDescription);
         lblModDesc.getStyleClass().add("muted-text");
+        lblModDesc.setWrapText(true);
 
         header.getChildren().addAll(lblModTitle, sp, lblModDesc);
         return header;
     }
 
     private ProgressStatus resolveLessonProgressStatus(Lesson lesson, int indexInList) {
-        return controller.resolveLessonProgressStatus(lesson, indexInList);
+        return lessonStatuses.getOrDefault(lesson, ProgressStatus.PENDING);
     }
 
     private HBox createSkillNodeRow(int orderNum, final Lesson lesson, ProgressStatus status) {
@@ -784,11 +981,13 @@ public class DashboardFrame {
         row.getStyleClass().add(nodeStyleClass);
 
         VBox textColumn = new VBox(4);
+        textColumn.setMinWidth(0);
         HBox.setHgrow(textColumn, Priority.ALWAYS);
 
-        HBox titleLine = new HBox(10);
+        FlowPane titleLine = new FlowPane(10, 8);
         titleLine.setAlignment(Pos.CENTER_LEFT);
-        Label lblTitle = new Label("Nodo #" + orderNum + ": " + lesson.getTitle());
+        Label lblTitle = new Label(orderNum + ". " + lesson.getTitle());
+        lblTitle.setWrapText(true);
         lblTitle.getStyleClass().add("card-title");
 
         Label statusBadge = Theme.createPillBadge(statusText, badgeStyleClass);
@@ -805,13 +1004,14 @@ public class DashboardFrame {
         }
         Label lblPreview = new Label(preview);
         lblPreview.getStyleClass().add("muted-text");
+        lblPreview.setWrapText(true);
 
         textColumn.getChildren().addAll(titleLine, lblPreview);
 
-        HBox actions = new HBox(8);
-        actions.setAlignment(Pos.CENTER_RIGHT);
+        FlowPane actions = new FlowPane(8, 8);
+        actions.setAlignment(Pos.CENTER_LEFT);
 
-        Button btnTheory = new Button("Estudiar Teoría");
+        Button btnTheory = new Button(status == ProgressStatus.COMPLETED ? "Repasar lección" : "Abrir lección");
         btnTheory.getStyleClass().add("btn-secondary");
         btnTheory.setOnAction(e -> new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show());
         actions.getChildren().add(btnTheory);
@@ -825,17 +1025,12 @@ public class DashboardFrame {
                 btnChallenge.setOnAction(e -> new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show());
                 actions.getChildren().add(btnChallenge);
             }
-        } else {
-            Button btnSolve = new Button("Resolver Reto");
-            btnSolve.getStyleClass().add("btn-primary");
-            btnSolve.setOnAction(e -> new ChallengeFrame(currentUser, null, this::onChallengeOrLessonCompleted).show());
-            actions.getChildren().add(btnSolve);
         }
 
+        textColumn.getChildren().add(actions);
         row.getChildren().addAll(
                 Theme.createIcon(iconKind, 20, iconHex),
-                textColumn,
-                actions
+                textColumn
         );
         return row;
     }
@@ -848,7 +1043,8 @@ public class DashboardFrame {
 
         HBox titleRow = new HBox(12);
         titleRow.setAlignment(Pos.CENTER_LEFT);
-        Label lblTitle = new Label("Comparador Espejo Sincronizado · 6 Tópicos Curriculares (Java · Python · C++)");
+        Label lblTitle = new Label("Una idea, tres lenguajes");
+        lblTitle.setWrapText(true);
         lblTitle.getStyleClass().add("page-title");
         lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.CODE, 20, Theme.HEX_CYAN));
         lblTitle.setGraphicTextGap(8);
@@ -857,7 +1053,7 @@ public class DashboardFrame {
         Label badgeTopics = Theme.createPillBadge("6 Tópicos Interactivos", "badge-cyan");
         titleRow.getChildren().addAll(lblTitle, spacer, badgeTopics);
 
-        HBox topicsRow = new HBox(8);
+        FlowPane topicsRow = new FlowPane(8, 8);
         topicsRow.setAlignment(Pos.CENTER_LEFT);
         comparatorTopicButtons.clear();
 
@@ -885,16 +1081,21 @@ public class DashboardFrame {
         txtComparePython = createComparisonTextArea();
         txtCompareCpp = createComparisonTextArea();
 
-        HBox threeColumns = new HBox(14);
+        TilePane threeColumns = new TilePane(14, 14);
+        threeColumns.setPrefColumns(3);
+        threeColumns.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(270, (threeColumns.getWidth() - (threeColumns.getWidth() >= 900 ? 28 : 0))
+                        / (threeColumns.getWidth() >= 900 ? 3 : 1)), threeColumns.widthProperty()));
+        threeColumns.setMinHeight(350);
         VBox.setVgrow(threeColumns, Priority.ALWAYS);
 
         VBox colJava = wrapCodeColumn("JAVA 21 LTS", "Tipado Estático · JVM", "lang-card-java", "badge-java", txtCompareJava);
         VBox colPy = wrapCodeColumn("PYTHON 3.12", "Tipado Dinámico · ABC", "lang-card-python", "badge-python", txtComparePython);
         VBox colCpp = wrapCodeColumn("ISO C++ 20", "Compilado Nativo · STL", "lang-card-cpp", "badge-cpp", txtCompareCpp);
 
-        HBox.setHgrow(colJava, Priority.ALWAYS);
-        HBox.setHgrow(colPy, Priority.ALWAYS);
-        HBox.setHgrow(colCpp, Priority.ALWAYS);
+        colJava.setMaxWidth(Double.MAX_VALUE);
+        colPy.setMaxWidth(Double.MAX_VALUE);
+        colCpp.setMaxWidth(Double.MAX_VALUE);
         threeColumns.getChildren().addAll(colJava, colPy, colCpp);
 
         HBox bottomCallout = new HBox(12);
@@ -908,7 +1109,7 @@ public class DashboardFrame {
         lblCompareSummary.setGraphicTextGap(10);
         HBox.setHgrow(lblCompareSummary, Priority.ALWAYS);
 
-        Button btnPractice = new Button("Practicar este Tópico en el Evaluador");
+        Button btnPractice = new Button("Practicar este tema");
         btnPractice.getStyleClass().add("btn-primary");
         btnPractice.setOnAction(e -> {
             List<Lesson> targetList = "PYTHON".equals(activeLanguageKey) ? pythonLessons
@@ -937,15 +1138,18 @@ public class DashboardFrame {
     private VBox wrapCodeColumn(String langName, String paradigmTag, String cardClass, String badgeClass, TextArea editor) {
         VBox col = new VBox(10);
         col.getStyleClass().add(cardClass);
+        col.setMinWidth(0);
+        col.setPrefWidth(280);
 
-        HBox head = new HBox(8);
+        VBox head = new VBox(8);
         head.setAlignment(Pos.CENTER_LEFT);
         Label lblLang = new Label(langName);
         lblLang.getStyleClass().add("card-title");
         Region sp = new Region();
         HBox.setHgrow(sp, Priority.ALWAYS);
         Label badge = Theme.createPillBadge(paradigmTag, badgeClass);
-        head.getChildren().addAll(lblLang, sp, badge);
+        badge.setWrapText(true);
+        head.getChildren().addAll(lblLang, badge);
 
         col.getChildren().addAll(head, editor);
         return col;
@@ -981,7 +1185,7 @@ public class DashboardFrame {
         txtCompareJava.setText(javaSnippet[0]);
         txtComparePython.setText(pySnippet[0]);
         txtCompareCpp.setText(cppSnippet[0]);
-        lblCompareSummary.setText("Análisis Comparativo · " + javaSnippet[1] + " | " + pySnippet[1] + " | " + cppSnippet[1]);
+        lblCompareSummary.setText(javaSnippet[1] + "\n" + pySnippet[1] + "\n" + cppSnippet[1]);
         Theme.playFadeIn(txtCompareJava);
         Theme.playFadeIn(txtComparePython);
         Theme.playFadeIn(txtCompareCpp);
@@ -994,7 +1198,7 @@ public class DashboardFrame {
         topHeader.getStyleClass().add("surface-card");
         topHeader.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblTitle = new Label("Catálogo de Logros e Insignias (Logros y Usuario_Logro)");
+        Label lblTitle = new Label("Celebra tu progreso");
         lblTitle.getStyleClass().add("page-title");
         lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.TROPHY, 20, Theme.HEX_AMBER));
         lblTitle.setGraphicTextGap(8);
@@ -1021,10 +1225,14 @@ public class DashboardFrame {
 
         ScrollPane scroll = new ScrollPane(achievementsGrid);
         scroll.setFitToWidth(true);
+        scroll.setMinHeight(420);
         scroll.getStyleClass().add("scroll-pane-clean");
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
         view.getChildren().addAll(topHeader, scroll);
+        achievementsGrid.widthProperty().addListener((obs, before, after) -> {
+            if ((before.doubleValue() >= 800) != (after.doubleValue() >= 800)) refreshAchievementsGrid();
+        });
         return view;
     }
 
@@ -1034,10 +1242,14 @@ public class DashboardFrame {
         }
         achievementsGrid.getChildren().clear();
 
-        Set<Integer> unlockedIds = controller.resolveUnlockedAchievementIds(
-                achievementsCatalog,
-                solvedChallengesCount
-        );
+        Set<Integer> unlockedIds = unlockedAchievementIds;
+        int columns = achievementsGrid.getWidth() >= 800 ? 2 : 1;
+        achievementsGrid.getColumnConstraints().clear();
+        for (int c = 0; c < columns; c++) {
+            ColumnConstraints constraint = new ColumnConstraints();
+            constraint.setPercentWidth(100.0 / columns);
+            achievementsGrid.getColumnConstraints().add(constraint);
+        }
 
         int unlockedCount = 0;
         for (int i = 0; i < achievementsCatalog.size(); i++) {
@@ -1046,8 +1258,8 @@ public class DashboardFrame {
             if (unlocked) {
                 unlockedCount++;
             }
-            int col = i % 2;
-            int row = i / 2;
+            int col = i % columns;
+            int row = i / columns;
             achievementsGrid.add(createAchievementCard(ach, unlocked), col, row);
         }
 
@@ -1092,11 +1304,11 @@ public class DashboardFrame {
 
         String ruleText = "Meta del logro";
         if (ach instanceof StreakAchievement) {
-            ruleText = "Meta Logro_Racha: " + ((StreakAchievement) ach).getRequiredDays() + " días consecutivos";
+            ruleText = "Practica " + ((StreakAchievement) ach).getRequiredDays() + " días consecutivos";
         } else if (ach instanceof ExperienceAchievement) {
-            ruleText = "Meta Logro_Exp: " + ((ExperienceAchievement) ach).getRequiredExp() + " XP acumulados";
+            ruleText = "Consigue " + ((ExperienceAchievement) ach).getRequiredExp() + " XP";
         } else if (ach instanceof ChallengeCountAchievement) {
-            ruleText = "Meta Logro_Retos: " + ((ChallengeCountAchievement) ach).getRequiredChallenges() + " retos superados";
+            ruleText = "Supera " + ((ChallengeCountAchievement) ach).getRequiredChallenges() + " retos";
         }
         Label lblRule = new Label(ruleText);
         lblRule.getStyleClass().add(unlocked ? "text-success" : "muted-text");
@@ -1113,7 +1325,7 @@ public class DashboardFrame {
         headerCard.getStyleClass().add("surface-card");
         headerCard.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblTitle = new Label("Panel de Administración CRUD de Retos (Retos, Reto_Codigo y Casos_Prueba)");
+        Label lblTitle = new Label("Crea una nueva práctica");
         lblTitle.getStyleClass().add("page-title");
         lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 20, Theme.HEX_GREEN));
         lblTitle.setGraphicTextGap(8);
@@ -1147,7 +1359,7 @@ public class DashboardFrame {
         txtAdminReward = new TextField("90");
         txtAdminReward.getStyleClass().add("input-field");
 
-        VBox colLesson = wrapLabeledField("LECCIÓN DESTINO (ID_LECCION)", cmbAdminLesson);
+        VBox colLesson = wrapLabeledField("LECCIÓN", cmbAdminLesson);
         VBox colTitle = wrapLabeledField("TÍTULO DEL RETO", txtAdminTitle);
         VBox colReward = wrapLabeledField("RECOMPENSA XP", txtAdminReward);
         HBox.setHgrow(colLesson, Priority.ALWAYS);
@@ -1176,7 +1388,7 @@ public class DashboardFrame {
         VBox.setVgrow(txtAdminTemplate, Priority.ALWAYS);
 
         VBox colStatement = wrapLabeledField("ENUNCIADO DEL PROBLEMA", txtAdminStatement);
-        VBox colTemplate = wrapLabeledField("PLANTILLA INICIAL DE CÓDIGO (PLANTILLA_CODIGO)", txtAdminTemplate);
+        VBox colTemplate = wrapLabeledField("CÓDIGO INICIAL PARA EL ESTUDIANTE", txtAdminTemplate);
         HBox.setHgrow(colStatement, Priority.ALWAYS);
         HBox.setHgrow(colTemplate, Priority.ALWAYS);
         VBox.setVgrow(colStatement, Priority.ALWAYS);
@@ -1206,13 +1418,15 @@ public class DashboardFrame {
         HBox actionRow = new HBox(12);
         actionRow.setAlignment(Pos.CENTER_LEFT);
 
-        lblAdminStatus = new Label("Los retos creados se insertan en Retos, Reto_Codigo y Casos_Prueba en Oracle.");
+        lblAdminStatus = new Label("Completa el enunciado y los ejemplos antes de guardar.");
+        lblAdminStatus.setWrapText(true);
         lblAdminStatus.getStyleClass().add("muted-text");
 
         Region sp = new Region();
         HBox.setHgrow(sp, Priority.ALWAYS);
 
-        Button btnCreateAndTest = new Button("Guardar Reto en Oracle y Probar en Evaluador");
+        Button btnCreateAndTest = new Button("Guardar y probar");
+        btnAdminSave = btnCreateAndTest;
         btnCreateAndTest.getStyleClass().add("btn-success");
         btnCreateAndTest.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
         btnCreateAndTest.setGraphicTextGap(8);
@@ -1221,6 +1435,7 @@ public class DashboardFrame {
         actionRow.getChildren().addAll(lblAdminStatus, sp, btnCreateAndTest);
 
         formCard.getChildren().addAll(row1, row2, casesRow, actionRow);
+        formCard.setMinHeight(580);
         view.getChildren().addAll(headerCard, formCard);
         return view;
     }
@@ -1228,6 +1443,9 @@ public class DashboardFrame {
     private VBox wrapLabeledField(String caption, Node control) {
         VBox box = new VBox(5);
         Label lbl = new Label(caption);
+        lbl.setLabelFor(control);
+        lbl.setWrapText(true);
+        box.setMinWidth(0);
         lbl.getStyleClass().add("section-caption");
         box.getChildren().addAll(lbl, control);
         return box;
@@ -1257,6 +1475,16 @@ public class DashboardFrame {
             return;
         }
 
+        if (targetLesson == null || title.isBlank() || statement.isBlank() || template.isBlank() || reward <= 0) {
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("Selecciona una lección y completa el título, enunciado y código. La recompensa debe ser mayor que cero.");
+            if (title.isBlank()) txtAdminTitle.requestFocus();
+            else if (statement.isBlank()) txtAdminStatement.requestFocus();
+            else if (template.isBlank()) txtAdminTemplate.requestFocus();
+            else txtAdminReward.requestFocus();
+            return;
+        }
+
         CodeChallenge newCh = new CodeChallenge(
                 0,
                 title,
@@ -1269,22 +1497,35 @@ public class DashboardFrame {
         newCh.addTestCase(new TestCase(1, newCh, txtAdminCase1In.getText().trim(), txtAdminCase1Out.getText().trim(), false));
         newCh.addTestCase(new TestCase(2, newCh, txtAdminCase2In.getText().trim(), txtAdminCase2Out.getText().trim(), false));
 
-        try {
-            Challenge saved = controller.createAdminChallenge(targetLesson, newCh);
+        btnAdminSave.setDisable(true);
+        btnAdminSave.setText("Guardando…");
+        lblAdminStatus.setText("Estamos guardando tu reto. Espera un momento.");
+        Task<Challenge> save = new Task<>() {
+            @Override protected Challenge call() { return controller.createAdminChallenge(targetLesson, newCh); }
+        };
+        save.setOnSucceeded(e -> {
+            if (disposed) return;
+            Challenge saved = save.getValue();
+            btnAdminSave.setDisable(false);
+            btnAdminSave.setText("Guardar y probar");
             if (targetLesson != null) {
                 targetLesson.addChallenge(saved);
             }
             lblAdminStatus.getStyleClass().setAll("text-success");
             lblAdminStatus.setText(oracleConnected && saved.getId() > 0
-                    ? "¡Reto #" + saved.getId() + " guardado en Retos, Reto_Codigo y Casos_Prueba en Oracle!"
-                    : "Reto creado localmente (modo demostración sin Oracle) y abierto en el evaluador.");
+                    ? "¡Reto guardado! Ya puedes probarlo."
+                    : "Reto creado para esta sesión de prueba.");
             populateLessonsForLanguage(activeLanguageKey);
             new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", ex);
+        });
+        save.setOnFailed(e -> {
+            LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());
+            btnAdminSave.setDisable(false);
+            btnAdminSave.setText("Reintentar guardado");
             lblAdminStatus.getStyleClass().setAll("text-danger");
-            lblAdminStatus.setText("Error al guardar el reto: " + ex.getMessage());
-        }
+            lblAdminStatus.setText("No pudimos guardar el reto. Tus datos siguen aquí; revisa la conexión y vuelve a intentarlo.");
+        });
+        startTask(save, "challenge-save");
     }
 
     private void switchWorkspaceView(String cardKey) {
@@ -1337,14 +1578,33 @@ public class DashboardFrame {
     }
 
     private void refreshAllDashboardState() {
-        this.solvedChallengesCount = controller.syncTelemetryAndGetSolvedChallenges(this.solvedChallengesCount);
-        this.lastKnownOfflineExp = currentUser.getTotalExp();
-        loadActivityHistoryFromOracle();
-        rebuildHeatmapCells();
-        refreshGamificationTelemetry();
-        populateLessonsForLanguage(activeLanguageKey);
-        refreshCourseProgressBars();
-        refreshAchievementsGrid();
+        if (disposed) return;
+        if (refreshing) { refreshPending = true; return; }
+        refreshing = true;
+        syncStatus.setText("Actualizando tu progreso…");
+        int offlineSolved = solvedChallengesCount;
+        Task<DashboardState> refresh = new Task<>() {
+            @Override protected DashboardState call() { return fetchDashboardState(offlineSolved); }
+        };
+        refresh.setOnSucceeded(e -> {
+            refreshing = false;
+            if (disposed) return;
+            applyDashboardState(refresh.getValue());
+            rebuildHeatmapCells();
+            refreshGamificationTelemetry();
+            populateLessonsForLanguage(activeLanguageKey);
+            refreshCourseProgressBars();
+            refreshAchievementsGrid();
+            syncStatus.setText(oracleConnected ? "Tu progreso está actualizado."
+                    : "Modo de prueba · Los cambios duran esta sesión.");
+            if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
+        });
+        refresh.setOnFailed(e -> {
+            refreshing = false;
+            LOGGER.log(Level.WARNING, "Dashboard refresh failed", refresh.getException());
+            if (!disposed) syncStatus.setText("No pudimos actualizar el progreso. Conservamos la última información disponible.");
+        });
+        startTask(refresh, "dashboard-refresh");
     }
 
     private void refreshGamificationTelemetry() {
@@ -1362,7 +1622,7 @@ public class DashboardFrame {
         lblExpVal.setText(exp + " XP");
         lblExpSub.setText(solvedChallengesCount > 0
                 ? solvedChallengesCount + " retos aprobados verificados"
-                : (oracleConnected ? "Sincronizado con tabla Usuarios" : "Modo demostración local"));
+                : "Cada práctica te acerca a tu meta");
 
         lblStreakVal.setText(currentUser.getCurrentStreak() + " Días");
         badgeMaxStreak.setText("Máx: " + currentUser.getMaxStreak() + "d");

@@ -697,3 +697,86 @@
 .scroll-pane-clean > .viewport {
     -fx-background-color: transparent;
 }
+
+/* Consistent keyboard feedback without changing the existing palette. */
+.root {
+    -fx-focus-color: #2563EB;
+    -fx-faint-focus-color: transparent;
+}
+.button {
+    -fx-cursor: hand;
+    -fx-min-height: 36;
+}
+.button:focused, .toggle-button:focused, .check-box:focused > .box,
+.radio-button:focused > .radio, .combo-box:focused {
+    -fx-effect: dropshadow(gaussian, #2563EB, 5, 0.4, 0, 0);
+}
+.button:disabled {
+    -fx-opacity: 0.6;
+    -fx-cursor: default;
+}
+.text-input {
+    -fx-highlight-fill: #2563EB;
+    -fx-highlight-text-fill: #FFFFFF;
+}
+.input-field {
+    -fx-prompt-text-fill: #64748B;
+}
+.input-field:focused {
+    -fx-border-width: 1;
+}
+.scroll-pane-clean > .scroll-bar:vertical,
+.scroll-pane-clean > .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12;
+}
+.scroll-bar .thumb {
+    -fx-background-color: #CBD5E1;
+    -fx-background-radius: 8;
+}
+.scroll-bar .thumb:hover {
+    -fx-background-color: #94A3B8;
+}
+.resume-card {
+    -fx-background-color: #EEF2FF;
+    -fx-background-radius: 12;
+    -fx-border-color: #2563EB;
+    -fx-border-radius: 12;
+    -fx-border-width: 0 0 0 4;
+    -fx-padding: 18;
+}
+.course-selected {
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.22), 10, 0.12, 0, 2);
+}
+.empty-state {
+    -fx-padding: 28;
+    -fx-text-fill: #64748B;
+    -fx-font-size: 14;
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+}
+.split-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.split-pane > .split-pane-divider {
+    -fx-background-color: #D8DEE9;
+    -fx-padding: 0 3 0 3;
+}
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: #EEF2F7;
+}
+.tab-pane .tab {
+    -fx-padding: 8 16;
+    -fx-background-color: #F8FAFC;
+}
+.tab-pane .tab:selected {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent transparent #2563EB transparent;
+    -fx-border-width: 0 0 3 0;
+}
+.tooltip {
+    -fx-font-size: 12;
+    -fx-wrap-text: true;
+    -fx-max-width: 360;
+}
