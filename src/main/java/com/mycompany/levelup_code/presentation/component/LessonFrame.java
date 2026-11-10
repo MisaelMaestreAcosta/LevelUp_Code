@@ -1,9 +1,12 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
+import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.User;
+import java.util.List;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.geometry.Insets;
@@ -51,7 +54,22 @@ public class LessonFrame extends Stage {
         this.onProgressCallback = onProgressCallback;
         initComponents();
         markLessonStartedInOracle();
-        switchComparativeSnippet("JAVA");
+        switchComparativeSnippet(resolveInitialLanguageKey());
+    }
+
+    private String resolveInitialLanguageKey() {
+        if (currentLesson != null && currentLesson.getModule() != null
+                && currentLesson.getModule().getLanguage() != null
+                && currentLesson.getModule().getLanguage().getName() != null) {
+            String lang = currentLesson.getModule().getLanguage().getName().toLowerCase(Locale.ROOT);
+            if (lang.contains("python")) {
+                return "PYTHON";
+            }
+            if (lang.contains("c++") || lang.contains("cpp")) {
+                return "CPP";
+            }
+        }
+        return "JAVA";
     }
 
     public void setVisible(boolean visible) {
@@ -112,10 +130,18 @@ public class LessonFrame extends Stage {
         lblTitle.setGraphicTextGap(10);
 
         int orderIdx = currentLesson != null ? currentLesson.getOrderIndex() : 1;
+        String moduleCrumb = (currentLesson != null && currentLesson.getModule() != null
+                && currentLesson.getModule().getTitle() != null)
+                ? currentLesson.getModule().getTitle()
+                : "Módulo Curricular";
+        Label badgeModule = Theme.createPillBadge(moduleCrumb, "badge-cyan");
         Label badgeOrder = Theme.createPillBadge("LECCIÓN #" + orderIdx, "badge-indigo");
         Label badgeReward = Theme.createPillBadge("+" + reward + " XP", "badge-green");
 
-        headerCard.getChildren().addAll(lblTitle, badgeOrder, badgeReward);
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        headerCard.getChildren().addAll(lblTitle, headerSpacer, badgeModule, badgeOrder, badgeReward);
         BorderPane.setMargin(headerCard, new Insets(0, 0, 14, 0));
         root.setTop(headerCard);
 
@@ -245,6 +271,7 @@ public class LessonFrame extends Stage {
                     }
                     lblStatusInfo.getStyleClass().setAll("text-success");
                     lblStatusInfo.setText("¡Lección aprobada y guardada en Oracle! Estado COMPLETADA en Progreso_Leccion.");
+                    Theme.playPulse(lblStatusInfo);
                 } catch (Exception ex) {
                     LOGGER.log(Level.SEVERE, "Error al guardar finalización de lección #" + currentLesson.getId() + " en Oracle", ex);
                     btnMarkComplete.setText("Reintentar Guardado en Oracle");
@@ -267,23 +294,42 @@ public class LessonFrame extends Stage {
                 }
                 lblStatusInfo.getStyleClass().setAll("text-success");
                 lblStatusInfo.setText("Lección completada localmente (modo demostración sin Oracle, +" + reward + " XP).");
+                Theme.playPulse(lblStatusInfo);
             }
         });
 
-        Button btnOpenChallenge = new Button("Ir al Reto Práctico");
-        btnOpenChallenge.getStyleClass().add("btn-primary");
-        btnOpenChallenge.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
-        btnOpenChallenge.setGraphicTextGap(6);
-        btnOpenChallenge.setOnAction(e -> {
-            Challenge firstChallenge = (currentLesson != null && currentLesson.getChallenges() != null
-                    && !currentLesson.getChallenges().isEmpty())
-                    ? currentLesson.getChallenges().get(0)
-                    : null;
-            ChallengeFrame challengeFrame = new ChallengeFrame(currentUser, firstChallenge, onProgressCallback);
-            challengeFrame.show();
-        });
+        bar.getChildren().addAll(lblStatusInfo, spacer, btnMarkComplete);
 
-        bar.getChildren().addAll(lblStatusInfo, spacer, btnMarkComplete, btnOpenChallenge);
+        List<Challenge> lessonChallenges = currentLesson != null ? currentLesson.getChallenges() : null;
+        if (lessonChallenges != null && !lessonChallenges.isEmpty()) {
+            for (final Challenge ch : lessonChallenges) {
+                boolean isQuiz = ch.getType() == ChallengeType.QUIZ;
+                String btnText = isQuiz
+                        ? "Resolver Quiz (+" + ch.getExpReward() + " XP)"
+                        : "Reto de Código (+" + ch.getExpReward() + " XP)";
+                Button btnChallenge = new Button(btnText);
+                btnChallenge.getStyleClass().add(isQuiz ? "btn-ghost" : "btn-primary");
+                btnChallenge.setGraphic(Theme.createIcon(
+                        isQuiz ? Theme.IconKind.TROPHY : Theme.IconKind.PLAY,
+                        14,
+                        isQuiz ? Theme.HEX_INDIGO : Theme.HEX_WHITE
+                ));
+                btnChallenge.setGraphicTextGap(6);
+                btnChallenge.setOnAction(e -> {
+                    ChallengeFrame challengeFrame = new ChallengeFrame(currentUser, ch, onProgressCallback);
+                    challengeFrame.show();
+                });
+                bar.getChildren().add(btnChallenge);
+            }
+        } else {
+            Button btnOpenChallenge = new Button("Ir al Reto Práctico");
+            btnOpenChallenge.getStyleClass().add("btn-primary");
+            btnOpenChallenge.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
+            btnOpenChallenge.setGraphicTextGap(6);
+            btnOpenChallenge.setOnAction(e -> new ChallengeFrame(currentUser, null, onProgressCallback).show());
+            bar.getChildren().add(btnOpenChallenge);
+        }
+
         return bar;
     }
 
@@ -305,5 +351,6 @@ public class LessonFrame extends Stage {
         }
         txtComparativeCode.setText(snippet[0]);
         lblComparisonCaption.setText(snippet[1]);
+        Theme.playFadeIn(txtComparativeCode);
     }
 }
