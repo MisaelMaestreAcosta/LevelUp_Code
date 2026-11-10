@@ -10,9 +10,7 @@ import com.mycompany.levelup_code.data.dao.ProgressRepository;
 import com.mycompany.levelup_code.data.dao.UserRepository;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
-import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
-import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.DailyActivity;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
@@ -24,12 +22,9 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Controlador de presentación del panel principal ({@code DashboardFrame}).
@@ -37,8 +32,6 @@ import java.util.logging.Logger;
  * de los componentes gráficos JavaFX para permitir pruebas unitarias aisladas.
  */
 public class DashboardController {
-
-    private static final Logger LOGGER = Logger.getLogger(DashboardController.class.getName());
 
     private final boolean oracleConnected;
     private final User currentUser;
@@ -94,110 +87,20 @@ public class DashboardController {
     }
 
     public List<Language> loadLanguages() {
-        if (oracleConnected && contentService != null) {
-            try {
-                List<Language> fromDb = contentService.listActiveLanguages();
-                if (fromDb != null && !fromDb.isEmpty()) {
-                    enrichCatalogFromSeed(fromDb);
-                    return fromDb;
-                }
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al consultar lenguajes activos en Oracle", ex);
-            }
+        if (oracleConnected) {
+            if (contentService == null) throw new IllegalStateException("Catálogo Oracle no configurado.");
+            return contentService.listActiveLanguages();
         }
         return DemoSeedCatalog.createSeedLanguages();
-    }
-
-    private void enrichCatalogFromSeed(List<Language> dbLanguages) {
-        List<Language> seedLanguages = DemoSeedCatalog.createSeedLanguages();
-        for (Language dbLang : dbLanguages) {
-            String dbName = dbLang.getName() != null ? dbLang.getName().toLowerCase(Locale.ROOT) : "";
-            Language matchingSeed = null;
-            for (Language s : seedLanguages) {
-                String sName = s.getName() != null ? s.getName().toLowerCase(Locale.ROOT) : "";
-                if (dbName.contains(sName) || sName.contains(dbName)) {
-                    matchingSeed = s;
-                    break;
-                }
-            }
-            if (matchingSeed == null) {
-                continue;
-            }
-            for (CourseModule seedMod : matchingSeed.getModules()) {
-                CourseModule dbMod = findMatchingModule(dbLang, seedMod);
-                if (dbMod == null) {
-                    dbLang.addModule(seedMod);
-                    continue;
-                }
-                for (Lesson seedLesson : seedMod.getLessons()) {
-                    Lesson dbLesson = findMatchingLesson(dbMod, seedLesson);
-                    if (dbLesson == null) {
-                        dbMod.addLesson(seedLesson);
-                        continue;
-                    }
-                    for (Challenge seedCh : seedLesson.getChallenges()) {
-                        if (!hasChallenge(dbLesson, seedCh)) {
-                            dbLesson.addChallenge(seedCh);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private CourseModule findMatchingModule(Language lang, CourseModule seedMod) {
-        if (lang.getModules() == null) {
-            return null;
-        }
-        for (CourseModule m : lang.getModules()) {
-            if (m.getId() == seedMod.getId() || m.getOrderIndex() == seedMod.getOrderIndex()) {
-                return m;
-            }
-        }
-        return null;
-    }
-
-    private Lesson findMatchingLesson(CourseModule mod, Lesson seedLesson) {
-        if (mod.getLessons() == null) {
-            return null;
-        }
-        for (Lesson l : mod.getLessons()) {
-            if (l.getId() == seedLesson.getId()) {
-                return l;
-            }
-        }
-        return null;
-    }
-
-    private boolean hasChallenge(Lesson lesson, Challenge seedCh) {
-        if (lesson.getChallenges() == null) {
-            return false;
-        }
-        for (Challenge ch : lesson.getChallenges()) {
-            if (ch.getId() == seedCh.getId() || ch.getType() == seedCh.getType()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public Set<String> loadEnrolledLanguageKeys(Language javaLang, Language pythonLang, Language cppLang) {
         Set<String> keys = new HashSet<>();
         if (oracleConnected && currentUser.getId() > 0 && enrollmentService != null) {
-            try {
-                Set<Integer> enrolledIds = enrollmentService.listEnrolledLanguageIds(currentUser);
-                if (javaLang != null && enrolledIds.contains(javaLang.getId())) {
-                    keys.add("JAVA");
-                }
-                if (pythonLang != null && enrolledIds.contains(pythonLang.getId())) {
-                    keys.add("PYTHON");
-                }
-                if (cppLang != null && enrolledIds.contains(cppLang.getId())) {
-                    keys.add("CPP");
-                }
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al consultar inscripciones del usuario en Oracle", ex);
-            }
+            Set<Integer> enrolledIds = enrollmentService.listEnrolledLanguageIds(currentUser);
+            if (javaLang != null && enrolledIds.contains(javaLang.getId())) keys.add("JAVA");
+            if (pythonLang != null && enrolledIds.contains(pythonLang.getId())) keys.add("PYTHON");
+            if (cppLang != null && enrolledIds.contains(cppLang.getId())) keys.add("CPP");
             return keys;
         }
 
@@ -219,17 +122,12 @@ public class DashboardController {
 
     public ProgressStatus resolveLessonProgressStatus(Lesson lesson, int indexInList) {
         if (oracleConnected && currentUser.getId() > 0) {
-            if (lesson == null || lesson.getId() <= 0 || progressRepository == null) {
+            if (lesson == null || lesson.getId() <= 0) {
                 return ProgressStatus.PENDING;
             }
-            try {
-                Optional<LessonProgress> lp = progressRepository.findByUserAndLesson(currentUser.getId(), lesson.getId());
-                if (lp.isPresent() && lp.get().getStatus() != null) {
-                    return lp.get().getStatus();
-                }
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al consultar Progreso_Leccion para lección #" + lesson.getId(), ex);
-            }
+            if (progressRepository == null) throw new IllegalStateException("Progreso Oracle no configurado.");
+            Optional<LessonProgress> lp = progressRepository.findByUserAndLesson(currentUser.getId(), lesson.getId());
+            if (lp.isPresent() && lp.get().getStatus() != null) return lp.get().getStatus();
             // En modo Oracle, la ausencia de fila se interpreta estrictamente como PENDIENTE
             return ProgressStatus.PENDING;
         }
@@ -246,17 +144,10 @@ public class DashboardController {
     public Map<LocalDate, Integer> loadRecentActivityHistory() {
         if (oracleConnected && currentUser.getId() > 0) {
             Map<LocalDate, Integer> fromDb = new HashMap<>();
-            if (activityRepository != null) {
-                try {
-                    List<DailyActivity> recent = activityRepository.findRecentByUser(currentUser.getId(), 14);
-                    for (DailyActivity da : recent) {
-                        if (da.getActivityDate() != null) {
-                            fromDb.put(da.getActivityDate(), da.getExperienceGained());
-                        }
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error al consultar Actividad_Diaria en Oracle", ex);
-                }
+            if (activityRepository == null) throw new IllegalStateException("Actividad Oracle no configurada.");
+            List<DailyActivity> recent = activityRepository.findRecentByUser(currentUser.getId(), 14);
+            for (DailyActivity da : recent) {
+                if (da.getActivityDate() != null) fromDb.put(da.getActivityDate(), da.getExperienceGained());
             }
             return fromDb;
         }
@@ -264,15 +155,9 @@ public class DashboardController {
     }
 
     public List<Achievement> loadAchievementsCatalog() {
-        if (oracleConnected && achievementRepository != null) {
-            try {
-                List<Achievement> fromDb = achievementRepository.findAllCatalog();
-                if (fromDb != null && !fromDb.isEmpty()) {
-                    return fromDb;
-                }
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al consultar catálogo de logros en Oracle", ex);
-            }
+        if (oracleConnected) {
+            if (achievementRepository == null) throw new IllegalStateException("Logros Oracle no configurados.");
+            return achievementRepository.findAllCatalog();
         }
         return DemoSeedCatalog.createSeedAchievements();
     }
@@ -284,21 +169,12 @@ public class DashboardController {
      */
     public Set<Integer> resolveUnlockedAchievementIds(List<Achievement> catalog, int offlineSolvedChallenges) {
         Set<Integer> unlockedIds = new HashSet<>();
-        if (oracleConnected && currentUser.getId() > 0 && achievementService != null) {
-            try {
-                achievementService.evaluateAndUnlock(currentUser);
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al evaluar logros pendientes en servicio transaccional", ex);
-            }
-            try {
-                List<UserAchievement> unlockedFromDb = achievementService.listUnlockedBy(currentUser);
-                for (UserAchievement ua : unlockedFromDb) {
-                    if (ua.getAchievement() != null) {
-                        unlockedIds.add(ua.getAchievement().getId());
-                    }
-                }
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al listar logros desbloqueados del usuario en Oracle", ex);
+        if (oracleConnected && currentUser.getId() > 0) {
+            if (achievementService == null) throw new IllegalStateException("Servicio de logros no configurado.");
+            achievementService.evaluateAndUnlock(currentUser);
+            List<UserAchievement> unlockedFromDb = achievementService.listUnlockedBy(currentUser);
+            for (UserAchievement ua : unlockedFromDb) {
+                if (ua.getAchievement() != null) unlockedIds.add(ua.getAchievement().getId());
             }
             return unlockedIds;
         }
@@ -325,30 +201,19 @@ public class DashboardController {
      */
     public int syncTelemetryAndGetSolvedChallenges(int offlineFallbackCount) {
         if (oracleConnected && currentUser.getId() > 0) {
-            if (userRepository != null) {
-                try {
-                    userRepository.findById(currentUser.getId()).ifPresent(fresh -> {
-                        currentUser.setExperience(fresh.getExperience());
-                        currentUser.setLevel(fresh.getLevel());
-                        currentUser.setCurrentStreak(fresh.getCurrentStreak());
-                        currentUser.setMaxStreak(fresh.getMaxStreak());
-                        currentUser.setLives(fresh.getLives());
-                    });
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error al refrescar estado del usuario desde Oracle", ex);
-                }
+            if (userRepository == null || achievementRepository == null) {
+                throw new IllegalStateException("Telemetría Oracle no configurada.");
             }
-            if (achievementRepository != null) {
-                try {
-                    Optional<UserStats> stats = achievementRepository.findStatsByUserId(currentUser.getId());
-                    if (stats.isPresent()) {
-                        return stats.get().getSolvedChallenges();
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error al consultar conteo real de retos resueltos en Oracle", ex);
-                }
-            }
-            return 0;
+            User fresh = userRepository.findById(currentUser.getId())
+                    .orElseThrow(() -> new IllegalStateException("No se encontró el usuario actual en Oracle."));
+            UserStats stats = achievementRepository.findStatsByUserId(currentUser.getId())
+                    .orElseThrow(() -> new IllegalStateException("No se encontraron las estadísticas del usuario en Oracle."));
+            currentUser.setExperience(fresh.getExperience());
+            currentUser.setLevel(fresh.getLevel());
+            currentUser.setCurrentStreak(fresh.getCurrentStreak());
+            currentUser.setMaxStreak(fresh.getMaxStreak());
+            currentUser.setLives(fresh.getLives());
+            return stats.getSolvedChallenges();
         }
         return Math.max(0, offlineFallbackCount);
     }

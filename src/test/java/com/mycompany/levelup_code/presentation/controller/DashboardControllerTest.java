@@ -24,9 +24,33 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DashboardControllerTest {
+
+    @Test
+    void oracleCatalogNeverInjectsDemoContentOrHidesQueryFailures() {
+        FakeContentRepository repository = new FakeContentRepository();
+        Language real = repository.saveLanguage(new Language(1, "Java", "Curso real", true));
+        User student = new User();
+        student.setId(42);
+        ContentService content = new ContentService(repository);
+        DashboardController controller = new DashboardController(true, student, content,
+                null, null, null, null, null, null);
+
+        assertEquals(List.of(real), controller.loadLanguages());
+        assertTrue(real.getModules().isEmpty(), "No se deben añadir módulos de demostración a Oracle");
+
+        ContentService failingContent = new ContentService(repository) {
+            @Override public List<Language> listActiveLanguages() {
+                throw new IllegalStateException("Oracle no responde");
+            }
+        };
+        DashboardController failing = new DashboardController(true, student, failingContent,
+                null, null, null, null, null, null);
+        assertThrows(IllegalStateException.class, failing::loadLanguages);
+    }
 
     @Test
     void oracleModeShowsPendingProgressEmptyHeatmapAndRealEnrollmentsForNewUser() {
