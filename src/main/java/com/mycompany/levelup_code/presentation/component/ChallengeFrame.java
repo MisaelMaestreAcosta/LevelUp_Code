@@ -57,11 +57,14 @@ public class ChallengeFrame extends Stage {
     private Label lblChallengeTitle;
     private Label lblStatement;
     private Label badgeType;
+    private Label badgeDifficulty;
     private Label badgeExecutionMode;
     private Label badgeReward;
+    private final List<Button> switcherButtons = new ArrayList<>();
     private StackPane centerCardPane;
     private VBox codeEditorCard;
     private VBox quizCard;
+    private Button btnNextChallenge;
     private Button btnSubmit;
 
     // Editor de código y numeración de líneas
@@ -72,9 +75,13 @@ public class ChallengeFrame extends Stage {
     private VBox quizOptionsContainer;
     private final List<HBox> quizOptionCards = new ArrayList<>();
 
-    // Panel lateral de casos de prueba y consola
+    // Panel lateral de casos de prueba, inspector interactivo y consola
     private VBox testCasesListBox;
+    private final List<VBox> testCaseRowCards = new ArrayList<>();
     private final List<Label> testCaseStatusBadges = new ArrayList<>();
+    private final List<SimulatedCodeRunner.CaseOutcome> latestCaseOutcomes = new ArrayList<>();
+    private Label lblCaseInspectorTitle;
+    private Label lblCaseInspectorDetail;
     private TextArea txtConsoleOutput;
     private Label lblExecutionMetrics;
     private Label lblResultBanner;
@@ -211,18 +218,20 @@ public class ChallengeFrame extends Stage {
         lblChallengeTitle.setGraphicTextGap(8);
 
         badgeType = Theme.createPillBadge("CÓDIGO", "badge-indigo");
+        badgeDifficulty = Theme.createDifficultyBadge(60);
         badgeExecutionMode = Theme.createPillBadge("EJECUCIÓN AISLADA JVM", "badge-green");
         badgeReward = Theme.createPillBadge("+60 XP", "badge-amber");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        topRow.getChildren().addAll(lblChallengeTitle, badgeType, badgeExecutionMode, badgeReward, spacer);
+        topRow.getChildren().addAll(lblChallengeTitle, badgeType, badgeDifficulty, badgeExecutionMode, badgeReward, spacer);
 
+        switcherButtons.clear();
         if (availableChallenges.size() > 1) {
             HBox switcher = new HBox(8);
             switcher.setAlignment(Pos.CENTER_RIGHT);
-            Label lblSwitch = new Label("Cambiar ejercicio:");
+            Label lblSwitch = new Label("Retos de la lección:");
             lblSwitch.getStyleClass().add("muted-text");
             switcher.getChildren().add(lblSwitch);
 
@@ -232,6 +241,7 @@ public class ChallengeFrame extends Stage {
                 Button btnCh = new Button(btnLabel);
                 btnCh.getStyleClass().add("btn-secondary");
                 btnCh.setOnAction(e -> loadChallengeIntoView(ch));
+                switcherButtons.add(btnCh);
                 switcher.getChildren().add(btnCh);
             }
             topRow.getChildren().add(switcher);
@@ -279,6 +289,10 @@ public class ChallengeFrame extends Stage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
+        Button btnHint = new Button("Ver Pista Didáctica");
+        btnHint.getStyleClass().add("btn-ghost-green");
+        btnHint.setOnAction(e -> showPedagogicalHint());
+
         Button btnSolutionHint = new Button("Insertar Solución Modelo");
         btnSolutionHint.getStyleClass().add("btn-ghost");
         btnSolutionHint.setOnAction(e -> fillReferenceSolution());
@@ -291,7 +305,7 @@ public class ChallengeFrame extends Stage {
             }
         });
 
-        toolbar.getChildren().addAll(lblFileTab, spacer, btnSolutionHint, btnResetCode);
+        toolbar.getChildren().addAll(lblFileTab, spacer, btnHint, btnSolutionHint, btnResetCode);
 
         // Contenedor con numeración de líneas (gutter) y área de edición
         HBox editorContainer = new HBox(0);
@@ -336,8 +350,17 @@ public class ChallengeFrame extends Stage {
         VBox card = new VBox(14);
         card.getStyleClass().add("surface-card");
 
-        HBox header = Theme.createSectionHeader(
-                "Selecciona la respuesta correcta", "Evaluación de selección única", "badge-violet");
+        HBox header = new HBox(10);
+        header.setAlignment(Pos.CENTER_LEFT);
+        Label lblQuizTitle = new Label("SELECCIONA LA RESPUESTA CORRECTA");
+        lblQuizTitle.getStyleClass().add("section-caption");
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+        Button btnQuizHint = new Button("Ver Pista Conceptual");
+        btnQuizHint.getStyleClass().add("btn-ghost-green");
+        btnQuizHint.setOnAction(e -> showPedagogicalHint());
+        Label badgeSingle = Theme.createPillBadge("Evaluación de selección única", "badge-violet");
+        header.getChildren().addAll(lblQuizTitle, sp, btnQuizHint, badgeSingle);
 
         quizOptionsContainer = new VBox(10);
         ScrollPane scrollQuiz = new ScrollPane(quizOptionsContainer);
@@ -352,12 +375,12 @@ public class ChallengeFrame extends Stage {
     private VBox buildRightValidationPane() {
         VBox rightColumn = new VBox(14);
 
-        // Tarjeta superior: Casos de prueba
+        // Tarjeta superior: Casos de prueba e inspector interactivo
         VBox casesCard = new VBox(10);
         casesCard.getStyleClass().add("surface-card");
         VBox.setVgrow(casesCard, Priority.ALWAYS);
 
-        HBox casesHeader = Theme.createSectionHeader("Casos de Prueba", "Visibles y Ocultos", "badge-indigo");
+        HBox casesHeader = Theme.createSectionHeader("Casos de Prueba", "Clic para inspeccionar", "badge-indigo");
 
         testCasesListBox = new VBox(8);
         ScrollPane scrollCases = new ScrollPane(testCasesListBox);
@@ -365,12 +388,21 @@ public class ChallengeFrame extends Stage {
         scrollCases.getStyleClass().add("scroll-pane-clean");
         VBox.setVgrow(scrollCases, Priority.ALWAYS);
 
-        casesCard.getChildren().addAll(casesHeader, scrollCases);
+        VBox inspectorCard = new VBox(4);
+        inspectorCard.getStyleClass().add("surface-subtle");
+        lblCaseInspectorTitle = new Label("Inspector de Caso de Prueba");
+        lblCaseInspectorTitle.getStyleClass().add("card-title");
+        lblCaseInspectorDetail = new Label("Haz clic en cualquier caso de prueba superior para ver su entrada, salida esperada y diagnóstico.");
+        lblCaseInspectorDetail.getStyleClass().add("muted-text");
+        lblCaseInspectorDetail.setWrapText(true);
+        inspectorCard.getChildren().addAll(lblCaseInspectorTitle, lblCaseInspectorDetail);
+
+        casesCard.getChildren().addAll(casesHeader, scrollCases, inspectorCard);
 
         // Tarjeta inferior: Consola de salida y métricas de tiempo
         VBox consoleCard = new VBox(8);
         consoleCard.getStyleClass().add("surface-card");
-        consoleCard.setPrefHeight(215);
+        consoleCard.setPrefHeight(205);
 
         HBox consoleHeader = new HBox(8);
         consoleHeader.setAlignment(Pos.CENTER_LEFT);
@@ -416,14 +448,29 @@ public class ChallengeFrame extends Stage {
         btnClose.getStyleClass().add("btn-secondary");
         btnClose.setOnAction(e -> close());
 
+        btnNextChallenge = new Button("Siguiente Reto →");
+        btnNextChallenge.getStyleClass().add("btn-ghost");
+        btnNextChallenge.setVisible(availableChallenges.size() > 1);
+        btnNextChallenge.setManaged(availableChallenges.size() > 1);
+        btnNextChallenge.setOnAction(e -> advanceToNextChallenge());
+
         btnSubmit = new Button("Ejecutar y Validar Solución");
         btnSubmit.getStyleClass().add("btn-success");
         btnSubmit.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
         btnSubmit.setGraphicTextGap(6);
         btnSubmit.setOnAction(e -> evaluateSubmission());
 
-        bottomBar.getChildren().addAll(lblResultBanner, spacer, btnClose, btnSubmit);
+        bottomBar.getChildren().addAll(lblResultBanner, spacer, btnClose, btnNextChallenge, btnSubmit);
         return bottomBar;
+    }
+
+    private void advanceToNextChallenge() {
+        if (availableChallenges.size() <= 1) {
+            return;
+        }
+        int currentIdx = availableChallenges.indexOf(activeChallenge);
+        int nextIdx = (currentIdx + 1) % availableChallenges.size();
+        loadChallengeIntoView(availableChallenges.get(nextIdx));
     }
 
     private String resolveChallengeLanguageName(Challenge challenge) {
@@ -443,13 +490,24 @@ public class ChallengeFrame extends Stage {
         if (btnSubmit != null) {
             btnSubmit.setText("Ejecutar y Validar Solución");
         }
+        if (btnNextChallenge != null) {
+            btnNextChallenge.getStyleClass().setAll("btn-ghost");
+        }
+
+        for (int i = 0; i < switcherButtons.size() && i < availableChallenges.size(); i++) {
+            boolean isActive = availableChallenges.get(i) == challenge;
+            switcherButtons.get(i).getStyleClass().setAll(isActive ? "btn-primary" : "btn-secondary");
+        }
 
         lblChallengeTitle.setText(challenge.getTitle());
         lblStatement.setText(challenge.getDescription());
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
+        updateDifficultyBadge(challenge.getExpReward());
 
         testCasesListBox.getChildren().clear();
+        testCaseRowCards.clear();
         testCaseStatusBadges.clear();
+        latestCaseOutcomes.clear();
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
@@ -473,7 +531,13 @@ public class ChallengeFrame extends Stage {
             List<TestCase> cases = codeChallenge.getTestCases();
             for (int i = 0; i < cases.size(); i++) {
                 TestCase tc = cases.get(i);
-                testCasesListBox.getChildren().add(createTestCaseRow(i + 1, tc));
+                testCasesListBox.getChildren().add(createTestCaseRow(i, tc));
+            }
+            if (!cases.isEmpty()) {
+                inspectTestCase(0);
+            } else {
+                lblCaseInspectorTitle.setText("Inspector de Caso de Prueba");
+                lblCaseInspectorDetail.setText("Este reto no registra casos de prueba individuales.");
             }
         } else if (challenge instanceof QuizChallenge) {
             QuizChallenge quizChallenge = (QuizChallenge) challenge;
@@ -488,13 +552,17 @@ public class ChallengeFrame extends Stage {
 
             VBox infoBox = new VBox(6);
             infoBox.getStyleClass().add("surface-subtle");
-            Label lblQuizInfo = new Label("Selecciona una de las opciones a la izquierda y presiona 'Ejecutar y Validar Solución'.");
+            Label lblQuizInfo = new Label("Selecciona una de las 4 opciones a la izquierda y presiona 'Ejecutar y Validar Solución'.");
             lblQuizInfo.getStyleClass().add("body-text");
             lblQuizInfo.setWrapText(true);
             infoBox.getChildren().add(lblQuizInfo);
             testCasesListBox.getChildren().add(infoBox);
+
+            lblCaseInspectorTitle.setText("Verificación Conceptual");
+            lblCaseInspectorDetail.setText("Al enviar tu respuesta se validará inmediatamente la opción elegida y se resaltará en verde o rojo.");
         }
 
+        Theme.playFadeIn(centerCardPane);
         txtConsoleOutput.getStyleClass().setAll("console-output");
         String modeNote = (challenge instanceof CodeChallenge)
                 ? (codeRunner.supportsRealIsolatedExecution(resolveChallengeLanguageName(challenge))
@@ -505,7 +573,24 @@ public class ChallengeFrame extends Stage {
         lblExecutionMetrics.setText("Tiempo: -- ms");
     }
 
-    private VBox createTestCaseRow(int index, TestCase tc) {
+    private void updateDifficultyBadge(int expReward) {
+        if (badgeDifficulty == null) {
+            return;
+        }
+        if (expReward <= 65) {
+            badgeDifficulty.setText("NIVEL FÁCIL");
+            badgeDifficulty.getStyleClass().setAll("badge-green");
+        } else if (expReward <= 85) {
+            badgeDifficulty.setText("NIVEL MEDIO");
+            badgeDifficulty.getStyleClass().setAll("badge-amber");
+        } else {
+            badgeDifficulty.setText("NIVEL DIFÍCIL");
+            badgeDifficulty.getStyleClass().setAll("badge-rose");
+        }
+    }
+
+    private VBox createTestCaseRow(final int zeroBasedIndex, final TestCase tc) {
+        int displayNum = zeroBasedIndex + 1;
         VBox row = new VBox(6);
         row.getStyleClass().add("test-case-card");
 
@@ -513,8 +598,8 @@ public class ChallengeFrame extends Stage {
         top.setAlignment(Pos.CENTER_LEFT);
 
         String titleText = tc.isHidden()
-                ? "Caso #" + index + " (Oculto)"
-                : "Caso #" + index + " · Entrada: \"" + tc.getInput() + "\"";
+                ? "Caso #" + displayNum + " (Oculto)"
+                : "Caso #" + displayNum + " · Entrada: \"" + tc.getInput() + "\"";
         Label lblCase = new Label(titleText);
         lblCase.getStyleClass().add("card-title");
 
@@ -533,7 +618,79 @@ public class ChallengeFrame extends Stage {
         lblDetail.getStyleClass().add("muted-text");
 
         row.getChildren().addAll(top, lblDetail);
+        row.setOnMouseClicked(e -> inspectTestCase(zeroBasedIndex));
+        testCaseRowCards.add(row);
         return row;
+    }
+
+    private void inspectTestCase(int index) {
+        if (!(activeChallenge instanceof CodeChallenge)) {
+            return;
+        }
+        List<TestCase> cases = ((CodeChallenge) activeChallenge).getTestCases();
+        if (index < 0 || index >= cases.size()) {
+            return;
+        }
+        TestCase tc = cases.get(index);
+        for (int i = 0; i < testCaseRowCards.size(); i++) {
+            VBox card = testCaseRowCards.get(i);
+            if (i < latestCaseOutcomes.size()) {
+                boolean passed = latestCaseOutcomes.get(i).isPassed();
+                card.getStyleClass().setAll(i == index
+                        ? "test-case-card-selected"
+                        : (passed ? "test-case-card-passed" : "test-case-card-failed"));
+            } else {
+                card.getStyleClass().setAll(i == index ? "test-case-card-selected" : "test-case-card");
+            }
+        }
+
+        lblCaseInspectorTitle.setText("Inspector · Caso #" + (index + 1) + (tc.isHidden() ? " (Oculto)" : " (Visible)"));
+        String inputDesc = tc.isHidden() ? "[Entrada reservada para validación anti-hardcoding]" : tc.getInput();
+        String expectedDesc = tc.isHidden() ? "[Salida verificada internamente]" : tc.getExpectedOutput();
+        String verdictDesc = "Pendiente de ejecución.";
+        if (index < latestCaseOutcomes.size()) {
+            SimulatedCodeRunner.CaseOutcome outcome = latestCaseOutcomes.get(index);
+            verdictDesc = (outcome.isPassed() ? "APROBADO — " : "FALLIDO — ") + outcome.getMessage();
+        }
+        lblCaseInspectorDetail.setText("• Entrada: " + inputDesc
+                + "\n• Salida esperada: " + expectedDesc
+                + "\n• Estado: " + verdictDesc);
+    }
+
+    private void showPedagogicalHint() {
+        String title = activeChallenge != null && activeChallenge.getTitle() != null
+                ? activeChallenge.getTitle().toLowerCase(Locale.ROOT)
+                : "";
+        String hint;
+        if (activeChallenge instanceof QuizChallenge) {
+            String lessonTheory = (activeChallenge.getLesson() != null && activeChallenge.getLesson().getTheory() != null)
+                    ? activeChallenge.getLesson().getTheory()
+                    : "Revisa el concepto clave de la lección antes de elegir una opción.";
+            hint = "> [PISTA CONCEPTUAL]\n> Repasa el fundamento de la lección:\n" + lessonTheory;
+        } else if (title.contains("binaria")) {
+            hint = "> [PISTA DIDÁCTICA — BÚSQUEDA BINARIA]\n"
+                    + "> 1. Mantén dos límites: low = 0 y high = n - 1 mientras low <= high.\n"
+                    + "> 2. Calcula el punto medio evitando overflow: mid = low + (high - low) / 2 (o // 2 en Python).\n"
+                    + "> 3. Si arr[mid] == target retorna mid; si es menor incrementa low = mid + 1; si no, high = mid - 1.";
+        } else if (title.contains("palíndromo") || title.contains("palindromo") || title.contains("punteros") || title.contains("slicing")) {
+            hint = "> [PISTA DIDÁCTICA — PALÍNDROMOS Y SECUENCIAS]\n"
+                    + "> 1. Normaliza el texto a minúsculas antes de comparar.\n"
+                    + "> 2. Compara extremos simétricos (left y right) avanzando hacia el centro, o invierte la secuencia.";
+        } else if (title.contains("pares")) {
+            hint = "> [PISTA DIDÁCTICA — FILTRADO Y ACUMULACIÓN]\n"
+                    + "> 1. Inicializa un acumulador total = 0.\n"
+                    + "> 2. Recorre cada número n y verifica la condición de paridad (n % 2 == 0) antes de sumarlo.";
+        } else if (title.contains("duplicado") || title.contains("hash")) {
+            hint = "> [PISTA DIDÁCTICA — CONJUNTOS HASH EN O(n)]\n"
+                    + "> 1. Crea un conjunto hash vacío (HashSet / set / std::unordered_set).\n"
+                    + "> 2. Al recorrer la secuencia, si el elemento ya está en el conjunto, retórnalo inmediatamente; si termina el ciclo, retorna -1.";
+        } else {
+            hint = "> [PISTA DIDÁCTICA — POLIMORFISMO Y CONTRATOS]\n"
+                    + "> 1. Normaliza la cadena de entrada ignorando diferencias entre mayúsculas y minúsculas.\n"
+                    + "> 2. Retorna exactamente la cadena esperada por cada caso de prueba visible y oculto.";
+        }
+        txtConsoleOutput.setText(hint);
+        Theme.playPulse(txtConsoleOutput);
     }
 
     private void populateQuizOptions(QuizChallenge quiz) {
@@ -581,23 +738,27 @@ public class ChallengeFrame extends Stage {
         }
         CodeChallenge codeChallenge = (CodeChallenge) activeChallenge;
         String template = codeChallenge.getInitialTemplate() != null ? codeChallenge.getInitialTemplate() : "";
+        String title = codeChallenge.getTitle() != null ? codeChallenge.getTitle().toLowerCase(Locale.ROOT) : "";
         String lang = resolveChallengeLanguageName(codeChallenge).toLowerCase(Locale.ROOT);
         List<TestCase> cases = codeChallenge.getTestCases();
 
         boolean isPython = lang.contains("python") || template.contains("def ");
         boolean isCpp = lang.contains("c++") || lang.contains("cpp") || template.contains("#include");
         boolean isBinarySearch = !cases.isEmpty() && cases.get(0).getInput().contains("target");
+        boolean isPalindrome = title.contains("palíndromo") || title.contains("palindromo") || template.toLowerCase(Locale.ROOT).contains("palindrom");
+        boolean isEvenSum = title.contains("pares") || template.toLowerCase(Locale.ROOT).contains("pares");
+        boolean isFirstDuplicate = title.contains("duplicado") || template.toLowerCase(Locale.ROOT).contains("duplicado");
 
         if (isBinarySearch) {
             if (isPython) {
                 txtEditor.setText(
-                        "def binary_search(arr: list[int], target: int) -> int:\n"
-                        + "    low, high = 0, len(arr) - 1\n"
+                        "def search(a: list, target: int) -> int:\n"
+                        + "    low, high = 0, len(a) - 1\n"
                         + "    while low <= high:\n"
                         + "        mid = (low + high) // 2\n"
-                        + "        if arr[mid] == target:\n"
+                        + "        if a[mid] == target:\n"
                         + "            return mid\n"
-                        + "        elif arr[mid] < target:\n"
+                        + "        elif a[mid] < target:\n"
                         + "            low = mid + 1\n"
                         + "        else:\n"
                         + "            high = mid - 1\n"
@@ -606,31 +767,151 @@ public class ChallengeFrame extends Stage {
             } else if (isCpp) {
                 txtEditor.setText(
                         "#include <vector>\n\n"
-                        + "int binarySearch(const std::vector<int>& arr, int target) {\n"
-                        + "    int lo = 0;\n"
-                        + "    int hi = static_cast<int>(arr.size()) - 1;\n"
-                        + "    while (lo <= hi) {\n"
-                        + "        int mid = lo + (hi - lo) / 2;\n"
-                        + "        if (arr[mid] == target) return mid;\n"
-                        + "        if (arr[mid] < target) lo = mid + 1;\n"
-                        + "        else hi = mid - 1;\n"
+                        + "int search(const std::vector<int>& a, int target) {\n"
+                        + "    int low = 0;\n"
+                        + "    int high = static_cast<int>(a.size()) - 1;\n"
+                        + "    while (low <= high) {\n"
+                        + "        int mid = low + (high - low) / 2;\n"
+                        + "        if (a[mid] == target) return mid;\n"
+                        + "        if (a[mid] < target) low = mid + 1;\n"
+                        + "        else high = mid - 1;\n"
                         + "    }\n"
                         + "    return -1;\n"
                         + "}"
                 );
             } else {
                 String className = extractJavaClassName(template, "BinarySearchSolver");
-                String methodName = extractJavaMethodName(template, "binarySearch");
+                String methodName = extractJavaMethodName(template, "search");
                 txtEditor.setText(
                         "public class " + className + " {\n"
-                        + "    public static int " + methodName + "(int[] arr, int target) {\n"
-                        + "        int low = 0;\n"
-                        + "        int high = arr.length - 1;\n"
+                        + "    public static int " + methodName + "(int[] a, int target) {\n"
+                        + "        int low = 0, high = a.length - 1;\n"
                         + "        while (low <= high) {\n"
                         + "            int mid = low + (high - low) / 2;\n"
-                        + "            if (arr[mid] == target) return mid;\n"
-                        + "            if (arr[mid] < target) low = mid + 1;\n"
+                        + "            if (a[mid] == target) return mid;\n"
+                        + "            if (a[mid] < target) low = mid + 1;\n"
                         + "            else high = mid - 1;\n"
+                        + "        }\n"
+                        + "        return -1;\n"
+                        + "    }\n"
+                        + "}"
+                );
+            }
+            return;
+        }
+
+        if (isPalindrome) {
+            if (isPython) {
+                txtEditor.setText(
+                        "def es_palindromo(texto: str) -> bool:\n"
+                        + "    limpio = texto.lower()\n"
+                        + "    return limpio == limpio[::-1]\n"
+                );
+            } else if (isCpp) {
+                txtEditor.setText(
+                        "#include <string>\n#include <cctype>\n\n"
+                        + "bool esPalindromo(const std::string& texto) {\n"
+                        + "    int left = 0, right = static_cast<int>(texto.size()) - 1;\n"
+                        + "    while (left < right) {\n"
+                        + "        if (std::tolower(texto[left]) != std::tolower(texto[right])) return false;\n"
+                        + "        left++; right--;\n"
+                        + "    }\n"
+                        + "    return true;\n"
+                        + "}"
+                );
+            } else {
+                String className = extractJavaClassName(template, "PalindromeSolver");
+                String methodName = extractJavaMethodName(template, "esPalindromo");
+                txtEditor.setText(
+                        "public class " + className + " {\n"
+                        + "    public static boolean " + methodName + "(String texto) {\n"
+                        + "        String s = texto.toLowerCase();\n"
+                        + "        int left = 0, right = s.length() - 1;\n"
+                        + "        while (left < right) {\n"
+                        + "            if (s.charAt(left) != s.charAt(right)) return false;\n"
+                        + "            left++;\n"
+                        + "            right--;\n"
+                        + "        }\n"
+                        + "        return true;\n"
+                        + "    }\n"
+                        + "}"
+                );
+            }
+            return;
+        }
+
+        if (isEvenSum) {
+            if (isPython) {
+                txtEditor.setText(
+                        "def sumar_pares(nums: list) -> int:\n"
+                        + "    total = 0\n"
+                        + "    for n in nums:\n"
+                        + "        if n % 2 == 0:\n"
+                        + "            total += n\n"
+                        + "    return total\n"
+                );
+            } else if (isCpp) {
+                txtEditor.setText(
+                        "#include <vector>\n\n"
+                        + "int sumarPares(const std::vector<int>& nums) {\n"
+                        + "    int total = 0;\n"
+                        + "    for (int n : nums) {\n"
+                        + "        if (n % 2 == 0) total += n;\n"
+                        + "    }\n"
+                        + "    return total;\n"
+                        + "}"
+                );
+            } else {
+                String className = extractJavaClassName(template, "EvenSumSolver");
+                String methodName = extractJavaMethodName(template, "sumarPares");
+                txtEditor.setText(
+                        "public class " + className + " {\n"
+                        + "    public static int " + methodName + "(int[] nums) {\n"
+                        + "        int total = 0;\n"
+                        + "        for (int n : nums) {\n"
+                        + "            if (n % 2 == 0) total += n;\n"
+                        + "        }\n"
+                        + "        return total;\n"
+                        + "    }\n"
+                        + "}"
+                );
+            }
+            return;
+        }
+
+        if (isFirstDuplicate) {
+            if (isPython) {
+                txtEditor.setText(
+                        "def primer_duplicado(nums: list) -> int:\n"
+                        + "    vistos = set()\n"
+                        + "    for n in nums:\n"
+                        + "        if n in vistos:\n"
+                        + "            return n\n"
+                        + "        vistos.add(n)\n"
+                        + "    return -1\n"
+                );
+            } else if (isCpp) {
+                txtEditor.setText(
+                        "#include <vector>\n#include <unordered_set>\n\n"
+                        + "int primerDuplicado(const std::vector<int>& nums) {\n"
+                        + "    std::unordered_set<int> vistos;\n"
+                        + "    for (int n : nums) {\n"
+                        + "        if (vistos.count(n) > 0) return n;\n"
+                        + "        vistos.insert(n);\n"
+                        + "    }\n"
+                        + "    return -1;\n"
+                        + "}"
+                );
+            } else {
+                String className = extractJavaClassName(template, "DuplicateFinderSolver");
+                String methodName = extractJavaMethodName(template, "primerDuplicado");
+                txtEditor.setText(
+                        "import java.util.HashSet;\nimport java.util.Set;\n\n"
+                        + "public class " + className + " {\n"
+                        + "    public static int " + methodName + "(int[] nums) {\n"
+                        + "        Set<Integer> vistos = new HashSet<>();\n"
+                        + "        for (int n : nums) {\n"
+                        + "            if (!vistos.add(n)) return n;\n"
                         + "        }\n"
                         + "        return -1;\n"
                         + "    }\n"
@@ -721,6 +1002,8 @@ public class ChallengeFrame extends Stage {
 
             SimulatedCodeRunner.ExecutionSummary summary = codeRunner.runAndValidate(codeChallenge, code);
             List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
+            latestCaseOutcomes.clear();
+            latestCaseOutcomes.addAll(outcomes);
 
             StringBuilder log = new StringBuilder();
             log.append("> [").append(summary.getExecutionModeDescription()).append("]\n");
@@ -728,22 +1011,37 @@ public class ChallengeFrame extends Stage {
                     .append(outcomes.size())
                     .append(" casos de prueba (Casos_Prueba)...\n");
 
+            int firstFailedIdx = -1;
             for (int i = 0; i < outcomes.size(); i++) {
                 SimulatedCodeRunner.CaseOutcome outcome = outcomes.get(i);
                 Label badge = i < testCaseStatusBadges.size() ? testCaseStatusBadges.get(i) : null;
+                VBox rowCard = i < testCaseRowCards.size() ? testCaseRowCards.get(i) : null;
                 if (outcome.isPassed()) {
                     if (badge != null) {
-                        badge.setText("APROBADO");
+                        badge.setText("APROBADO ✓");
                         badge.getStyleClass().setAll("badge-green");
+                    }
+                    if (rowCard != null) {
+                        rowCard.getStyleClass().setAll("test-case-card-passed");
                     }
                     log.append("  [OK] ").append(outcome.getMessage()).append("\n");
                 } else {
+                    if (firstFailedIdx < 0) {
+                        firstFailedIdx = i;
+                    }
                     if (badge != null) {
-                        badge.setText("FALLIDO");
+                        badge.setText("FALLIDO ✗");
                         badge.getStyleClass().setAll("badge-rose");
+                    }
+                    if (rowCard != null) {
+                        rowCard.getStyleClass().setAll("test-case-card-failed");
                     }
                     log.append("  [X]  ").append(outcome.getMessage()).append("\n");
                 }
+            }
+
+            if (!outcomes.isEmpty()) {
+                inspectTestCase(firstFailedIdx >= 0 ? firstFailedIdx : 0);
             }
 
             lblExecutionMetrics.setText(String.format("Tiempo: %.2f ms · Casos: %d/%d",
@@ -763,10 +1061,22 @@ public class ChallengeFrame extends Stage {
             }
             boolean correct = quiz.isCorrectOption(selectedQuizIndex);
             String chosenOption = quiz.getOptions().get(selectedQuizIndex);
+
+            if (selectedQuizIndex < quizOptionCards.size()) {
+                HBox chosenCard = quizOptionCards.get(selectedQuizIndex);
+                chosenCard.getStyleClass().setAll(correct ? "quiz-option-card-correct" : "quiz-option-card-wrong");
+                Theme.playPulse(chosenCard);
+            }
+
             lblExecutionMetrics.setText("Tiempo: 2.00 ms");
             String msg = correct
-                    ? "> Respuesta verificada: CORRECTA.\n> Concepto dominado con éxito."
-                    : "> Respuesta incorrecta.\n> Revisa la teoría de la lección e inténtalo de nuevo.";
+                    ? "> Respuesta verificada: CORRECTA ✓\n> Opción elegida: \"" + chosenOption + "\"\n> Concepto dominado con éxito."
+                    : "> Respuesta incorrecta ✗\n> Opción elegida: \"" + chosenOption + "\"\n> Usa 'Ver Pista Conceptual' o revisa la teoría de la lección.";
+
+            lblCaseInspectorTitle.setText(correct ? "Veredicto Conceptual: CORRECTO ✓" : "Veredicto Conceptual: INCORRECTO ✗");
+            lblCaseInspectorDetail.setText(correct
+                    ? "Has identificado correctamente el fundamento técnico evaluado en este reto."
+                    : "La opción seleccionada no corresponde al contrato esperado. Revisa la pista conceptual e inténtalo de nuevo.");
 
             PersistenceOutcome persistence = persistAttemptIfConnected(chosenOption, correct);
             handleEvaluationOutcome(correct, true, msg, persistence);
@@ -838,6 +1148,10 @@ public class ChallengeFrame extends Stage {
         txtConsoleOutput.setText(fullConsole.toString());
 
         if (effectiveSuccess) {
+            if (btnNextChallenge != null && availableChallenges.size() > 1) {
+                btnNextChallenge.getStyleClass().setAll("btn-primary");
+                Theme.playPulse(btnNextChallenge);
+            }
             int reward = persistence.savedToOracle && persistence.attempt != null
                     ? persistence.attempt.getEarnedExperience()
                     : activeChallenge.getExpReward();
@@ -872,6 +1186,7 @@ public class ChallengeFrame extends Stage {
                         : "¡Solución aprobada localmente!";
                 lblResultBanner.setText(statusPrefix + modeQualifier);
             }
+            Theme.playPulse(lblResultBanner);
         } else {
             if (onSolvedCallback != null) {
                 onSolvedCallback.run();
@@ -881,6 +1196,7 @@ public class ChallengeFrame extends Stage {
                     ? " (intento registrado en Oracle; se descontó 1 vida)."
                     : " (modo local; revisa la consola e inténtalo de nuevo).";
             lblResultBanner.setText("Algunos casos fallaron" + saveSuffix);
+            Theme.playPulse(lblResultBanner);
         }
     }
 
