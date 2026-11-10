@@ -130,7 +130,11 @@ public class SimulatedCodeRunner implements CodeRunner {
         Path sandboxDir = Files.createTempDirectory("levelup_jvm_sandbox_");
         try {
             Path userFile = sandboxDir.resolve(userClassName + ".java");
-            Files.writeString(userFile, rawSourceCode, StandardCharsets.UTF_8);
+            String sourceToWrite = rawSourceCode;
+            if (!rawSourceCode.contains("import java.util.") && !rawSourceCode.trim().startsWith("package ")) {
+                sourceToWrite = "import java.util.*;\n" + rawSourceCode;
+            }
+            Files.writeString(userFile, sourceToWrite, StandardCharsets.UTF_8);
 
             String runnerClassName = "__LevelUpRunnerMain";
             List<File> filesToCompile = new ArrayList<>();
@@ -175,6 +179,10 @@ public class SimulatedCodeRunner implements CodeRunner {
             String csv = arrMatcher.group(1).trim();
             int target = Integer.parseInt(targetMatcher.group(1));
             callExpression = userClassName + "." + methodName + "(new int[]{" + csv + "}, " + target + ")";
+        } else if (compactParams.contains("int[]")) {
+            Matcher arrMatcher = ARRAY_PATTERN.matcher(normalizedInput);
+            String csv = arrMatcher.find() ? arrMatcher.group(1).trim() : normalizedInput;
+            callExpression = userClassName + "." + methodName + "(new int[]{" + csv + "})";
         } else if (compactParams.startsWith("int ") || "int".equals(compactParams)
                 || compactParams.startsWith("long ") || "long".equals(compactParams)) {
             String[] parts = normalizedInput.split(",");
@@ -343,13 +351,24 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         Matcher arrMatcher = ARRAY_PATTERN.matcher(normalizedInput);
         Matcher targetMatcher = TARGET_PATTERN.matcher(normalizedInput);
-        if (arrMatcher.find() && targetMatcher.find()) {
-            return evaluateArraySearch(cleanCode, arrMatcher.group(1), Integer.parseInt(targetMatcher.group(1)));
+        if (arrMatcher.find()) {
+            if (targetMatcher.find()) {
+                return evaluateArraySearch(cleanCode, arrMatcher.group(1), Integer.parseInt(targetMatcher.group(1)));
+            }
+            String singleArrayResult = evaluateSingleArrayAlgorithm(cleanCode, arrMatcher.group(1));
+            if (singleArrayResult != null) {
+                return singleArrayResult;
+            }
         }
 
         String branchOutput = evaluateConditionalBranches(cleanCode, normalizedInput);
         if (branchOutput != null) {
             return branchOutput;
+        }
+
+        String palindromeOutput = evaluatePalindromeLogic(cleanCode, normalizedInput);
+        if (palindromeOutput != null) {
+            return palindromeOutput;
         }
 
         if (normalizedInput.matches("-?\\d+(?:\\s*,\\s*-?\\d+)*")) {
@@ -495,6 +514,69 @@ public class SimulatedCodeRunner implements CodeRunner {
             }
         }
         return cleanCode.contains("-1") ? "-1" : "";
+    }
+
+    private String evaluateSingleArrayAlgorithm(String cleanCode, String csvNumbers) {
+        String[] parts = csvNumbers.split(",");
+        List<Integer> list = new ArrayList<>();
+        for (String p : parts) {
+            if (!p.trim().isEmpty()) {
+                list.add(Integer.parseInt(p.trim()));
+            }
+        }
+
+        boolean looksLikeDuplicateSearch = cleanCode.contains("set(")
+                || cleanCode.contains("unordered_set")
+                || cleanCode.contains("HashSet")
+                || cleanCode.contains("vistos")
+                || cleanCode.contains("seen")
+                || cleanCode.contains(".count(")
+                || cleanCode.contains(".insert(");
+        if (looksLikeDuplicateSearch && (cleanCode.contains("for") || cleanCode.contains("while"))) {
+            List<Integer> seen = new ArrayList<>();
+            for (int v : list) {
+                if (seen.contains(v)) {
+                    return String.valueOf(v);
+                }
+                seen.add(v);
+            }
+            return cleanCode.contains("-1") ? "-1" : "0";
+        }
+
+        boolean looksLikeEvenSum = (cleanCode.contains("% 2") || cleanCode.contains("%2"))
+                && (cleanCode.contains("sum") || cleanCode.contains("total") || cleanCode.contains("+=") || cleanCode.contains("+"));
+        if (looksLikeEvenSum) {
+            int sum = 0;
+            for (int v : list) {
+                if (v % 2 == 0) {
+                    sum += v;
+                }
+            }
+            return String.valueOf(sum);
+        }
+
+        return null;
+    }
+
+    private String evaluatePalindromeLogic(String cleanCode, String input) {
+        if (input == null || input.isEmpty()) {
+            return null;
+        }
+        boolean looksLikePalindrome = cleanCode.contains("[::-1]")
+                || cleanCode.contains("reverse")
+                || (cleanCode.contains("left") && cleanCode.contains("right"))
+                || (cleanCode.contains("izq") && cleanCode.contains("der"))
+                || cleanCode.contains("palindrom")
+                || cleanCode.contains("Palindrom");
+        if (!looksLikePalindrome) {
+            return null;
+        }
+        boolean ignoreCase = cleanCode.contains("lower")
+                || cleanCode.contains("Lower")
+                || cleanCode.contains("tolower");
+        String candidate = ignoreCase ? input.toLowerCase(Locale.ROOT) : input;
+        String reversed = new StringBuilder(candidate).reverse().toString();
+        return candidate.equals(reversed) ? "true" : "false";
     }
 
     private String evaluateNumericLogic(String cleanCode, String numericInput) {

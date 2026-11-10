@@ -12,6 +12,7 @@ import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
+import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.DailyActivity;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -96,6 +98,7 @@ public class DashboardController {
             try {
                 List<Language> fromDb = contentService.listActiveLanguages();
                 if (fromDb != null && !fromDb.isEmpty()) {
+                    enrichCatalogFromSeed(fromDb);
                     return fromDb;
                 }
             } catch (Exception ex) {
@@ -103,6 +106,79 @@ public class DashboardController {
             }
         }
         return DemoSeedCatalog.createSeedLanguages();
+    }
+
+    private void enrichCatalogFromSeed(List<Language> dbLanguages) {
+        List<Language> seedLanguages = DemoSeedCatalog.createSeedLanguages();
+        for (Language dbLang : dbLanguages) {
+            String dbName = dbLang.getName() != null ? dbLang.getName().toLowerCase(Locale.ROOT) : "";
+            Language matchingSeed = null;
+            for (Language s : seedLanguages) {
+                String sName = s.getName() != null ? s.getName().toLowerCase(Locale.ROOT) : "";
+                if (dbName.contains(sName) || sName.contains(dbName)) {
+                    matchingSeed = s;
+                    break;
+                }
+            }
+            if (matchingSeed == null) {
+                continue;
+            }
+            for (CourseModule seedMod : matchingSeed.getModules()) {
+                CourseModule dbMod = findMatchingModule(dbLang, seedMod);
+                if (dbMod == null) {
+                    dbLang.addModule(seedMod);
+                    continue;
+                }
+                for (Lesson seedLesson : seedMod.getLessons()) {
+                    Lesson dbLesson = findMatchingLesson(dbMod, seedLesson);
+                    if (dbLesson == null) {
+                        dbMod.addLesson(seedLesson);
+                        continue;
+                    }
+                    for (Challenge seedCh : seedLesson.getChallenges()) {
+                        if (!hasChallenge(dbLesson, seedCh)) {
+                            dbLesson.addChallenge(seedCh);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private CourseModule findMatchingModule(Language lang, CourseModule seedMod) {
+        if (lang.getModules() == null) {
+            return null;
+        }
+        for (CourseModule m : lang.getModules()) {
+            if (m.getId() == seedMod.getId() || m.getOrderIndex() == seedMod.getOrderIndex()) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    private Lesson findMatchingLesson(CourseModule mod, Lesson seedLesson) {
+        if (mod.getLessons() == null) {
+            return null;
+        }
+        for (Lesson l : mod.getLessons()) {
+            if (l.getId() == seedLesson.getId()) {
+                return l;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasChallenge(Lesson lesson, Challenge seedCh) {
+        if (lesson.getChallenges() == null) {
+            return false;
+        }
+        for (Challenge ch : lesson.getChallenges()) {
+            if (ch.getId() == seedCh.getId() || ch.getType() == seedCh.getType()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Set<String> loadEnrolledLanguageKeys(Language javaLang, Language pythonLang, Language cppLang) {

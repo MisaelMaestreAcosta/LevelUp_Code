@@ -1,10 +1,14 @@
 package com.mycompany.levelup_code.business.evaluator;
 
+import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
+import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
@@ -94,6 +98,55 @@ class SimulatedCodeRunnerTest {
 
         assertFalse(summary.isSandboxedExecution(), "Python sin sandbox externo debe declararse explícitamente como simulado");
         assertTrue(summary.getExecutionModeDescription().toLowerCase().contains("simulada"));
+    }
+
+    @Test
+    void validatesEntireExpandedCurriculumAcrossAllThreeLanguages() {
+        List<Language> languages = DemoSeedCatalog.createSeedLanguages();
+        assertEquals(3, languages.size());
+
+        int totalModules = 0;
+        int totalLessons = 0;
+        int totalChallenges = 0;
+        int totalTestCases = 0;
+
+        for (Language lang : languages) {
+            assertEquals(3, lang.getModules().size(), "Cada lenguaje debe tener 3 módulos");
+            for (CourseModule mod : lang.getModules()) {
+                totalModules++;
+                assertEquals(2, mod.getLessons().size(), "Cada módulo debe tener 2 lecciones");
+                for (Lesson lesson : mod.getLessons()) {
+                    totalLessons++;
+                    assertEquals(2, lesson.getChallenges().size(),
+                            "Cada lección debe tener 2 retos (Código y Quiz): " + lesson.getTitle());
+                    for (Challenge ch : lesson.getChallenges()) {
+                        totalChallenges++;
+                        if (ch instanceof CodeChallenge) {
+                            CodeChallenge cc = (CodeChallenge) ch;
+                            assertEquals(3, cc.getTestCases().size(),
+                                    "Cada reto de código debe tener 3 casos de prueba: " + cc.getTitle());
+                            totalTestCases += cc.getTestCases().size();
+                            SimulatedCodeRunner.ExecutionSummary summary =
+                                    runner.runAndValidate(cc, cc.getInitialTemplate());
+                            assertTrue(summary.isAllPassed(),
+                                    "El reto #" + cc.getId() + " (" + cc.getTitle() + ") falló validación: "
+                                    + summary.getCaseOutcomes().stream()
+                                            .map(SimulatedCodeRunner.CaseOutcome::getMessage)
+                                            .reduce("", (a, b) -> a + " | " + b));
+                        } else if (ch instanceof QuizChallenge) {
+                            QuizChallenge qc = (QuizChallenge) ch;
+                            assertEquals(4, qc.getOptions().size());
+                            assertTrue(qc.getOptions().contains(qc.getCorrectAnswer()));
+                        }
+                    }
+                }
+            }
+        }
+
+        assertEquals(9, totalModules);
+        assertEquals(18, totalLessons);
+        assertEquals(36, totalChallenges);
+        assertEquals(54, totalTestCases);
     }
 }
 

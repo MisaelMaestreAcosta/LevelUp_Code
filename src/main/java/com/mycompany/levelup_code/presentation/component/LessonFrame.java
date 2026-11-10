@@ -288,59 +288,22 @@ public class LessonFrame extends Stage {
     }
 
     private void switchComparativeSnippet(String lang) {
+        String[] snippet = com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog
+                .resolveComparativeSnippet(currentLesson, lang);
         if ("JAVA".equals(lang)) {
             btnTabJava.getStyleClass().setAll("btn-java");
             btnTabPython.getStyleClass().setAll("btn-secondary");
             btnTabCpp.getStyleClass().setAll("btn-secondary");
-            txtComparativeCode.setText(
-                    "// Java 21: Clase abstracta y sobrescritura verificada\n"
-                    + "public abstract class Animal {\n"
-                    + "    public abstract String emitirSonido();\n"
-                    + "}\n\n"
-                    + "public class Perro extends Animal {\n"
-                    + "    @Override\n"
-                    + "    public String emitirSonido() {\n"
-                    + "        return \"Guau\";\n"
-                    + "    }\n"
-                    + "}"
-            );
-            lblComparisonCaption.setText("Java: @Override valida en tiempo de compilación que la firma coincida con la superclase.");
         } else if ("PYTHON".equals(lang)) {
             btnTabJava.getStyleClass().setAll("btn-secondary");
             btnTabPython.getStyleClass().setAll("btn-python");
             btnTabCpp.getStyleClass().setAll("btn-secondary");
-            txtComparativeCode.setText(
-                    "# Python 3.12: Clases Base Abstractas con el módulo abc\n"
-                    + "from abc import ABC, abstractmethod\n\n"
-                    + "class Animal(ABC):\n"
-                    + "    @abstractmethod\n"
-                    + "    def emitir_sonido(self) -> str:\n"
-                    + "        pass\n\n"
-                    + "class Perro(Animal):\n"
-                    + "    def emitir_sonido(self) -> str:\n"
-                    + "        return \"Guau\""
-            );
-            lblComparisonCaption.setText("Python: @abstractmethod impide instanciar Animal si la subclase no implementa emitir_sonido().");
         } else {
             btnTabJava.getStyleClass().setAll("btn-secondary");
             btnTabPython.getStyleClass().setAll("btn-secondary");
             btnTabCpp.getStyleClass().setAll("btn-cpp");
-            txtComparativeCode.setText(
-                    "// C++ 20: Función virtual pura (= 0) y destructor virtual\n"
-                    + "#include <string>\n\n"
-                    + "class Animal {\n"
-                    + "public:\n"
-                    + "    virtual ~Animal() = default;\n"
-                    + "    virtual std::string emitirSonido() const = 0;\n"
-                    + "};\n\n"
-                    + "class Perro : public Animal {\n"
-                    + "public:\n"
-                    + "    std::string emitirSonido() const override {\n"
-                    + "        return \"Guau\";\n"
-                    + "    }\n"
-                    + "};"
-            );
-            lblComparisonCaption.setText("C++: '= 0' define una clase abstracta pura y 'override' garantiza despacho vía vtable.");
         }
+        txtComparativeCode.setText(snippet[0]);
+        lblComparisonCaption.setText(snippet[1]);
     }
 }
