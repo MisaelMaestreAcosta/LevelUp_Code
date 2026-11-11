@@ -158,6 +158,11 @@ public class ChallengeFrame extends Stage {
 
         initComponents();
         loadChallengeIntoView(this.activeChallenge);
+        SessionWindowRegistry.track(this);
+        addEventHandler(WindowEvent.WINDOW_HIDING, event -> {
+            draftSaveDelay.stop();
+            rememberDraft();
+        });
     }
 
     public void setVisible(boolean visible) {

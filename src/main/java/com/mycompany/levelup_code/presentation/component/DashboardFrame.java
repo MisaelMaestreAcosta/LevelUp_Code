@@ -502,6 +502,7 @@ public class DashboardFrame {
         btnLogout.setOnAction(e -> {
             disposed = true;
             if (connectionWatch != null) connectionWatch.stop();
+            SessionWindowRegistry.closeAll();
             LoginFrame loginFrame = new LoginFrame(stage);
             loginFrame.show();
         });
