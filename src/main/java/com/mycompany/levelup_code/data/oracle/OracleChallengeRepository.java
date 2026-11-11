@@ -15,7 +15,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -109,9 +108,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
         if ("QUIZ".equalsIgnoreCase(type)) {
             String rawOptions = rs.getString("opciones");
-            List<String> options = rawOptions != null && !rawOptions.isEmpty()
-                    ? Arrays.asList(rawOptions.split("\\|"))
-                    : new ArrayList<>();
+            List<String> options = QuizOptionCodec.decode(rawOptions);
             String correctAnswer = rs.getString("respuesta_correcta");
             return new QuizChallenge(id, title, statement, lesson, expReward, options, correctAnswer);
         }

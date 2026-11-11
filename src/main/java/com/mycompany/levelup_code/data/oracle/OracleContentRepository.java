@@ -346,7 +346,7 @@ public class OracleContentRepository implements ContentRepository {
                     String quizSql = "INSERT INTO Reto_Quiz (id_reto, opciones, respuesta_correcta) VALUES (?, ?, ?)";
                     try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
                         stmt.setInt(1, qc.getId());
-                        stmt.setString(2, String.join("|", qc.getOptions()));
+                        stmt.setString(2, QuizOptionCodec.encode(qc.getOptions()));
                         stmt.setString(3, qc.getCorrectAnswer());
                         stmt.executeUpdate();
                     }
