@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.business.service.ChallengeService;
+import com.mycompany.levelup_code.data.local.ChallengeDraftStore;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Attempt;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import java.time.format.DateTimeFormatter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -33,6 +35,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.concurrent.Task;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -79,6 +83,8 @@ public class ChallengeFrame extends Stage {
     private final List<Challenge> availableChallenges;
     private final Runnable onSolvedCallback;
     private final SimulatedCodeRunner codeRunner = AppContext.getInstance().getCodeRunner();
+    private final ChallengeDraftStore draftStore = new ChallengeDraftStore();
+    private final PauseTransition draftSaveDelay = new PauseTransition(Duration.millis(900));
 
     private Challenge activeChallenge;
     private boolean xpAwardedForCurrent = false;
@@ -130,6 +136,7 @@ public class ChallengeFrame extends Stage {
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback) {
         this.currentUser = user;
+        draftSaveDelay.setOnFinished(event -> rememberDraft());
         this.onSolvedCallback = onSolvedCallback;
         this.availableChallenges = new ArrayList<>();
         if (challenge != null) {
@@ -171,6 +178,8 @@ public class ChallengeFrame extends Stage {
 
     private boolean allowClose() {
         if (!busy) {
+            draftSaveDelay.stop();
+            rememberDraft();
             return true;
         }
         showFeedback("Espera a que termine el envío antes de cerrar. El guardado sigue en curso.", "text-warning");
@@ -496,13 +505,16 @@ public class ChallengeFrame extends Stage {
 
         txtEditor = new TextArea();
         txtEditor.setAccessibleText("Código de la solución");
-        txtEditor.setAccessibleHelp("Ctrl+Enter para enviar. El borrador se conserva al cambiar de reto durante esta sesión.");
+        txtEditor.setAccessibleHelp("Ctrl+Enter para enviar. El borrador se conserva al cerrar y volver a abrir.");
         txtEditor.setMinWidth(0);
         txtEditor.setPrefRowCount(12);
         txtEditor.getStyleClass().add("code-editor");
         HBox.setHgrow(txtEditor, Priority.ALWAYS);
 
-        txtEditor.textProperty().addListener((obs, oldVal, newVal) -> updateLineGutter(newVal));
+        txtEditor.textProperty().addListener((obs, oldVal, newVal) -> {
+            updateLineGutter(newVal);
+            scheduleDraftSave();
+        });
         txtEditor.scrollTopProperty().addListener((obs, oldVal, newVal) -> txtLineGutter.setScrollTop(newVal.doubleValue()));
 
         editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
@@ -700,10 +712,21 @@ public class ChallengeFrame extends Stage {
         if (busy || (viewLoaded && activeChallenge == challenge)) {
             return;
         }
+        draftSaveDelay.stop();
         rememberDraft();
         viewLoaded = false;
         this.activeChallenge = challenge;
         Draft draft = drafts.get(challenge);
+        if (draft == null && canPersistDraft(challenge)) {
+            try {
+                draft = draftStore.load(draftMode(), currentUser.getEmail(), challenge.getId())
+                        .map(saved -> new Draft(saved.code(), saved.quizIndex(), saved.caret(),
+                                saved.scrollTop(), false, saved.saveUncertain()))
+                        .orElse(null);
+            } catch (IOException ex) {
+                LOGGER.log(Level.WARNING, "No se pudo leer el borrador del reto", ex);
+            }
+        }
         this.saveUncertain = draft != null && draft.saveUncertain();
         this.xpAwardedForCurrent = draft != null && draft.xpAwarded();
         this.selectedQuizIndex = draft != null ? draft.quizIndex() : -1;
@@ -802,7 +825,7 @@ public class ChallengeFrame extends Stage {
         showFeedback(isPracticeOnly()
                 ? "Modo práctica: este intento no se guardará ni otorgará XP. Recupera la conexión o las vidas para volver a enviar."
                 : draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
-                : "Resuelve el reto y envía tu respuesta. Los borradores se conservan durante esta sesión.", "body-text");
+                : "Resuelve el reto y envía tu respuesta. Tu borrador se guarda en este equipo.", "body-text");
         if (saveUncertain && !isPracticeOnly()) {
             btnSubmit.setText("Volver a enviar");
             showFeedback("El guardado anterior sigue sin confirmar. Revisa tu historial antes de reenviar.", "text-warning");
@@ -812,9 +835,34 @@ public class ChallengeFrame extends Stage {
 
     private void rememberDraft() {
         if (viewLoaded) {
-            drafts.put(activeChallenge, new Draft(txtEditor.getText(), selectedQuizIndex,
-                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent, saveUncertain));
+            Draft draft = new Draft(txtEditor.getText(), selectedQuizIndex,
+                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent, saveUncertain);
+            drafts.put(activeChallenge, draft);
+            if (canPersistDraft(activeChallenge)) {
+                try {
+                    draftStore.save(draftMode(), currentUser.getEmail(), activeChallenge.getId(),
+                            new ChallengeDraftStore.DraftData(draft.code(), draft.quizIndex(),
+                                    draft.caret(), draft.scrollTop(), draft.saveUncertain()));
+                } catch (IOException ex) {
+                    LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
+                    showFeedback("No pudimos guardar el borrador en este equipo. Conserva una copia de tu respuesta.",
+                            "text-warning");
+                }
+            }
         }
+    }
+
+    private boolean canPersistDraft(Challenge challenge) {
+        return currentUser != null && currentUser.getEmail() != null
+                && !currentUser.getEmail().isBlank() && challenge != null && challenge.getId() > 0;
+    }
+
+    private String draftMode() {
+        return AppContext.getInstance().isOracleConnected() ? "oracle" : "demo";
+    }
+
+    private void scheduleDraftSave() {
+        if (viewLoaded && !busy) draftSaveDelay.playFromStart();
     }
 
     private record Draft(String code, int quizIndex, int caret, double scrollTop,
@@ -1035,6 +1083,7 @@ public class ChallengeFrame extends Stage {
             card.getStyleClass().setAll("radio-button", i == index ? "quiz-option-card-selected" : "quiz-option-card");
         }
         showFeedback("Respuesta seleccionada. Envía con Ctrl+Enter o con el botón.", "body-text");
+        scheduleDraftSave();
     }
 
     /**
