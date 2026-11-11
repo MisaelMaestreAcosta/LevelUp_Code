@@ -15,7 +15,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -73,6 +75,49 @@ public class OracleChallengeRepository implements ChallengeRepository {
         return challenges;
     }
 
+    /** Loads every challenge and test case for the active catalog without N+1 queries. */
+    void loadActiveCatalog(Connection conn, Map<Integer, Lesson> lessonsById) throws SQLException {
+        if (lessonsById.isEmpty()) return;
+
+        Map<Integer, CodeChallenge> codeChallengesById = new HashMap<>();
+        String sql = SELECT_CHALLENGE_SQL + "WHERE lg.activo = 1 "
+                + "ORDER BY lg.id_lenguaje, m.orden_secuencia, l.orden_secuencia, r.orden_secuencia";
+        try (PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                Lesson lesson = lessonsById.get(rs.getInt("id_leccion"));
+                if (lesson == null) continue;
+                Challenge challenge = mapChallengeRow(rs, lesson);
+                lesson.addChallenge(challenge);
+                if (challenge instanceof CodeChallenge codeChallenge) {
+                    codeChallengesById.put(codeChallenge.getId(), codeChallenge);
+                }
+            }
+        }
+
+        if (codeChallengesById.isEmpty()) return;
+        String casesSql = "SELECT cp.id_caso, cp.id_reto, cp.entrada, cp.salida_esperada, cp.es_oculto "
+                + "FROM Casos_Prueba cp "
+                + "JOIN Retos r ON r.id_reto = cp.id_reto "
+                + "JOIN Lecciones le ON le.id_leccion = r.id_leccion "
+                + "JOIN Modulos m ON m.id_modulo = le.id_modulo "
+                + "JOIN Lenguajes lg ON lg.id_lenguaje = m.id_lenguaje "
+                + "WHERE lg.activo = 1 ORDER BY cp.id_reto, cp.id_caso";
+        try (PreparedStatement stmt = conn.prepareStatement(casesSql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                CodeChallenge challenge = codeChallengesById.get(rs.getInt("id_reto"));
+                if (challenge == null) continue;
+                challenge.addTestCase(new TestCase(
+                        rs.getInt("id_caso"),
+                        challenge,
+                        rs.getString("entrada"),
+                        rs.getString("salida_esperada"),
+                        rs.getInt("es_oculto") == 1));
+            }
+        }
+    }
+
     private Challenge mapChallenge(Connection conn, ResultSet rs) throws SQLException {
         Language lang = new Language(
                 rs.getInt("id_lenguaje"),
@@ -100,6 +145,28 @@ public class OracleChallengeRepository implements ChallengeRepository {
     }
 
     private Challenge mapChallengeWithLesson(Connection conn, ResultSet rs, Lesson lesson) throws SQLException {
+        Challenge challenge = mapChallengeRow(rs, lesson);
+        if (!(challenge instanceof CodeChallenge codeChallenge)) return challenge;
+
+        String casesSql = "SELECT id_caso, entrada, salida_esperada, es_oculto "
+                + "FROM Casos_Prueba WHERE id_reto = ? ORDER BY id_caso ASC";
+        try (PreparedStatement caseStmt = conn.prepareStatement(casesSql)) {
+            caseStmt.setInt(1, codeChallenge.getId());
+            try (ResultSet caseRs = caseStmt.executeQuery()) {
+                while (caseRs.next()) {
+                    codeChallenge.addTestCase(new TestCase(
+                            caseRs.getInt("id_caso"),
+                            codeChallenge,
+                            caseRs.getString("entrada"),
+                            caseRs.getString("salida_esperada"),
+                            caseRs.getInt("es_oculto") == 1));
+                }
+            }
+        }
+        return codeChallenge;
+    }
+
+    private Challenge mapChallengeRow(ResultSet rs, Lesson lesson) throws SQLException {
         int id = rs.getInt("id_reto");
         String title = rs.getString("titulo_reto");
         String statement = rs.getString("enunciado");
@@ -119,24 +186,6 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
         CodeChallenge codeChallenge = new CodeChallenge(
                 id, title, statement, lesson, expReward, template, limitSeconds);
-
-        String casesSql = "SELECT id_caso, entrada, salida_esperada, es_oculto "
-                + "FROM Casos_Prueba WHERE id_reto = ? ORDER BY id_caso ASC";
-        try (PreparedStatement caseStmt = conn.prepareStatement(casesSql)) {
-            caseStmt.setInt(1, id);
-            try (ResultSet caseRs = caseStmt.executeQuery()) {
-                while (caseRs.next()) {
-                    TestCase tc = new TestCase(
-                            caseRs.getInt("id_caso"),
-                            codeChallenge,
-                            caseRs.getString("entrada"),
-                            caseRs.getString("salida_esperada"),
-                            caseRs.getInt("es_oculto") == 1
-                    );
-                    codeChallenge.addTestCase(tc);
-                }
-            }
-        }
         return codeChallenge;
     }
 }
