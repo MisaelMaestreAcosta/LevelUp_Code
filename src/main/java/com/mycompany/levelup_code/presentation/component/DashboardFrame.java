@@ -452,7 +452,7 @@ public class DashboardFrame {
             switchWorkspaceView("ACHIEVEMENTS");
         });
         btnQuickLab.setOnAction(e -> {
-            Lesson l = nextLesson();
+            Lesson l = lessonForPrimaryAction();
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
             new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
@@ -729,7 +729,7 @@ public class DashboardFrame {
         continueButton = new Button("Continuar aprendiendo");
         continueButton.getStyleClass().add("btn-primary");
         continueButton.setOnAction(e -> {
-            Lesson lesson = nextLesson();
+            Lesson lesson = lessonForPrimaryAction();
             if (lesson != null) new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show();
         });
         VBox resume = new VBox(10, continueSummary, continueButton);
@@ -907,10 +907,12 @@ public class DashboardFrame {
             if (key.equals(langKey)) card.getStyleClass().add("course-selected");
         });
         Lesson next = nextLesson();
-        continueSummary.setText(next == null ? "Este curso aún no tiene lecciones."
-                : (selectedList.stream().allMatch(l -> resolveLessonProgressStatus(l, 0) == ProgressStatus.COMPLETED)
-                        ? "¡Curso completado! Puedes repasar: " : "Tu siguiente paso: ") + next.getTitle());
-        continueButton.setDisable(next == null);
+        boolean courseCompleted = !selectedList.isEmpty() && next == null;
+        continueSummary.setText(selectedList.isEmpty() ? "Este curso aún no tiene lecciones."
+                : courseCompleted ? "¡Curso completado! Puedes repasar cualquier lección cuando quieras."
+                : "Tu siguiente paso: " + next.getTitle());
+        continueButton.setText(courseCompleted ? "Repasar desde el inicio" : "Continuar aprendiendo");
+        continueButton.setDisable(selectedList.isEmpty());
         String query = lessonSearch.getText().strip().toLowerCase(Locale.ROOT);
         int shown = 0;
 
@@ -955,7 +957,13 @@ public class DashboardFrame {
         return lessons.stream().filter(l -> resolveLessonProgressStatus(l, 0) == ProgressStatus.IN_PROGRESS)
                 .findFirst().orElseGet(() -> lessons.stream()
                         .filter(l -> resolveLessonProgressStatus(l, 0) != ProgressStatus.COMPLETED)
-                        .findFirst().orElse(lessons.isEmpty() ? null : lessons.get(0)));
+                        .findFirst().orElse(null));
+    }
+
+    private Lesson lessonForPrimaryAction() {
+        Lesson next = nextLesson();
+        List<Lesson> lessons = selectedLessons();
+        return next != null ? next : lessons.isEmpty() ? null : lessons.get(0);
     }
 
     private HBox createModuleHeaderRow(String moduleTitle, String moduleDescription) {
