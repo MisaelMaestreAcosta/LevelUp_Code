@@ -37,6 +37,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.concurrent.Task;
@@ -96,6 +97,9 @@ public class ChallengeFrame extends Stage {
     private int selectedQuizIndex = -1;
     // Session-only drafts: challenge identity also keeps unsaved/demo IDs separate.
     private final Map<Challenge, Draft> drafts = new IdentityHashMap<>();
+    private final Map<Challenge, Long> draftRevisions = new IdentityHashMap<>();
+    private final Object draftWriteLock = new Object();
+    private long nextDraftRevision;
     private boolean viewLoaded;
     private boolean busy;
     private boolean saveUncertain;
@@ -103,6 +107,7 @@ public class ChallengeFrame extends Stage {
     private String pendingPayloadHash;
     private ProgressIndicator busyIndicator;
     private Label lblBusy;
+    private Label lblDraftStatus;
     private TitledPane consolePane;
 
     private Label lblChallengeTitle;
@@ -695,8 +700,11 @@ public class ChallengeFrame extends Stage {
         busyIndicator.setManaged(false);
         lblBusy.setVisible(false);
         lblBusy.setManaged(false);
+        lblDraftStatus = new Label("Guardado automático activo");
+        lblDraftStatus.getStyleClass().add("muted-text");
+        lblDraftStatus.setAccessibleText("Estado del borrador local");
         FlowPane actions = new FlowPane(10, 8, btnClose, btnNextChallenge, btnSubmit,
-                new Label("Ctrl+Enter"), busyIndicator, lblBusy);
+                new Label("Ctrl+Enter"), busyIndicator, lblBusy, lblDraftStatus);
         bottomBar.getChildren().addAll(lblResultBanner, actions);
         return bottomBar;
     }
@@ -845,6 +853,7 @@ public class ChallengeFrame extends Stage {
             btnSubmit.setText("Volver a enviar");
             showFeedback("El guardado anterior sigue sin confirmar. Puedes reintentar con seguridad: Oracle no duplicará el mismo envío.", "text-warning");
         }
+        lblDraftStatus.setText(draft != null ? "Borrador recuperado" : "Guardado automático activo");
         viewLoaded = true;
     }
 
@@ -855,17 +864,48 @@ public class ChallengeFrame extends Stage {
                     saveUncertain, pendingRequestId, pendingPayloadHash);
             drafts.put(activeChallenge, draft);
             if (canPersistDraft(activeChallenge)) {
-                try {
-                    draftStore.save(draftMode(), currentUser.getEmail(), activeChallenge.getId(),
-                            new ChallengeDraftStore.DraftData(draft.code(), draft.quizIndex(),
-                                    draft.caret(), draft.scrollTop(), draft.saveUncertain(),
-                                    draft.pendingRequestId(), draft.pendingPayloadHash()));
-                } catch (IOException ex) {
-                    LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
-                    showFeedback("No pudimos guardar el borrador en este equipo. Conserva una copia de tu respuesta.",
-                            "text-warning");
-                }
+                Challenge challengeToSave = activeChallenge;
+                String mode = draftMode();
+                String email = currentUser.getEmail();
+                int challengeId = challengeToSave.getId();
+                long revision = ++nextDraftRevision;
+                draftRevisions.put(challengeToSave, revision);
+                ChallengeDraftStore.DraftData data = new ChallengeDraftStore.DraftData(
+                        draft.code(), draft.quizIndex(), draft.caret(), draft.scrollTop(),
+                        draft.saveUncertain(), draft.pendingRequestId(), draft.pendingPayloadHash());
+                lblDraftStatus.setText("Guardando borrador…");
+                Thread writer = new Thread(() -> saveDraftInBackground(
+                        challengeToSave, revision, mode, email, challengeId, data),
+                        "challenge-draft-save-" + challengeId);
+                // Keep the short write alive during application shutdown so the
+                // latest answer is not lost after the window disappears.
+                writer.setDaemon(false);
+                writer.start();
             }
+        }
+    }
+
+    private void saveDraftInBackground(Challenge challenge, long revision, String mode,
+            String email, int challengeId, ChallengeDraftStore.DraftData data) {
+        try {
+            synchronized (draftWriteLock) {
+                Long latest = draftRevisions.get(challenge);
+                if (latest == null || latest != revision) return;
+                draftStore.save(mode, email, challengeId, data);
+            }
+            Platform.runLater(() -> {
+                if (activeChallenge == challenge && revision == draftRevisions.getOrDefault(challenge, -1L)) {
+                    lblDraftStatus.setText("Borrador guardado en este equipo");
+                }
+            });
+        } catch (IOException ex) {
+            LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
+            Platform.runLater(() -> {
+                if (activeChallenge == challenge) {
+                    lblDraftStatus.setText("No se pudo guardar el borrador");
+                    lblDraftStatus.getStyleClass().setAll("text-warning");
+                }
+            });
         }
     }
 
@@ -879,7 +919,11 @@ public class ChallengeFrame extends Stage {
     }
 
     private void scheduleDraftSave() {
-        if (viewLoaded && !busy) draftSaveDelay.playFromStart();
+        if (viewLoaded && !busy) {
+            lblDraftStatus.getStyleClass().setAll("muted-text");
+            lblDraftStatus.setText("Cambios pendientes de guardar…");
+            draftSaveDelay.playFromStart();
+        }
     }
 
     private record Draft(String code, int quizIndex, int caret, double scrollTop,
