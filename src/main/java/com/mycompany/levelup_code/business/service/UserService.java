@@ -4,14 +4,9 @@ import com.mycompany.levelup_code.data.dao.UserRepository;
 
 import com.mycompany.levelup_code.domain.model.Role;
 import com.mycompany.levelup_code.domain.model.User;
-import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.util.Base64;
+import com.mycompany.levelup_code.util.PasswordHasher;
 import java.util.Locale;
 import java.util.Optional;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 
 /**
  * Reglas de negocio para registrar usuarios e iniciar sesión.
@@ -24,13 +19,8 @@ public class UserService {
 
     public static final int MAX_EMAIL_LENGTH = 120;
 
-    private static final int SALT_BYTES = 16;
-    private static final int KEY_BITS = 256;
-    private static final int ITERATIONS = 120_000;
-
     private final UserRepository userRepository;
     private final Role studentRole;
-    private final SecureRandom secureRandom = new SecureRandom();
 
     public UserService(UserRepository userRepository, Role studentRole) {
         if (userRepository == null || studentRole == null) {
@@ -61,7 +51,7 @@ public class UserService {
         User user = new User();
         user.setUsername(username.trim());
         user.setEmail(normalizedEmail);
-        user.setPasswordHash(hashPassword(password));
+        user.setPasswordHash(PasswordHasher.hash(password));
         user.setRole(studentRole);
 
         User savedUser = userRepository.save(user);
@@ -97,7 +87,7 @@ public class UserService {
 
         User user = userResult.get();
 
-        if (!verifyPassword(password, user.getPasswordHash())) {
+        if (!PasswordHasher.verify(password, user.getPasswordHash())) {
             return Optional.empty();
         }
 
@@ -135,63 +125,6 @@ public class UserService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String hashPassword(String password) {
-        byte[] salt = new byte[SALT_BYTES];
-        secureRandom.nextBytes(salt);
-
-        byte[] hash = deriveKey(password.toCharArray(), salt, ITERATIONS);
-
-        return "pbkdf2$" + ITERATIONS + "$"
-                + Base64.getEncoder().encodeToString(salt) + "$"
-                + Base64.getEncoder().encodeToString(hash);
-    }
-
-    private boolean verifyPassword(String password, String storedHash) {
-        if (storedHash == null) {
-            return false;
-        }
-
-        try {
-            String[] parts = storedHash.split("\\$");
-
-            if (parts.length != 4 || !"pbkdf2".equals(parts[0])) {
-                return false;
-            }
-
-            int iterations = Integer.parseInt(parts[1]);
-            if (iterations < 1 || iterations > 2_000_000) {
-                return false;
-            }
-            byte[] salt = Base64.getDecoder().decode(parts[2]);
-            byte[] expectedHash = Base64.getDecoder().decode(parts[3]);
-            if (salt.length != SALT_BYTES || expectedHash.length != KEY_BITS / 8) {
-                return false;
-            }
-            byte[] actualHash =
-                    deriveKey(password.toCharArray(), salt, iterations);
-
-            return MessageDigest.isEqual(expectedHash, actualHash);
-        } catch (IllegalArgumentException exception) {
-            return false;
-        }
-    }
-
-    private byte[] deriveKey(char[] password, byte[] salt, int iterations) {
-        PBEKeySpec spec = new PBEKeySpec(password, salt, iterations, KEY_BITS);
-
-        try {
-            SecretKeyFactory factory =
-                    SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            return factory.generateSecret(spec).getEncoded();
-        } catch (GeneralSecurityException exception) {
-            throw new IllegalStateException(
-                    "No fue posible procesar la contraseña.", exception
-            );
-        } finally {
-            spec.clearPassword();
-        }
     }
 
 }

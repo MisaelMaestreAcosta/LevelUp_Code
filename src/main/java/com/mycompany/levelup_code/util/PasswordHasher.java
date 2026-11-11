@@ -55,8 +55,14 @@ public final class PasswordHasher {
                 return false;
             }
             int iterations = Integer.parseInt(parts[1]);
+            if (iterations < 1 || iterations > 2_000_000) {
+                return false;
+            }
             byte[] salt = Base64.getDecoder().decode(parts[2]);
             byte[] expectedHash = Base64.getDecoder().decode(parts[3]);
+            if (salt.length != SALT_BYTES || expectedHash.length != KEY_BITS / 8) {
+                return false;
+            }
             byte[] actualHash = deriveKey(password.toCharArray(), salt, iterations);
             return MessageDigest.isEqual(expectedHash, actualHash);
         } catch (IllegalArgumentException ex) {
