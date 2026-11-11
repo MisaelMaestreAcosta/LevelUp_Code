@@ -10,9 +10,6 @@ import com.mycompany.levelup_code.presentation.fx.LevelUpFxApp;
 public class Main {
 
     public static void main(String[] args) {
-        // Pre-inicializa el contenedor de servicios y verifica la conexión a Oracle XEPDB1
-        AppContext.getInstance();
-
         // Lanza la interfaz gráfica completa en JavaFX + CSS
         LevelUpFxApp.launchApp(args);
     }
