@@ -105,6 +105,7 @@ public class ChallengeFrame extends Stage {
     private boolean saveUncertain;
     private String pendingRequestId;
     private String pendingPayloadHash;
+    private int editorFontSize = 14;
     private ProgressIndicator busyIndicator;
     private Label lblBusy;
     private Label lblDraftStatus;
@@ -506,7 +507,18 @@ public class ChallengeFrame extends Stage {
             }
         });
 
-        toolbar.getChildren().addAll(lblFileTab, btnHint, btnSolutionHint, btnResetCode);
+        Button btnFontDown = new Button("A−");
+        btnFontDown.getStyleClass().add("btn-ghost");
+        btnFontDown.setTooltip(new Tooltip("Reducir tamaño del código"));
+        btnFontDown.setOnAction(event -> adjustEditorFontSize(-1));
+
+        Button btnFontUp = new Button("A+");
+        btnFontUp.getStyleClass().add("btn-ghost");
+        btnFontUp.setTooltip(new Tooltip("Aumentar tamaño del código"));
+        btnFontUp.setOnAction(event -> adjustEditorFontSize(1));
+
+        toolbar.getChildren().addAll(lblFileTab, btnHint, btnSolutionHint,
+                btnResetCode, btnFontDown, btnFontUp);
 
         // Contenedor con numeración de líneas (gutter) y área de edición
         HBox editorContainer = new HBox(0);
@@ -526,7 +538,15 @@ public class ChallengeFrame extends Stage {
         txtEditor.setMinWidth(0);
         txtEditor.setPrefRowCount(12);
         txtEditor.getStyleClass().add("code-editor");
+        txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         HBox.setHgrow(txtEditor, Priority.ALWAYS);
+
+        txtEditor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.TAB && !event.isControlDown() && !event.isAltDown()) {
+                txtEditor.insertText(txtEditor.getCaretPosition(), "    ");
+                event.consume();
+            }
+        });
 
         txtEditor.textProperty().addListener((obs, oldVal, newVal) -> {
             updateLineGutter(newVal);
@@ -537,6 +557,13 @@ public class ChallengeFrame extends Stage {
         editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
         editorCard.getChildren().addAll(toolbar, editorContainer);
         return editorCard;
+    }
+
+    private void adjustEditorFontSize(int delta) {
+        editorFontSize = Math.max(11, Math.min(24, editorFontSize + delta));
+        txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
+        txtEditor.setAccessibleHelp("Editor a " + editorFontSize
+                + " píxeles. Tab inserta cuatro espacios; Ctrl+Enter envía.");
     }
 
     private void updateLineGutter(String text) {
