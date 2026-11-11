@@ -48,6 +48,10 @@ La aplicación no incluye credenciales por defecto en el código fuente. Config�
 2. Edita `src/main/resources/db.properties` con el usuario y contraseña definidos al ejecutar `00_setup_user.sql`.  
    *(Nota: `db.properties` está ignorado en Git para prevenir exposición de credenciales).*
 
+La plantilla también define límites de conexión y lectura. Puedes ajustarlos con
+`db.connect.timeout.ms` y `db.read.timeout.ms`, o con las variables de entorno
+`DB_CONNECT_TIMEOUT_MS` y `DB_READ_TIMEOUT_MS`.
+
 ### 4. Compilación Reproducible, Pruebas Automatizadas y Ejecución (Maven Wrapper)
 
 El repositorio incluye **Maven Wrapper** (`mvnw` / `mvnw.cmd`), por lo que no requiere tener `mvn` instalado globalmente en el `PATH`:
