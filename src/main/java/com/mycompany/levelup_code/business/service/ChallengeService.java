@@ -8,6 +8,7 @@ import com.mycompany.levelup_code.data.dao.ChallengeRepository;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.model.Challenge;
+import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.Collections;
@@ -97,6 +98,12 @@ public class ChallengeService {
         ChallengeEvaluation evaluation = evaluator.evaluate(challenge, submission.trim());
         if (evaluation == null) {
             throw new IllegalStateException("El evaluador no devolvió un resultado.");
+        }
+        if (challenge instanceof CodeChallenge
+                && evaluation.getExecutionSummary() != null
+                && !evaluation.getExecutionSummary().isSandboxedExecution()) {
+            throw new IllegalStateException(
+                    "Una validación simulada solo puede usarse como práctica y no puede guardarse como intento.");
         }
 
         boolean firstCorrectAttempt = evaluation.getResult() == AttemptResult.CORRECT

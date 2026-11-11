@@ -838,7 +838,7 @@ public class ChallengeFrame extends Stage {
         lblExecutionMetrics.setText("Tiempo: -- ms");
         consolePane.setExpanded(false);
         showFeedback(isPracticeOnly()
-                ? "Modo práctica: este intento no se guardará ni otorgará XP. Recupera la conexión o las vidas para volver a enviar."
+                ? practiceModeMessage()
                 : draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
                 : "Resuelve el reto y envía tu respuesta. Tu borrador se guarda en este equipo.", "body-text");
         if (saveUncertain && !isPracticeOnly()) {
@@ -1557,7 +1557,34 @@ public class ChallengeFrame extends Stage {
     private boolean isPracticeOnly() {
         AppContext context = AppContext.getInstance();
         return (currentUser != null && currentUser.getLives() <= 0)
-                || (context.isOracleConnected() && !context.isOracleAvailable());
+                || (context.isOracleConnected() && !context.isOracleAvailable())
+                || isSimulatedCodeEvaluation();
+    }
+
+    private boolean isSimulatedCodeEvaluation() {
+        return activeChallenge instanceof CodeChallenge
+                && !codeRunner.supportsRealIsolatedExecution(
+                        resolveChallengeLanguageName(activeChallenge));
+    }
+
+    private String practiceModeMessage() {
+        if (isSimulatedCodeEvaluation()) {
+            return "Práctica simulada: puedes probar tu idea, pero este resultado no modificará XP ni vidas hasta contar con ejecución real para este lenguaje.";
+        }
+        if (currentUser != null && currentUser.getLives() <= 0) {
+            return "Modo práctica: no tienes vidas disponibles. Puedes seguir aprendiendo sin guardar ni recibir XP.";
+        }
+        return "Modo práctica: Oracle no está disponible. Puedes continuar sin guardar ni recibir XP.";
+    }
+
+    private String practiceSuccessMessage() {
+        if (isSimulatedCodeEvaluation()) {
+            return "¡Práctica simulada completada! El resultado no modificó XP ni vidas.";
+        }
+        if (currentUser != null && currentUser.getLives() <= 0) {
+            return "¡Práctica aprobada! El intento no se guardó ni dio XP porque no había vidas disponibles.";
+        }
+        return "¡Práctica aprobada! El intento no se guardó ni dio XP porque Oracle no estaba disponible.";
     }
 
     private record CaseSnapshot(int id, String input, String expected, boolean hidden) { }
@@ -1765,7 +1792,7 @@ public class ChallengeFrame extends Stage {
             String rewardMessage = currentUser != null && reward > 0 && (persistence.savedToOracle || awardLocal)
                     ? " +" + reward + " XP." : "";
             showFeedback((persistence.savedToOracle ? "¡Aprobado y guardado!"
-                    : practiceOnly ? "¡Práctica aprobada! Sin vidas, el intento no se guardó ni dio XP."
+                    : practiceOnly ? practiceSuccessMessage()
                     : "¡Aprobado en modo local!")
                     + (sandboxedValidation ? "" : " (Simulación)") + rewardMessage
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");

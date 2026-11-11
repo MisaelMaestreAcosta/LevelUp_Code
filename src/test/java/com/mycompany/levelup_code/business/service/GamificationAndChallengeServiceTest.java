@@ -111,6 +111,43 @@ class GamificationAndChallengeServiceTest {
     }
 
     @Test
+    void simulatedCodeValidationCannotChangePersistentProgress() {
+        FakeUserRepository users = new FakeUserRepository();
+        FakeAttemptRepository attempts = new FakeAttemptRepository(false);
+        FakeChallengeRepository challenges = new FakeChallengeRepository();
+        AchievementService achievements = new AchievementService(new FakeAchievementRepository(users, attempts));
+        GamificationService gamification = new GamificationService(users,
+                new FakeActivityRepository(), new StandardLevelPolicy(), achievements);
+        SimulatedCodeRunner runner = new SimulatedCodeRunner() {
+            @Override public ExecutionSummary runAndValidate(CodeChallenge challenge, String source) {
+                return new ExecutionSummary(1, 1, 0.01,
+                        List.of(new CaseOutcome(true, "Simulado")), false);
+            }
+        };
+        Map<ChallengeType, ChallengeEvaluator> evaluators = new EnumMap<>(ChallengeType.class);
+        evaluators.put(ChallengeType.CODE, new CodeChallengeEvaluator(runner));
+        ChallengeService service = new ChallengeService(challenges, attempts,
+                evaluators, gamification, achievements);
+
+        User student = new User();
+        student.setId(15);
+        student.setLives(4);
+        users.save(student);
+        Language language = new Language(2, "Python", "Python", true);
+        CourseModule module = new CourseModule(2, "Módulo", "Desc", 1, language);
+        Lesson lesson = new Lesson(2, "Lección", "Desc", 1, 0, module);
+        CodeChallenge challenge = new CodeChallenge(15, "Reto", "Desc", lesson, 50, "", 2);
+        challenge.addTestCase(new TestCase(15, challenge, "1", "1", false));
+        challenges.register(challenge);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.submitAttemptDetailed(student, 15, "print(1)"));
+        assertTrue(attempts.findByUserAndChallenge(15, 15).isEmpty());
+        assertEquals(4, student.getLives());
+        assertEquals(0, student.getTotalExp());
+    }
+
+    @Test
     void highExperienceFromLessonsNeverUnlocksChallengeCountAchievementWithoutSolvedChallenges() {
         FakeUserRepository userRepo = new FakeUserRepository();
         FakeAttemptRepository attemptRepo = new FakeAttemptRepository(false);
