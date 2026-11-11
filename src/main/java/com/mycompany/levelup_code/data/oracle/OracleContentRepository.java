@@ -15,8 +15,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -158,22 +160,82 @@ public class OracleContentRepository implements ContentRepository {
     }
 
     @Override
+    public Optional<Challenge> findChallengeById(int id) {
+        return challengeRepository.findById(id);
+    }
+
+    @Override
     public List<Language> findActiveLanguages() {
         List<Language> languages = new ArrayList<>();
+        Map<Integer, Language> languagesById = new LinkedHashMap<>();
         String sql = "SELECT id_lenguaje, nombre, descripcion, icono_url, activo "
                 + "FROM Lenguajes WHERE activo = 1 ORDER BY id_lenguaje ASC";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                Language lang = mapLanguageRow(rs);
-                loadModulesAndLessons(conn, lang);
-                languages.add(lang);
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql);
+                 ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Language lang = mapLanguageRow(rs);
+                    languages.add(lang);
+                    languagesById.put(lang.getId(), lang);
+                }
             }
+            loadActiveCatalog(conn, languagesById);
         } catch (SQLException e) {
             throw new BusinessException("Error al listar lenguajes activos en Oracle: " + e.getMessage(), e);
         }
         return languages;
+    }
+
+    private void loadActiveCatalog(Connection conn, Map<Integer, Language> languagesById)
+            throws SQLException {
+        if (languagesById.isEmpty()) return;
+
+        Map<Integer, CourseModule> modulesById = new LinkedHashMap<>();
+        String modulesSql = "SELECT m.id_modulo, m.id_lenguaje, m.nombre_modulo, "
+                + "m.descripcion, m.orden_secuencia FROM Modulos m "
+                + "JOIN Lenguajes l ON l.id_lenguaje = m.id_lenguaje "
+                + "WHERE l.activo = 1 ORDER BY m.id_lenguaje, m.orden_secuencia";
+        try (PreparedStatement stmt = conn.prepareStatement(modulesSql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                Language language = languagesById.get(rs.getInt("id_lenguaje"));
+                if (language == null) continue;
+                CourseModule module = new CourseModule(
+                        rs.getInt("id_modulo"),
+                        rs.getString("nombre_modulo"),
+                        rs.getString("descripcion"),
+                        rs.getInt("orden_secuencia"),
+                        language);
+                language.addModule(module);
+                modulesById.put(module.getId(), module);
+            }
+        }
+
+        Map<Integer, Lesson> lessonsById = new LinkedHashMap<>();
+        String lessonsSql = "SELECT le.id_leccion, le.id_modulo, le.titulo, le.contenido, "
+                + "le.orden_secuencia, le.exp_recompensa FROM Lecciones le "
+                + "JOIN Modulos m ON m.id_modulo = le.id_modulo "
+                + "JOIN Lenguajes l ON l.id_lenguaje = m.id_lenguaje "
+                + "WHERE l.activo = 1 "
+                + "ORDER BY m.id_lenguaje, m.orden_secuencia, le.orden_secuencia";
+        try (PreparedStatement stmt = conn.prepareStatement(lessonsSql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                CourseModule module = modulesById.get(rs.getInt("id_modulo"));
+                if (module == null) continue;
+                Lesson lesson = new Lesson(
+                        rs.getInt("id_leccion"),
+                        rs.getString("titulo"),
+                        rs.getString("contenido"),
+                        rs.getInt("orden_secuencia"),
+                        rs.getInt("exp_recompensa"),
+                        module);
+                module.addLesson(lesson);
+                lessonsById.put(lesson.getId(), lesson);
+            }
+        }
+
+        challengeRepository.loadActiveCatalog(conn, lessonsById);
     }
 
     private Language mapLanguageRow(ResultSet rs) throws SQLException {
@@ -346,7 +408,7 @@ public class OracleContentRepository implements ContentRepository {
                     String quizSql = "INSERT INTO Reto_Quiz (id_reto, opciones, respuesta_correcta) VALUES (?, ?, ?)";
                     try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
                         stmt.setInt(1, qc.getId());
-                        stmt.setString(2, String.join("|", qc.getOptions()));
+                        stmt.setString(2, QuizOptionCodec.encode(qc.getOptions()));
                         stmt.setString(3, qc.getCorrectAnswer());
                         stmt.executeUpdate();
                     }
@@ -417,15 +479,70 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Challenge updateChallenge(Challenge challenge) {
-        String sql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, exp_recompensa = ? WHERE id_reto = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, challenge.getTitle());
-            stmt.setString(2, challenge.getDescription());
-            stmt.setInt(3, challenge.getExpReward());
-            stmt.setInt(4, challenge.getId());
-            stmt.executeUpdate();
-            return challenge;
+        String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
+                + "exp_recompensa = ? WHERE id_reto = ?";
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement stmt = conn.prepareStatement(baseSql)) {
+                    stmt.setString(1, challenge.getTitle());
+                    stmt.setString(2, challenge.getDescription());
+                    stmt.setInt(3, challenge.getExpReward());
+                    stmt.setInt(4, challenge.getId());
+                    if (stmt.executeUpdate() != 1) {
+                        throw new SQLException("El reto ya no existe.");
+                    }
+                }
+
+                if (challenge instanceof CodeChallenge code) {
+                    String codeSql = "UPDATE Reto_Codigo SET codigo_inicial = ?, limite_tiempo_ms = ? "
+                            + "WHERE id_reto = ?";
+                    try (PreparedStatement stmt = conn.prepareStatement(codeSql)) {
+                        stmt.setString(1, code.getInitialTemplate());
+                        stmt.setInt(2, Math.max(1000, code.getTimeLimitSeconds() * 1000));
+                        stmt.setInt(3, code.getId());
+                        if (stmt.executeUpdate() != 1) {
+                            throw new SQLException("No se encontró la configuración de código del reto.");
+                        }
+                    }
+                    try (PreparedStatement stmt = conn.prepareStatement(
+                            "DELETE FROM Casos_Prueba WHERE id_reto = ?")) {
+                        stmt.setInt(1, code.getId());
+                        stmt.executeUpdate();
+                    }
+                    String caseSql = "INSERT INTO Casos_Prueba "
+                            + "(id_reto, entrada, salida_esperada, es_oculto) VALUES (?, ?, ?, ?)";
+                    try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
+                        for (TestCase testCase : code.getTestCases()) {
+                            stmt.setInt(1, code.getId());
+                            stmt.setString(2, testCase.getInput());
+                            stmt.setString(3, testCase.getExpectedOutput());
+                            stmt.setInt(4, testCase.isHidden() ? 1 : 0);
+                            stmt.addBatch();
+                        }
+                        stmt.executeBatch();
+                    }
+                } else if (challenge instanceof QuizChallenge quiz) {
+                    String quizSql = "UPDATE Reto_Quiz SET opciones = ?, respuesta_correcta = ? "
+                            + "WHERE id_reto = ?";
+                    try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
+                        stmt.setString(1, QuizOptionCodec.encode(quiz.getOptions()));
+                        stmt.setString(2, quiz.getCorrectAnswer());
+                        stmt.setInt(3, quiz.getId());
+                        if (stmt.executeUpdate() != 1) {
+                            throw new SQLException("No se encontró la configuración del quiz.");
+                        }
+                    }
+                }
+
+                conn.commit();
+                return challenge;
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         } catch (SQLException e) {
             throw new BusinessException("Error al actualizar reto en Oracle: " + e.getMessage(), e);
         }

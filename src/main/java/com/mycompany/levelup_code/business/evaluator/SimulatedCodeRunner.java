@@ -109,6 +109,8 @@ public class SimulatedCodeRunner implements CodeRunner {
             String input,
             int timeoutSeconds) throws IOException, InterruptedException, TimeoutException {
 
+        validateSafeJavaSource(cleanCode);
+
         Matcher classMatcher = PUBLIC_CLASS_DECL.matcher(cleanCode);
         if (!classMatcher.find()) {
             throw new IOException("Error de compilación Java: no se encontró una declaración 'class NombreClase'.");
@@ -220,7 +222,8 @@ public class SimulatedCodeRunner implements CodeRunner {
         try (StandardJavaFileManager fileManager =
                 compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             Iterable<? extends JavaFileObject> units = fileManager.getJavaFileObjectsFromFiles(files);
-            List<String> options = Arrays.asList("-d", outputDir.toString(), "-encoding", "UTF-8");
+            List<String> options = Arrays.asList(
+                    "-proc:none", "-d", outputDir.toString(), "-encoding", "UTF-8");
             Boolean ok = compiler.getTask(null, fileManager, diagnostics, options, null, units).call();
             if (ok == null || !ok) {
                 StringBuilder err = new StringBuilder("Error de compilación Java: ");
@@ -291,6 +294,21 @@ public class SimulatedCodeRunner implements CodeRunner {
         }
 
         return stdoutBuf.toString(StandardCharsets.UTF_8).trim();
+    }
+
+    private static void validateSafeJavaSource(String source) throws IOException {
+        String compact = source.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
+        String[] forbidden = {
+            "java.io.", "java.nio.file", "java.net.", "javax.", "jdk.", "sun.",
+            "processbuilder", "runtime.getruntime", "system.exit", "system.load",
+            "class.forname", "getclassloader", "java.lang.reflect", "methodhandles",
+            "setsecuritymanager", "setout(", "seterr("
+        };
+        for (String token : forbidden) {
+            if (compact.contains(token)) {
+                throw new IOException("API no permitida en retos: " + token);
+            }
+        }
     }
 
     private Thread startStreamCollector(InputStream stream, ByteArrayOutputStream target, int maxBytes) {

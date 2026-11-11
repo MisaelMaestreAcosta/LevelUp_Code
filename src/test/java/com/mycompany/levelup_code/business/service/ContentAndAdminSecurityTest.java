@@ -92,4 +92,37 @@ class ContentAndAdminSecurityTest {
         assertTrue(savedChallenge.getId() > 0);
         assertEquals("Invertir", savedChallenge.getTitle());
     }
+
+    @Test
+    void updatesChallengeTemplateAndCasesOnlyForVerifiedAdministrator() {
+        FakeUserRepository userRepo = new FakeUserRepository();
+        FakeContentRepository contentRepo = new FakeContentRepository();
+        ContentService service = new ContentService(contentRepo, userRepo);
+        User admin = new User();
+        admin.setId(7);
+        admin.setUsername("Admin");
+        admin.setRole(new Role(2, "Administrador", "Administrador"));
+        userRepo.save(admin);
+
+        Language language = service.createLanguage(admin,
+                new Language(0, "Java", "Java", true));
+        CourseModule module = service.createModule(admin,
+                new CourseModule(0, "Bases", "Bases", 1, language));
+        Lesson lesson = service.createLesson(admin,
+                new Lesson(0, "Métodos", "Teoría", 1, 50, module));
+        CodeChallenge original = new CodeChallenge(0, "Original", "Resuelve", lesson,
+                70, "class Solver {}", 2);
+        original.addTestCase(new TestCase(1, original, "a", "A", false));
+        service.createChallenge(admin, original);
+
+        CodeChallenge edited = new CodeChallenge(original.getId(), "Editado", "Resuelve mejor",
+                lesson, 90, "class Solver { static String solve(String s) { return s; } }", 3);
+        edited.addTestCase(new TestCase(0, edited, "b", "B", false));
+        CodeChallenge saved = (CodeChallenge) service.updateChallenge(admin, edited);
+
+        assertEquals("Editado", saved.getTitle());
+        assertEquals(3, saved.getTimeLimitSeconds());
+        assertEquals("b", saved.getTestCases().getFirst().getInput());
+        assertEquals(saved, contentRepo.findChallengeById(saved.getId()).orElseThrow());
+    }
 }

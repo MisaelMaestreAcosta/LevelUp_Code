@@ -33,6 +33,9 @@ public class Attempt {
     // Experiencia otorgada por este intento
     private int earnedExperience;
 
+    // Stable client key used to make retries idempotent in Oracle.
+    private String requestId;
+
     // Fecha y hora exacta en la que se registró el intento (submittedAt)
     private LocalDateTime attemptDate;
 
@@ -170,6 +173,14 @@ public class Attempt {
 
     public void setExpEarned(int expEarned) {
         this.earnedExperience = expEarned;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public LocalDateTime getAttemptDate() {

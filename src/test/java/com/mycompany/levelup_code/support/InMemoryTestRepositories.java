@@ -121,6 +121,11 @@ public final class InMemoryTestRepositories {
         }
 
         @Override
+        public Optional<Challenge> findChallengeById(int id) {
+            return Optional.ofNullable(challenges.get(id));
+        }
+
+        @Override
         public List<Language> findActiveLanguages() {
             return languages.values().stream()
                     .filter(Language::isActive)

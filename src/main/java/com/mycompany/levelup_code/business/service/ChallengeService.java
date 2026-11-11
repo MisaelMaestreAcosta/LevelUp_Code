@@ -8,6 +8,7 @@ import com.mycompany.levelup_code.data.dao.ChallengeRepository;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.model.Challenge;
+import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.Collections;
@@ -15,9 +16,12 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /** Coordina la evaluación, el registro y la recompensa de los intentos. */
 public class ChallengeService {
+
+    public static final int ATTEMPT_HISTORY_LIMIT = 50;
 
     private final ChallengeRepository challengeRepository;
     private final AttemptRepository attemptRepository;
@@ -63,7 +67,15 @@ public class ChallengeService {
     public record SubmissionResult(Attempt attempt, ChallengeEvaluation evaluation) { }
 
     public SubmissionResult submitAttemptDetailed(User user, int challengeId, String submission) {
+        return submitAttemptDetailed(user, challengeId, submission, UUID.randomUUID().toString());
+    }
+
+    public SubmissionResult submitAttemptDetailed(
+            User user, int challengeId, String submission, String requestId) {
         validateSubmission(user, challengeId, submission);
+        if (requestId == null || requestId.isBlank() || requestId.length() > 64) {
+            throw new IllegalArgumentException("El identificador del envío debe ser válido.");
+        }
         if (user.getLives() <= 0) {
             throw new IllegalStateException("El usuario no dispone de vidas suficientes para enviar intentos.");
         }
@@ -89,6 +101,12 @@ public class ChallengeService {
         if (evaluation == null) {
             throw new IllegalStateException("El evaluador no devolvió un resultado.");
         }
+        if (challenge instanceof CodeChallenge
+                && evaluation.getExecutionSummary() != null
+                && !evaluation.getExecutionSummary().isSandboxedExecution()) {
+            throw new IllegalStateException(
+                    "Una validación simulada solo puede usarse como práctica y no puede guardarse como intento.");
+        }
 
         boolean firstCorrectAttempt = evaluation.getResult() == AttemptResult.CORRECT
                 && !attemptRepository.hasSuccessfulAttempt(user.getId(), challengeId);
@@ -100,6 +118,7 @@ public class ChallengeService {
         attempt.setResult(evaluation.getResult());
         attempt.setExecutionTimeMs(evaluation.getExecutionTimeMs());
         attempt.setEarnedExperience(firstCorrectAttempt ? challenge.getExpReward() : 0);
+        attempt.setRequestId(requestId.trim());
 
         Attempt savedAttempt = attemptRepository.save(attempt);
         if (savedAttempt == null) {
@@ -113,7 +132,7 @@ public class ChallengeService {
                 } else {
                     achievementService.evaluateAndUnlock(user);
                 }
-            } else {
+            } else if (savedAttempt.getResult() == AttemptResult.INCORRECT) {
                 gamificationService.penalizeFailedAttempt(user);
             }
         }
@@ -127,7 +146,8 @@ public class ChallengeService {
         }
 
         List<Attempt> history =
-                attemptRepository.findByUserAndChallenge(userId, challengeId);
+                attemptRepository.findRecentByUserAndChallenge(
+                        userId, challengeId, ATTEMPT_HISTORY_LIMIT);
         if (history == null) {
             throw new IllegalStateException("El repositorio devolvió un historial inválido.");
         }

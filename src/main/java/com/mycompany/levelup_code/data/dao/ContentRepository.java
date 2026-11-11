@@ -23,6 +23,7 @@ public interface ContentRepository {
     Optional<Language> findLanguageById(int id);
     Optional<CourseModule> findModuleById(int id);
     Optional<Lesson> findLessonById(int id);
+    Optional<Challenge> findChallengeById(int id);
 
     // Devuelve los lenguajes disponibles para los estudiantes.
     List<Language> findActiveLanguages();

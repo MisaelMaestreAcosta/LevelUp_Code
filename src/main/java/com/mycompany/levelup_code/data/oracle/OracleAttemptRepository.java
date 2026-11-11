@@ -17,6 +17,8 @@ import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Implementación Oracle JDBC de {@link AttemptRepository} sobre la tabla {@code Intentos}.
@@ -24,6 +26,8 @@ import java.util.List;
  * {@code PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO} confirmando la transacción desde el cliente.
  */
 public class OracleAttemptRepository implements AttemptRepository {
+
+    private static final Logger LOGGER = Logger.getLogger(OracleAttemptRepository.class.getName());
 
     private final OracleChallengeRepository challengeRepository = new OracleChallengeRepository();
     private final UserDAO userDAO = new UserDAO();
@@ -50,7 +54,7 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public Attempt save(Attempt attempt) {
-        String plsql = "{call PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
+        String plsql = "{call PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try (CallableStatement cstmt = conn.prepareCall(plsql)) {
@@ -60,20 +64,21 @@ public class OracleAttemptRepository implements AttemptRepository {
                 cstmt.setString(4, attempt.getSubmittedContent() != null ? attempt.getSubmittedContent() : "");
                 cstmt.setString(5, attempt.getResult() != null ? attempt.getResult().name() : AttemptResult.INCORRECT.name());
                 cstmt.setInt(6, (int) Math.max(0, attempt.getExecutionTimeMs()));
+                cstmt.setString(7, attempt.getRequestId());
 
-                cstmt.registerOutParameter(7, Types.NUMERIC);  // p_nuevo_nivel
-                cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nueva_exp
-                cstmt.registerOutParameter(9, Types.NUMERIC);  // p_vidas_restantes
-                cstmt.registerOutParameter(10, Types.NUMERIC); // p_exp_otorgada
-                cstmt.registerOutParameter(11, Types.NUMERIC); // p_id_intento_creado
+                cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nuevo_nivel
+                cstmt.registerOutParameter(9, Types.NUMERIC);  // p_nueva_exp
+                cstmt.registerOutParameter(10, Types.NUMERIC); // p_vidas_restantes
+                cstmt.registerOutParameter(11, Types.NUMERIC); // p_exp_otorgada
+                cstmt.registerOutParameter(12, Types.NUMERIC); // p_id_intento_creado
 
                 cstmt.execute();
 
-                int nuevoNivel = cstmt.getInt(7);
-                int nuevaExp = cstmt.getInt(8);
-                int vidasRestantes = cstmt.getInt(9);
-                int expOtorgada = cstmt.getInt(10);
-                int idIntentoCreado = cstmt.getInt(11);
+                int nuevoNivel = cstmt.getInt(8);
+                int nuevaExp = cstmt.getInt(9);
+                int vidasRestantes = cstmt.getInt(10);
+                int expOtorgada = cstmt.getInt(11);
+                int idIntentoCreado = cstmt.getInt(12);
 
                 conn.commit();
 
@@ -84,10 +89,20 @@ public class OracleAttemptRepository implements AttemptRepository {
                     attempt.getUser().setLevel(nuevoNivel);
                     attempt.getUser().setExperience(nuevaExp);
                     attempt.getUser().setLives(vidasRestantes);
-                    userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
-                        attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
-                        attempt.getUser().setMaxStreak(fresh.getMaxStreak());
-                    });
+                    // The attempt is already committed at this point. A secondary
+                    // statistics refresh must never turn that confirmed save into
+                    // a failure that invites the student to submit it again.
+                    try {
+                        userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
+                            attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
+                            attempt.getUser().setMaxStreak(fresh.getMaxStreak());
+                        });
+                    } catch (RuntimeException refreshError) {
+                        LOGGER.log(Level.WARNING,
+                                "Attempt #{0} was saved, but user streak refresh failed",
+                                idIntentoCreado);
+                        LOGGER.log(Level.FINE, "User streak refresh details", refreshError);
+                    }
                 }
                 return attempt;
             } catch (SQLException ex) {
@@ -105,10 +120,19 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public List<Attempt> findByUserAndChallenge(int userId, int challengeId) {
+        List<Attempt> recent = findRecentByUserAndChallenge(userId, challengeId, Integer.MAX_VALUE);
+        java.util.Collections.reverse(recent);
+        return recent;
+    }
+
+    @Override
+    public List<Attempt> findRecentByUserAndChallenge(int userId, int challengeId, int limit) {
+        if (limit <= 0) throw new IllegalArgumentException("El límite debe ser mayor que cero.");
         List<Attempt> list = new ArrayList<>();
-        String sql = "SELECT id_intento, id_usuario, id_reto, codigo_enviado, salida_obtenida, "
+        String sql = "SELECT * FROM (SELECT id_intento, id_usuario, id_reto, codigo_enviado, salida_obtenida, "
                 + "es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento "
-                + "FROM Intentos WHERE id_usuario = ? AND id_reto = ? ORDER BY fecha_intento ASC";
+                + "FROM Intentos WHERE id_usuario = ? AND id_reto = ? "
+                + "ORDER BY fecha_intento DESC) WHERE ROWNUM <= ?";
 
         User user = userDAO.findById(userId).orElse(null);
         Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
@@ -117,6 +141,7 @@ public class OracleAttemptRepository implements AttemptRepository {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
             stmt.setInt(2, challengeId);
+            stmt.setInt(3, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     AttemptResult result = rs.getInt("es_correcto") == 1

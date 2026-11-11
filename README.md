@@ -31,7 +31,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
-   Si ya tienes una base de datos creada, vuelve a ejecutar solo `database/03_plsql_gamificacion.sql` para activar la recuperación diaria de vidas y el bloqueo de intentos sin vidas. No necesitas borrar ni volver a cargar los datos.
+   Si ya tienes una base de datos creada, vuelve a ejecutar solo `database/03_plsql_gamificacion.sql` para activar la recuperación diaria de vidas, el bloqueo de intentos sin vidas y los reintentos idempotentes. No necesitas borrar ni volver a cargar los datos.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:
@@ -47,6 +47,10 @@ La aplicación no incluye credenciales por defecto en el código fuente. Config�
    ```
 2. Edita `src/main/resources/db.properties` con el usuario y contraseña definidos al ejecutar `00_setup_user.sql`.  
    *(Nota: `db.properties` está ignorado en Git para prevenir exposición de credenciales).*
+
+La plantilla también define límites de conexión y lectura. Puedes ajustarlos con
+`db.connect.timeout.ms` y `db.read.timeout.ms`, o con las variables de entorno
+`DB_CONNECT_TIMEOUT_MS` y `DB_READ_TIMEOUT_MS`.
 
 ### 4. Compilación Reproducible, Pruebas Automatizadas y Ejecución (Maven Wrapper)
 

@@ -17,7 +17,6 @@ import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -27,11 +26,17 @@ import java.time.format.DateTimeFormatter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.concurrent.Task;
@@ -40,6 +45,7 @@ import javafx.util.Duration;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
@@ -91,11 +97,19 @@ public class ChallengeFrame extends Stage {
     private int selectedQuizIndex = -1;
     // Session-only drafts: challenge identity also keeps unsaved/demo IDs separate.
     private final Map<Challenge, Draft> drafts = new IdentityHashMap<>();
+    private final Map<Challenge, Integer> hintStages = new IdentityHashMap<>();
+    private final Map<Challenge, Long> draftRevisions = new IdentityHashMap<>();
+    private final Object draftWriteLock = new Object();
+    private long nextDraftRevision;
     private boolean viewLoaded;
     private boolean busy;
     private boolean saveUncertain;
+    private String pendingRequestId;
+    private String pendingPayloadHash;
+    private int editorFontSize = 14;
     private ProgressIndicator busyIndicator;
     private Label lblBusy;
+    private Label lblDraftStatus;
     private TitledPane consolePane;
 
     private Label lblChallengeTitle;
@@ -110,6 +124,7 @@ public class ChallengeFrame extends Stage {
     private VBox quizCard;
     private Button btnNextChallenge;
     private Button btnSubmit;
+    private Button btnHint;
 
     // Editor de código y numeración de líneas
     private TextArea txtEditor;
@@ -158,6 +173,11 @@ public class ChallengeFrame extends Stage {
 
         initComponents();
         loadChallengeIntoView(this.activeChallenge);
+        SessionWindowRegistry.track(this);
+        addEventHandler(WindowEvent.WINDOW_HIDING, event -> {
+            draftSaveDelay.stop();
+            rememberDraft();
+        });
     }
 
     public void setVisible(boolean visible) {
@@ -393,9 +413,10 @@ public class ChallengeFrame extends Stage {
             refresh.setDisable(false);
             entries.getChildren().clear();
             List<Attempt> attempts = new ArrayList<>(query.getValue());
-            Collections.reverse(attempts);
             status.setText(attempts.isEmpty() ? "Todavía no hay intentos guardados para este reto."
-                    : attempts.size() + " intento(s) guardado(s), del más reciente al más antiguo.");
+                    : attempts.size() + " intento(s) reciente(s), del más reciente al más antiguo."
+                    + (attempts.size() == ChallengeService.ATTEMPT_HISTORY_LIMIT
+                            ? " Se muestran como máximo los últimos 50." : ""));
             for (Attempt attempt : attempts) {
                 VBox card = new VBox(6);
                 card.getStyleClass().add("surface-subtle");
@@ -473,13 +494,9 @@ public class ChallengeFrame extends Stage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button btnHint = new Button("Ver Pista Didáctica");
+        btnHint = new Button("Ver pista 1 de 3");
         btnHint.getStyleClass().add("btn-ghost-green");
         btnHint.setOnAction(e -> showPedagogicalHint());
-
-        Button btnSolutionHint = new Button("Insertar Solución Modelo");
-        btnSolutionHint.getStyleClass().add("btn-ghost");
-        btnSolutionHint.setOnAction(e -> fillReferenceSolution());
 
         Button btnResetCode = new Button("Restaurar Plantilla");
         btnResetCode.getStyleClass().add("btn-secondary");
@@ -489,7 +506,17 @@ public class ChallengeFrame extends Stage {
             }
         });
 
-        toolbar.getChildren().addAll(lblFileTab, btnHint, btnSolutionHint, btnResetCode);
+        Button btnFontDown = new Button("A−");
+        btnFontDown.getStyleClass().add("btn-ghost");
+        btnFontDown.setTooltip(new Tooltip("Reducir tamaño del código"));
+        btnFontDown.setOnAction(event -> adjustEditorFontSize(-1));
+
+        Button btnFontUp = new Button("A+");
+        btnFontUp.getStyleClass().add("btn-ghost");
+        btnFontUp.setTooltip(new Tooltip("Aumentar tamaño del código"));
+        btnFontUp.setOnAction(event -> adjustEditorFontSize(1));
+
+        toolbar.getChildren().addAll(lblFileTab, btnHint, btnResetCode, btnFontDown, btnFontUp);
 
         // Contenedor con numeración de líneas (gutter) y área de edición
         HBox editorContainer = new HBox(0);
@@ -509,7 +536,15 @@ public class ChallengeFrame extends Stage {
         txtEditor.setMinWidth(0);
         txtEditor.setPrefRowCount(12);
         txtEditor.getStyleClass().add("code-editor");
+        txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         HBox.setHgrow(txtEditor, Priority.ALWAYS);
+
+        txtEditor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.TAB && !event.isControlDown() && !event.isAltDown()) {
+                txtEditor.insertText(txtEditor.getCaretPosition(), "    ");
+                event.consume();
+            }
+        });
 
         txtEditor.textProperty().addListener((obs, oldVal, newVal) -> {
             updateLineGutter(newVal);
@@ -520,6 +555,13 @@ public class ChallengeFrame extends Stage {
         editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
         editorCard.getChildren().addAll(toolbar, editorContainer);
         return editorCard;
+    }
+
+    private void adjustEditorFontSize(int delta) {
+        editorFontSize = Math.max(11, Math.min(24, editorFontSize + delta));
+        txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
+        txtEditor.setAccessibleHelp("Editor a " + editorFontSize
+                + " píxeles. Tab inserta cuatro espacios; Ctrl+Enter envía.");
     }
 
     private void updateLineGutter(String text) {
@@ -683,8 +725,11 @@ public class ChallengeFrame extends Stage {
         busyIndicator.setManaged(false);
         lblBusy.setVisible(false);
         lblBusy.setManaged(false);
+        lblDraftStatus = new Label("Guardado automático activo");
+        lblDraftStatus.getStyleClass().add("muted-text");
+        lblDraftStatus.setAccessibleText("Estado del borrador local");
         FlowPane actions = new FlowPane(10, 8, btnClose, btnNextChallenge, btnSubmit,
-                new Label("Ctrl+Enter"), busyIndicator, lblBusy);
+                new Label("Ctrl+Enter"), busyIndicator, lblBusy, lblDraftStatus);
         bottomBar.getChildren().addAll(lblResultBanner, actions);
         return bottomBar;
     }
@@ -717,19 +762,35 @@ public class ChallengeFrame extends Stage {
         viewLoaded = false;
         this.activeChallenge = challenge;
         Draft draft = drafts.get(challenge);
+        boolean outdatedDraftSkipped = false;
         if (draft == null && canPersistDraft(challenge)) {
             try {
-                draft = draftStore.load(draftMode(), currentUser.getEmail(), challenge.getId())
-                        .map(saved -> new Draft(saved.code(), saved.quizIndex(), saved.caret(),
-                                saved.scrollTop(), false, saved.saveUncertain()))
+                ChallengeDraftStore.DraftData saved = draftStore
+                        .load(draftMode(), currentUser.getEmail(), challenge.getId())
                         .orElse(null);
+                if (saved != null && saved.challengeFingerprint() != null
+                        && !saved.challengeFingerprint().equals(challengeFingerprint(challenge))
+                        && !confirmOutdatedDraftRecovery()) {
+                    saved = null;
+                    outdatedDraftSkipped = true;
+                }
+                if (saved != null) {
+                    draft = new Draft(saved.code(), saved.quizIndex(), saved.caret(),
+                            saved.scrollTop(), false, saved.saveUncertain(),
+                            saved.pendingRequestId(), saved.pendingPayloadHash());
+                }
             } catch (IOException ex) {
                 LOGGER.log(Level.WARNING, "No se pudo leer el borrador del reto", ex);
             }
         }
         this.saveUncertain = draft != null && draft.saveUncertain();
+        this.pendingRequestId = draft != null ? draft.pendingRequestId() : null;
+        this.pendingPayloadHash = draft != null ? draft.pendingPayloadHash() : null;
         this.xpAwardedForCurrent = draft != null && draft.xpAwarded();
         this.selectedQuizIndex = draft != null ? draft.quizIndex() : -1;
+        int revealedHints = hintStages.getOrDefault(challenge, 0);
+        btnHint.setText(revealedHints >= 3 ? "Pistas completas"
+                : "Ver pista " + (revealedHints + 1) + " de 3");
         if (btnSubmit != null) {
             btnSubmit.setText(isPracticeOnly()
                     ? "Practicar sin XP" : "Enviar solución");
@@ -823,32 +884,68 @@ public class ChallengeFrame extends Stage {
         lblExecutionMetrics.setText("Tiempo: -- ms");
         consolePane.setExpanded(false);
         showFeedback(isPracticeOnly()
-                ? "Modo práctica: este intento no se guardará ni otorgará XP. Recupera la conexión o las vidas para volver a enviar."
+                ? practiceModeMessage()
+                : outdatedDraftSkipped ? "El reto cambió. Se cargó su contenido actualizado y el borrador anterior se conservó en este equipo."
                 : draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
                 : "Resuelve el reto y envía tu respuesta. Tu borrador se guarda en este equipo.", "body-text");
         if (saveUncertain && !isPracticeOnly()) {
             btnSubmit.setText("Volver a enviar");
-            showFeedback("El guardado anterior sigue sin confirmar. Revisa tu historial antes de reenviar.", "text-warning");
+            showFeedback("El guardado anterior sigue sin confirmar. Puedes reintentar con seguridad: Oracle no duplicará el mismo envío.", "text-warning");
         }
+        lblDraftStatus.setText(draft != null ? "Borrador recuperado" : "Guardado automático activo");
         viewLoaded = true;
     }
 
     private void rememberDraft() {
         if (viewLoaded) {
             Draft draft = new Draft(txtEditor.getText(), selectedQuizIndex,
-                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent, saveUncertain);
+                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent,
+                    saveUncertain, pendingRequestId, pendingPayloadHash);
             drafts.put(activeChallenge, draft);
             if (canPersistDraft(activeChallenge)) {
-                try {
-                    draftStore.save(draftMode(), currentUser.getEmail(), activeChallenge.getId(),
-                            new ChallengeDraftStore.DraftData(draft.code(), draft.quizIndex(),
-                                    draft.caret(), draft.scrollTop(), draft.saveUncertain()));
-                } catch (IOException ex) {
-                    LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
-                    showFeedback("No pudimos guardar el borrador en este equipo. Conserva una copia de tu respuesta.",
-                            "text-warning");
-                }
+                Challenge challengeToSave = activeChallenge;
+                String mode = draftMode();
+                String email = currentUser.getEmail();
+                int challengeId = challengeToSave.getId();
+                long revision = ++nextDraftRevision;
+                draftRevisions.put(challengeToSave, revision);
+                ChallengeDraftStore.DraftData data = new ChallengeDraftStore.DraftData(
+                        draft.code(), draft.quizIndex(), draft.caret(), draft.scrollTop(),
+                        draft.saveUncertain(), draft.pendingRequestId(), draft.pendingPayloadHash(),
+                        challengeFingerprint(challengeToSave));
+                lblDraftStatus.setText("Guardando borrador…");
+                Thread writer = new Thread(() -> saveDraftInBackground(
+                        challengeToSave, revision, mode, email, challengeId, data),
+                        "challenge-draft-save-" + challengeId);
+                // Keep the short write alive during application shutdown so the
+                // latest answer is not lost after the window disappears.
+                writer.setDaemon(false);
+                writer.start();
             }
+        }
+    }
+
+    private void saveDraftInBackground(Challenge challenge, long revision, String mode,
+            String email, int challengeId, ChallengeDraftStore.DraftData data) {
+        try {
+            synchronized (draftWriteLock) {
+                Long latest = draftRevisions.get(challenge);
+                if (latest == null || latest != revision) return;
+                draftStore.save(mode, email, challengeId, data);
+            }
+            Platform.runLater(() -> {
+                if (activeChallenge == challenge && revision == draftRevisions.getOrDefault(challenge, -1L)) {
+                    lblDraftStatus.setText("Borrador guardado en este equipo");
+                }
+            });
+        } catch (IOException ex) {
+            LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
+            Platform.runLater(() -> {
+                if (activeChallenge == challenge) {
+                    lblDraftStatus.setText("No se pudo guardar el borrador");
+                    lblDraftStatus.getStyleClass().setAll("text-warning");
+                }
+            });
         }
     }
 
@@ -861,12 +958,58 @@ public class ChallengeFrame extends Stage {
         return AppContext.getInstance().isOracleConnected() ? "oracle" : "demo";
     }
 
+    private boolean confirmOutdatedDraftRecovery() {
+        ButtonType recover = new ButtonType("Recuperar mi respuesta", ButtonBar.ButtonData.OK_DONE);
+        ButtonType useCurrent = new ButtonType("Usar contenido actualizado", ButtonBar.ButtonData.CANCEL_CLOSE);
+        Alert alert = new Alert(Alert.AlertType.WARNING,
+                "El contenido de este reto cambió desde que guardaste tu borrador. "
+                + "Puedes recuperar tu respuesta para copiarla o empezar con la versión actual.",
+                recover, useCurrent);
+        alert.initOwner(this);
+        alert.setTitle("El reto fue actualizado");
+        alert.setHeaderText("Tu borrador pertenece a una versión anterior");
+        return alert.showAndWait().orElse(useCurrent) == recover;
+    }
+
+    private String challengeFingerprint(Challenge challenge) {
+        StringBuilder content = new StringBuilder();
+        appendFingerprintField(content, challenge.getType());
+        appendFingerprintField(content, challenge.getTitle());
+        appendFingerprintField(content, challenge.getDescription());
+        if (challenge instanceof CodeChallenge code) {
+            appendFingerprintField(content, code.getInitialTemplate());
+            appendFingerprintField(content, code.getTimeLimitSeconds());
+            appendFingerprintField(content, resolveChallengeLanguageName(code));
+            for (TestCase testCase : code.getTestCases()) {
+                appendFingerprintField(content, testCase.getInput());
+                appendFingerprintField(content, testCase.getExpectedOutput());
+                appendFingerprintField(content, testCase.isHidden());
+            }
+        } else if (challenge instanceof QuizChallenge quiz) {
+            for (String option : quiz.getOptions()) {
+                appendFingerprintField(content, option);
+            }
+            appendFingerprintField(content, quiz.getCorrectAnswer());
+        }
+        return hashPayload(content.toString());
+    }
+
+    private static void appendFingerprintField(StringBuilder target, Object value) {
+        String text = value == null ? "<null>" : value.toString();
+        target.append(text.length()).append(':').append(text).append(';');
+    }
+
     private void scheduleDraftSave() {
-        if (viewLoaded && !busy) draftSaveDelay.playFromStart();
+        if (viewLoaded && !busy) {
+            lblDraftStatus.getStyleClass().setAll("muted-text");
+            lblDraftStatus.setText("Cambios pendientes de guardar…");
+            draftSaveDelay.playFromStart();
+        }
     }
 
     private record Draft(String code, int quizIndex, int caret, double scrollTop,
-            boolean xpAwarded, boolean saveUncertain) { }
+            boolean xpAwarded, boolean saveUncertain, String pendingRequestId,
+            String pendingPayloadHash) { }
 
     private void showFeedback(String message, String style) {
         lblResultBanner.setGraphic(null);
@@ -992,12 +1135,19 @@ public class ChallengeFrame extends Stage {
         String title = activeChallenge != null && activeChallenge.getTitle() != null
                 ? activeChallenge.getTitle().toLowerCase(Locale.ROOT)
                 : "";
+        int stage = Math.min(3, hintStages.getOrDefault(activeChallenge, 0) + 1);
+        hintStages.put(activeChallenge, stage);
+        btnHint.setText(stage >= 3 ? "Pistas completas" : "Ver pista " + (stage + 1) + " de 3");
         String hint;
         if (activeChallenge instanceof QuizChallenge) {
             String lessonTheory = (activeChallenge.getLesson() != null && activeChallenge.getLesson().getTheory() != null)
                     ? activeChallenge.getLesson().getTheory()
                     : "Revisa el concepto clave de la lección antes de elegir una opción.";
-            hint = "> [PISTA CONCEPTUAL]\n> Repasa el fundamento de la lección:\n" + lessonTheory;
+            hint = stage == 1
+                    ? "> [PISTA 1 · CONCEPTO]\n> Identifica la definición principal que pregunta el enunciado antes de mirar las opciones."
+                    : stage == 2
+                            ? "> [PISTA 2 · DESCARTE]\n> Compara cada opción con el contrato explicado en la lección y descarta las que usan afirmaciones absolutas o conceptos distintos."
+                            : "> [PISTA 3 · REPASO]\n" + lessonTheory;
         } else if (title.contains("binaria")) {
             hint = "> [PISTA DIDÁCTICA — BÚSQUEDA BINARIA]\n"
                     + "> 1. Mantén dos límites: low = 0 y high = n - 1 mientras low <= high.\n"
@@ -1019,6 +1169,11 @@ public class ChallengeFrame extends Stage {
             hint = "> [PISTA DIDÁCTICA — POLIMORFISMO Y CONTRATOS]\n"
                     + "> 1. Normaliza la cadena de entrada ignorando diferencias entre mayúsculas y minúsculas.\n"
                     + "> 2. Retorna exactamente la cadena esperada por cada caso de prueba visible y oculto.";
+        }
+        if (!(activeChallenge instanceof QuizChallenge)) {
+            String[] lines = hint.split("\n");
+            int visibleLines = Math.min(lines.length, stage + 1);
+            hint = String.join("\n", Arrays.copyOf(lines, visibleLines));
         }
         txtConsoleOutput.setText(hint);
         consolePane.setExpanded(true);
@@ -1362,8 +1517,8 @@ public class ChallengeFrame extends Stage {
             retry.initOwner(this);
             retry.setTitle("Confirmar nuevo envío");
             retry.setHeaderText("El guardado anterior no pudo confirmarse");
-            retry.setContentText("Consulta tu historial en el panel antes de reenviar: si Oracle ya lo guardó, se creará otro intento y podrían descontarse vidas otra vez.");
-            ButtonType resend = new ButtonType("Enviar otro intento");
+            retry.setContentText("Si mantienes la misma respuesta, Oracle comprobará la clave del envío y devolverá el intento existente sin duplicarlo.");
+            ButtonType resend = new ButtonType("Comprobar y reintentar");
             retry.getButtonTypes().setAll(ButtonType.CANCEL, resend);
             Theme.applyCss(retry.getDialogPane().getScene());
             if (retry.showAndWait().filter(resend::equals).isEmpty()) {
@@ -1397,7 +1552,8 @@ public class ChallengeFrame extends Stage {
                     try {
                         ChallengeService.SubmissionResult saved = AppContext.getInstance()
                                 .getChallengeService().submitAttemptDetailed(
-                                        submission.user().toUser(), submission.challengeId(), submission.payload());
+                                        submission.user().toUser(), submission.challengeId(),
+                                        submission.payload(), submission.requestId());
                         SimulatedCodeRunner.ExecutionSummary detail = saved.evaluation().getExecutionSummary();
                         return new EvaluationOutcome(detail, saved.attempt().isCorrect(),
                                 PersistenceOutcome.saved(saved.attempt()));
@@ -1441,7 +1597,7 @@ public class ChallengeFrame extends Stage {
             LOGGER.log(Level.SEVERE, "Error al evaluar el reto #" + submission.challengeId(), task.getException());
             txtConsoleOutput.setText(exceptionDetails(task.getException()));
             consolePane.setExpanded(true);
-            showFeedback(saveUncertain ? "Envío sin confirmar. Revisa tu historial antes de reenviar."
+            showFeedback(saveUncertain ? "Envío sin confirmar. Puedes comprobarlo y reintentarlo sin duplicar el intento."
                     : "No se pudo evaluar. Conservamos tu borrador; revisa los detalles.", "text-warning");
             rememberDraft();
             finishSubmission();
@@ -1505,18 +1661,67 @@ public class ChallengeFrame extends Stage {
         boolean practiceOnly = isPracticeOnly();
         boolean saveToOracle = !practiceOnly && AppContext.getInstance().isOracleConnected()
                 && user != null && user.id() > 0 && activeChallenge.getId() > 0;
+        String requestId = null;
+        if (saveToOracle) {
+            String payloadHash = hashPayload(payload);
+            boolean samePendingSubmission = saveUncertain && pendingRequestId != null
+                    && payloadHash.equals(pendingPayloadHash);
+            requestId = samePendingSubmission ? pendingRequestId : UUID.randomUUID().toString();
+            pendingRequestId = requestId;
+            pendingPayloadHash = payloadHash;
+            // Persist this state before the network operation. If the app closes
+            // before receiving Oracle's response, the same key is reused later.
+            saveUncertain = true;
+        }
         return new Submission(activeChallenge.getId(), payload, code, selectedQuizIndex,
-                correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly);
+                correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly, requestId);
     }
 
     private record Submission(int challengeId, String payload, CodeSnapshot code, int quizIndex,
             int correctQuizIndex, String correctAnswer, UserSnapshot user,
-            boolean saveToOracle, boolean practiceOnly) { }
+            boolean saveToOracle, boolean practiceOnly, String requestId) { }
+
+    private static String hashPayload(String payload) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((payload == null ? "" : payload).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 no está disponible.", ex);
+        }
+    }
 
     private boolean isPracticeOnly() {
         AppContext context = AppContext.getInstance();
         return (currentUser != null && currentUser.getLives() <= 0)
-                || (context.isOracleConnected() && !context.isOracleAvailable());
+                || (context.isOracleConnected() && !context.isOracleAvailable())
+                || isSimulatedCodeEvaluation();
+    }
+
+    private boolean isSimulatedCodeEvaluation() {
+        return activeChallenge instanceof CodeChallenge
+                && !codeRunner.supportsRealIsolatedExecution(
+                        resolveChallengeLanguageName(activeChallenge));
+    }
+
+    private String practiceModeMessage() {
+        if (isSimulatedCodeEvaluation()) {
+            return "Práctica simulada: puedes probar tu idea, pero este resultado no modificará XP ni vidas hasta contar con ejecución real para este lenguaje.";
+        }
+        if (currentUser != null && currentUser.getLives() <= 0) {
+            return "Modo práctica: no tienes vidas disponibles. Puedes seguir aprendiendo sin guardar ni recibir XP.";
+        }
+        return "Modo práctica: Oracle no está disponible. Puedes continuar sin guardar ni recibir XP.";
+    }
+
+    private String practiceSuccessMessage() {
+        if (isSimulatedCodeEvaluation()) {
+            return "¡Práctica simulada completada! El resultado no modificó XP ni vidas.";
+        }
+        if (currentUser != null && currentUser.getLives() <= 0) {
+            return "¡Práctica aprobada! El intento no se guardó ni dio XP porque no había vidas disponibles.";
+        }
+        return "¡Práctica aprobada! El intento no se guardó ni dio XP porque Oracle no estaba disponible.";
     }
 
     private record CaseSnapshot(int id, String input, String expected, boolean hidden) { }
@@ -1672,14 +1877,19 @@ public class ChallengeFrame extends Stage {
         StringBuilder fullConsole = new StringBuilder(consoleMessage);
         if (!practiceOnly) saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
 
+        if (persistence.savedToOracle) {
+            pendingRequestId = null;
+            pendingPayloadHash = null;
+        }
+
         if (saveUncertain && !practiceOnly) {
             fullConsole.append("\n[ERROR DE GUARDADO EN ORACLE] ").append(persistence.errorMessage).append("\n")
-                    .append("> No se pudo confirmar el guardado. Consulta el historial en el panel antes de reenviar; el intento podría haberse registrado.");
+                    .append("> No se pudo confirmar el guardado. Reintentar la misma respuesta reutiliza su clave y no crea un duplicado.");
             txtConsoleOutput.setText(fullConsole.toString());
             consolePane.setExpanded(true);
             btnSubmit.setText("Volver a enviar");
             showFeedback((localSuccess ? "Aprobado localmente. " : "Evaluación terminada. ")
-                    + "Guardado sin confirmar: revisa tu historial antes de reenviar.", "text-warning");
+                    + "Guardado sin confirmar: puedes comprobarlo y reintentarlo con seguridad.", "text-warning");
             return;
         }
 
@@ -1719,7 +1929,7 @@ public class ChallengeFrame extends Stage {
             String rewardMessage = currentUser != null && reward > 0 && (persistence.savedToOracle || awardLocal)
                     ? " +" + reward + " XP." : "";
             showFeedback((persistence.savedToOracle ? "¡Aprobado y guardado!"
-                    : practiceOnly ? "¡Práctica aprobada! Sin vidas, el intento no se guardó ni dio XP."
+                    : practiceOnly ? practiceSuccessMessage()
                     : "¡Aprobado en modo local!")
                     + (sandboxedValidation ? "" : " (Simulación)") + rewardMessage
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");

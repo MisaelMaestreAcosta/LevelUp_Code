@@ -86,6 +86,7 @@ public class LessonFrame extends Stage {
         this.currentLesson = lesson;
         this.onProgressCallback = onProgressCallback;
         initComponents();
+        SessionWindowRegistry.track(this);
         switchComparativeSnippet(resolveInitialLanguageKey());
         runProgressOperation(false);
         addEventHandler(WindowEvent.WINDOW_HIDDEN, event -> {

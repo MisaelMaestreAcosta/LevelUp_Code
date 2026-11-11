@@ -9,3 +9,7 @@ db.url=jdbc:oracle:thin:@//localhost:1521/XEPDB1
 db.fallback.url=jdbc:oracle:thin:@localhost:1521:xe
 db.user=LEVELUP_ADMIN
 db.password=tu_contraseña_aqui
+
+# Límites para evitar esperas indefinidas si Oracle o la red dejan de responder.
+db.connect.timeout.ms=3000
+db.read.timeout.ms=10000

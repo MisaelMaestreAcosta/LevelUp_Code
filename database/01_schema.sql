@@ -214,6 +214,7 @@ CREATE TABLE Intentos (
     es_correcto         NUMBER(1) DEFAULT 0 NOT NULL,
     tiempo_ejecucion_ms NUMBER,
     exp_obtenida        NUMBER    DEFAULT 0 NOT NULL,
+    id_solicitud        VARCHAR2(64) DEFAULT RAWTOHEX(SYS_GUID()) NOT NULL,
     fecha_intento       TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT pk_intentos PRIMARY KEY (id_intento),
     CONSTRAINT fk_intentos_usuario FOREIGN KEY (id_usuario)
@@ -221,7 +222,8 @@ CREATE TABLE Intentos (
     CONSTRAINT fk_intentos_reto FOREIGN KEY (id_reto)
         REFERENCES Retos (id_reto) ON DELETE CASCADE,
     CONSTRAINT ck_intentos_correcto CHECK (es_correcto IN (0, 1)),
-    CONSTRAINT ck_intentos_exp CHECK (exp_obtenida >= 0)
+    CONSTRAINT ck_intentos_exp CHECK (exp_obtenida >= 0),
+    CONSTRAINT uq_intentos_solicitud UNIQUE (id_solicitud)
 );
 
 -- -----------------------------------------------------------------------------

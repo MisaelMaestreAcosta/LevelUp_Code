@@ -17,12 +17,13 @@ import java.util.Optional;
 /** Keeps a student's unfinished answer on this computer across app restarts. */
 public final class ChallengeDraftStore {
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 3;
     private static final int MAX_CODE_BYTES = 1_048_576;
     private final Path directory;
 
     public record DraftData(String code, int quizIndex, int caret, double scrollTop,
-            boolean saveUncertain) { }
+            boolean saveUncertain, String pendingRequestId, String pendingPayloadHash,
+            String challengeFingerprint) { }
 
     public ChallengeDraftStore() {
         this(Path.of(System.getProperty("user.home"), ".levelup-code", "drafts"));
@@ -36,13 +37,22 @@ public final class ChallengeDraftStore {
         Path file = draftPath(mode, email, challengeId);
         if (!Files.isRegularFile(file)) return Optional.empty();
         try (DataInputStream input = new DataInputStream(Files.newInputStream(file))) {
-            if (input.readInt() != VERSION) throw new IOException("Versión de borrador no compatible.");
+            int version = input.readInt();
+            if (version < 1 || version > VERSION) throw new IOException("Versión de borrador no compatible.");
             int length = input.readInt();
             if (length < 0 || length > MAX_CODE_BYTES) throw new IOException("Borrador demasiado grande.");
             byte[] code = new byte[length];
             input.readFully(code);
+            int quizIndex = input.readInt();
+            int caret = input.readInt();
+            double scrollTop = input.readDouble();
+            boolean saveUncertain = input.readBoolean();
+            String requestId = version >= 2 ? emptyToNull(input.readUTF()) : null;
+            String payloadHash = version >= 2 ? emptyToNull(input.readUTF()) : null;
+            String challengeFingerprint = version >= 3 ? emptyToNull(input.readUTF()) : null;
             return Optional.of(new DraftData(new String(code, StandardCharsets.UTF_8),
-                    input.readInt(), input.readInt(), input.readDouble(), input.readBoolean()));
+                    quizIndex, caret, scrollTop, saveUncertain, requestId, payloadHash,
+                    challengeFingerprint));
         }
     }
 
@@ -61,6 +71,9 @@ public final class ChallengeDraftStore {
                 output.writeInt(draft.caret());
                 output.writeDouble(draft.scrollTop());
                 output.writeBoolean(draft.saveUncertain());
+                output.writeUTF(draft.pendingRequestId() == null ? "" : draft.pendingRequestId());
+                output.writeUTF(draft.pendingPayloadHash() == null ? "" : draft.pendingPayloadHash());
+                output.writeUTF(draft.challengeFingerprint() == null ? "" : draft.challengeFingerprint());
             }
             try {
                 Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE,
@@ -71,6 +84,10 @@ public final class ChallengeDraftStore {
         } finally {
             Files.deleteIfExists(temporary);
         }
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private Path draftPath(String mode, String email, int challengeId) {
