@@ -9,6 +9,7 @@ import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
 import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.LessonProgress;
 import com.mycompany.levelup_code.domain.model.Role;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeAchievementRepository;
@@ -19,14 +20,39 @@ import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeEnrollmen
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeProgressRepository;
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeUserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DashboardControllerTest {
+
+    @Test
+    void oracleCatalogNeverInjectsDemoContentOrHidesQueryFailures() {
+        FakeContentRepository repository = new FakeContentRepository();
+        Language real = repository.saveLanguage(new Language(1, "Java", "Curso real", true));
+        User student = new User();
+        student.setId(42);
+        ContentService content = new ContentService(repository);
+        DashboardController controller = new DashboardController(true, student, content,
+                null, null, null, null, null, null);
+
+        assertEquals(List.of(real), controller.loadLanguages());
+        assertTrue(real.getModules().isEmpty(), "No se deben añadir módulos de demostración a Oracle");
+
+        ContentService failingContent = new ContentService(repository) {
+            @Override public List<Language> listActiveLanguages() {
+                throw new IllegalStateException("Oracle no responde");
+            }
+        };
+        DashboardController failing = new DashboardController(true, student, failingContent,
+                null, null, null, null, null, null);
+        assertThrows(IllegalStateException.class, failing::loadLanguages);
+    }
 
     @Test
     void oracleModeShowsPendingProgressEmptyHeatmapAndRealEnrollmentsForNewUser() {
@@ -72,6 +98,11 @@ class DashboardControllerTest {
         // 1. Sin registros en Progreso_Leccion -> ambas lecciones son PENDIENTE (no COMPLETADA ni EN_CURSO)
         assertEquals(ProgressStatus.PENDING, controller.resolveLessonProgressStatus(lesson1, 0));
         assertEquals(ProgressStatus.PENDING, controller.resolveLessonProgressStatus(lesson2, 1));
+        assertTrue(controller.loadLessonProgressStatuses().isEmpty());
+        progressRepo.saveOrUpdate(new LessonProgress(0, newStudent, lesson1,
+                ProgressStatus.IN_PROGRESS, null));
+        assertEquals(Map.of(lesson1.getId(), ProgressStatus.IN_PROGRESS),
+                controller.loadLessonProgressStatuses());
 
         // 2. Sin registros en Actividad_Diaria -> mapa vacío (sin datos de demostración)
         assertTrue(controller.loadRecentActivityHistory().isEmpty());

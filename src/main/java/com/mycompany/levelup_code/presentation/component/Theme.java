@@ -2,6 +2,8 @@ package com.mycompany.levelup_code.presentation.component;
 
 import java.net.URL;
 import javafx.animation.FadeTransition;
+import javafx.animation.ParallelTransition;
+import javafx.animation.ScaleTransition;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -105,6 +107,38 @@ public final class Theme {
         ft.setFromValue(0.28);
         ft.setToValue(1.0);
         ft.play();
+    }
+
+    /**
+     * Ejecuta un pulso suave de escala y opacidad para retroalimentación interactiva al aprobar retos.
+     */
+    public static void playPulse(Node node) {
+        if (node == null) {
+            return;
+        }
+        ScaleTransition st = new ScaleTransition(Duration.millis(160), node);
+        st.setFromX(0.96);
+        st.setFromY(0.96);
+        st.setToX(1.0);
+        st.setToY(1.0);
+
+        FadeTransition ft = new FadeTransition(Duration.millis(160), node);
+        ft.setFromValue(0.65);
+        ft.setToValue(1.0);
+
+        new ParallelTransition(st, ft).play();
+    }
+
+    /**
+     * Crea una insignia de dificultad según la recompensa de experiencia del reto.
+     */
+    public static Label createDifficultyBadge(int expReward) {
+        if (expReward <= 65) {
+            return createPillBadge("NIVEL FÁCIL", "badge-green");
+        } else if (expReward <= 85) {
+            return createPillBadge("NIVEL MEDIO", "badge-amber");
+        }
+        return createPillBadge("NIVEL DIFÍCIL", "badge-rose");
     }
 
     /**

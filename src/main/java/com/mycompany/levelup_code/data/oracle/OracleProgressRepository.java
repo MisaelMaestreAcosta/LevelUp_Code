@@ -14,6 +14,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -58,6 +60,24 @@ public class OracleProgressRepository implements ProgressRepository {
             throw new BusinessException("Error al consultar progreso de lección en Oracle: " + e.getMessage(), e);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Map<Integer, ProgressStatus> findStatusesByUser(int userId) {
+        String sql = "SELECT id_leccion, estado FROM Progreso_Leccion WHERE id_usuario = ?";
+        Map<Integer, ProgressStatus> statuses = new HashMap<>();
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    statuses.put(rs.getInt("id_leccion"), mapStatusFromDb(rs.getString("estado")));
+                }
+            }
+            return statuses;
+        } catch (SQLException e) {
+            throw new BusinessException("Error al consultar progreso de lecciones en Oracle: " + e.getMessage(), e);
+        }
     }
 
     @Override

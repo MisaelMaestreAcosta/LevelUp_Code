@@ -7,12 +7,14 @@ import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
+import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.ExperienceAchievement;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.Role;
+import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.domain.model.UserAchievement;
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeAchievementRepository;
@@ -36,6 +38,45 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GamificationAndChallengeServiceTest {
+
+    @Test
+    void detailedSubmissionReturnsTheSingleEvaluationUsedForPersistence() {
+        FakeUserRepository users = new FakeUserRepository();
+        FakeAttemptRepository attempts = new FakeAttemptRepository(false);
+        FakeChallengeRepository challenges = new FakeChallengeRepository();
+        AchievementService achievements = new AchievementService(new FakeAchievementRepository(users, attempts));
+        GamificationService gamification = new GamificationService(users,
+                new FakeActivityRepository(), new StandardLevelPolicy(), achievements);
+        int[] evaluations = {0};
+        SimulatedCodeRunner runner = new SimulatedCodeRunner() {
+            @Override public ExecutionSummary runAndValidate(CodeChallenge challenge, String source) {
+                evaluations[0]++;
+                return new ExecutionSummary(1, 1, 0.01,
+                        List.of(new CaseOutcome(true, "Caso #1 aprobado")), true);
+            }
+        };
+        Map<ChallengeType, ChallengeEvaluator> evaluators = new EnumMap<>(ChallengeType.class);
+        evaluators.put(ChallengeType.CODE, new CodeChallengeEvaluator(runner));
+        ChallengeService service = new ChallengeService(challenges, attempts,
+                evaluators, gamification, achievements);
+
+        User student = new User();
+        student.setId(5);
+        student.setLives(5);
+        users.save(student);
+        Language language = new Language(1, "Java", "Java", true);
+        CourseModule module = new CourseModule(1, "Módulo", "Desc", 1, language);
+        Lesson lesson = new Lesson(1, "Lección", "Desc", 1, 0, module);
+        CodeChallenge challenge = new CodeChallenge(7, "Reto", "Desc", lesson, 50, "", 2);
+        challenge.addTestCase(new TestCase(1, challenge, "entrada", "salida", false));
+        challenges.register(challenge);
+
+        ChallengeService.SubmissionResult saved = service.submitAttemptDetailed(student, 7, "código");
+        assertEquals(1, evaluations[0]);
+        assertTrue(saved.attempt().isCorrect());
+        assertTrue(saved.evaluation().getExecutionSummary().isAllPassed());
+        assertEquals(50, saved.attempt().getEarnedExperience());
+    }
 
     @Test
     void highExperienceFromLessonsNeverUnlocksChallengeCountAchievementWithoutSolvedChallenges() {

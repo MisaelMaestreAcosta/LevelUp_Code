@@ -19,6 +19,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UserAndEnrollmentServiceTest {
 
     @Test
+    void rejectsEmailLongerThanOracleColumnBeforeSaving() {
+        UserService service = new UserService(new FakeUserRepository(),
+                new Role(1, "Estudiante", "Estudiante"));
+        String tooLong = "a".repeat(110) + "@example.com";
+        assertTrue(tooLong.length() > UserService.MAX_EMAIL_LENGTH);
+        assertThrows(IllegalArgumentException.class,
+                () -> service.register("Estudiante", tooLong, "ClaveSegura2026"));
+    }
+
+    @Test
     void registersUserWithPbkdf2HashAndAuthenticatesValidCredentials() {
         FakeUserRepository userRepo = new FakeUserRepository();
         Role studentRole = new Role(1, "Estudiante", "Estudiante");

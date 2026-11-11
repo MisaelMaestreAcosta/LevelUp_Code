@@ -52,6 +52,20 @@ public class CodeChallengeEvaluator implements ChallengeEvaluator {
             return new ChallengeEvaluation(AttemptResult.ERROR, 0);
         }
 
+        if (codeRunner instanceof SimulatedCodeRunner detailedRunner) {
+            SimulatedCodeRunner.ExecutionSummary summary = detailedRunner.runAndValidate(codeChallenge, submission);
+            AttemptResult result = summary.isAllPassed() ? AttemptResult.CORRECT : AttemptResult.INCORRECT;
+            for (SimulatedCodeRunner.CaseOutcome outcome : summary.getCaseOutcomes()) {
+                if (outcome.getFailureResult() == AttemptResult.TIMEOUT) {
+                    result = AttemptResult.TIMEOUT;
+                    break;
+                }
+                if (outcome.getFailureResult() == AttemptResult.ERROR) result = AttemptResult.ERROR;
+            }
+            return new ChallengeEvaluation(result,
+                    Math.round(summary.getExecutionTimeSeconds() * 1000), summary);
+        }
+
         long totalExecutionTimeMs = 0;
 
         // Ejecuta cada caso y compara la salida con la esperada.

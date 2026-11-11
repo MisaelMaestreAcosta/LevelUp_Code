@@ -56,7 +56,12 @@
     -fx-border-width: 1 1 1 5;
     -fx-border-radius: 12;
     -fx-padding: 16;
+    -fx-cursor: hand;
     -fx-effect: dropshadow(gaussian, rgba(231, 111, 0, 0.08), 12, 0, 0, 3);
+}
+.lang-card-java:hover {
+    -fx-border-color: #E76F00 #E76F00 #E76F00 #E76F00;
+    -fx-effect: dropshadow(gaussian, rgba(231, 111, 0, 0.16), 14, 0, 0, 4);
 }
 
 .lang-card-python {
@@ -66,7 +71,12 @@
     -fx-border-width: 1 1 1 5;
     -fx-border-radius: 12;
     -fx-padding: 16;
+    -fx-cursor: hand;
     -fx-effect: dropshadow(gaussian, rgba(55, 118, 171, 0.08), 12, 0, 0, 3);
+}
+.lang-card-python:hover {
+    -fx-border-color: #3776AB #3776AB #3776AB #3776AB;
+    -fx-effect: dropshadow(gaussian, rgba(55, 118, 171, 0.16), 14, 0, 0, 4);
 }
 
 .lang-card-cpp {
@@ -76,7 +86,22 @@
     -fx-border-width: 1 1 1 5;
     -fx-border-radius: 12;
     -fx-padding: 16;
+    -fx-cursor: hand;
     -fx-effect: dropshadow(gaussian, rgba(0, 89, 156, 0.08), 12, 0, 0, 3);
+}
+.lang-card-cpp:hover {
+    -fx-border-color: #00599C #00599C #00599C #00599C;
+    -fx-effect: dropshadow(gaussian, rgba(0, 89, 156, 0.16), 14, 0, 0, 4);
+}
+
+/* Cabecera de Módulo en el Árbol de Habilidades */
+.module-header-card {
+    -fx-background-color: #EEF2F7;
+    -fx-background-radius: 10;
+    -fx-border-color: #CBD5E1 #CBD5E1 #CBD5E1 #2563EB;
+    -fx-border-width: 1 1 1 4;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
 }
 
 /* Jerarquía tipográfica */
@@ -407,6 +432,10 @@
     -fx-padding: 14 18 14 18;
     -fx-effect: dropshadow(gaussian, rgba(22, 163, 74, 0.06), 8, 0, 0, 2);
 }
+.skill-node-completed:hover {
+    -fx-border-color: #86EFAC #86EFAC #86EFAC #16A34A;
+    -fx-effect: dropshadow(gaussian, rgba(22, 163, 74, 0.14), 10, 0, 0, 3);
+}
 
 .skill-node-active {
     -fx-background-color: #EFF6FF;
@@ -417,6 +446,10 @@
     -fx-padding: 14 18 14 18;
     -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.07), 8, 0, 0, 2);
 }
+.skill-node-active:hover {
+    -fx-border-color: #93C5FD #93C5FD #93C5FD #2563EB;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.14), 10, 0, 0, 3);
+}
 
 .skill-node-pending {
     -fx-background-color: #F8FAFC;
@@ -425,6 +458,10 @@
     -fx-background-radius: 12;
     -fx-border-radius: 12;
     -fx-padding: 14 18 14 18;
+}
+.skill-node-pending:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #CBD5E1 #CBD5E1 #CBD5E1 #64748B;
 }
 
 /* Tarjetas de Logros e Insignias */
@@ -472,6 +509,26 @@
     -fx-cursor: hand;
 }
 
+.quiz-option-card-correct {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #16A34A #16A34A #16A34A #16A34A;
+    -fx-border-width: 1.5 1.5 1.5 5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 14 18 14 16;
+    -fx-cursor: hand;
+}
+
+.quiz-option-card-wrong {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #DC2626 #DC2626 #DC2626 #DC2626;
+    -fx-border-width: 1.5 1.5 1.5 5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 14 18 14 16;
+    -fx-cursor: hand;
+}
+
 .test-case-card {
     -fx-background-color: #F8FAFC;
     -fx-border-color: #D8DEE9;
@@ -479,6 +536,41 @@
     -fx-background-radius: 10;
     -fx-border-radius: 10;
     -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+.test-case-card:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #93C5FD;
+}
+
+.test-case-card-selected {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #2563EB;
+    -fx-border-width: 1.5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+
+.test-case-card-passed {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #86EFAC #86EFAC #86EFAC #16A34A;
+    -fx-border-width: 1 1 1 4;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+
+.test-case-card-failed {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #FCA5A5 #FCA5A5 #FCA5A5 #DC2626;
+    -fx-border-width: 1 1 1 4;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
 }
 
 /* Celdas del Mapa de Calor (Heatmap Actividad_Diaria) */
@@ -577,6 +669,16 @@
     -fx-background-radius: 999;
 }
 
+.progress-bar-green > .bar {
+    -fx-background-color: #16A34A;
+    -fx-background-radius: 999;
+    -fx-padding: 4;
+}
+.progress-bar-green > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+}
+
 .progress-bar-rose > .bar {
     -fx-background-color: #DC2626;
     -fx-background-radius: 999;
@@ -594,4 +696,87 @@
 }
 .scroll-pane-clean > .viewport {
     -fx-background-color: transparent;
+}
+
+/* Consistent keyboard feedback without changing the existing palette. */
+.root {
+    -fx-focus-color: #2563EB;
+    -fx-faint-focus-color: transparent;
+}
+.button {
+    -fx-cursor: hand;
+    -fx-min-height: 36;
+}
+.button:focused, .toggle-button:focused, .check-box:focused > .box,
+.radio-button:focused > .radio, .combo-box:focused {
+    -fx-effect: dropshadow(gaussian, #2563EB, 5, 0.4, 0, 0);
+}
+.button:disabled {
+    -fx-opacity: 0.6;
+    -fx-cursor: default;
+}
+.text-input {
+    -fx-highlight-fill: #2563EB;
+    -fx-highlight-text-fill: #FFFFFF;
+}
+.input-field {
+    -fx-prompt-text-fill: #64748B;
+}
+.input-field:focused {
+    -fx-border-width: 1;
+}
+.scroll-pane-clean > .scroll-bar:vertical,
+.scroll-pane-clean > .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12;
+}
+.scroll-bar .thumb {
+    -fx-background-color: #CBD5E1;
+    -fx-background-radius: 8;
+}
+.scroll-bar .thumb:hover {
+    -fx-background-color: #94A3B8;
+}
+.resume-card {
+    -fx-background-color: #EEF2FF;
+    -fx-background-radius: 12;
+    -fx-border-color: #2563EB;
+    -fx-border-radius: 12;
+    -fx-border-width: 0 0 0 4;
+    -fx-padding: 18;
+}
+.course-selected {
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.22), 10, 0.12, 0, 2);
+}
+.empty-state {
+    -fx-padding: 28;
+    -fx-text-fill: #64748B;
+    -fx-font-size: 14;
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+}
+.split-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.split-pane > .split-pane-divider {
+    -fx-background-color: #D8DEE9;
+    -fx-padding: 0 3 0 3;
+}
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: #EEF2F7;
+}
+.tab-pane .tab {
+    -fx-padding: 8 16;
+    -fx-background-color: #F8FAFC;
+}
+.tab-pane .tab:selected {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent transparent #2563EB transparent;
+    -fx-border-width: 0 0 3 0;
+}
+.tooltip {
+    -fx-font-size: 12;
+    -fx-wrap-text: true;
+    -fx-max-width: 360;
 }

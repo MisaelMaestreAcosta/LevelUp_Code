@@ -1,5 +1,7 @@
 package com.mycompany.levelup_code.business.evaluator;
 
+import com.mycompany.levelup_code.domain.enums.AttemptResult;
+
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import java.io.ByteArrayOutputStream;
@@ -277,7 +279,7 @@ public class SimulatedCodeRunner implements CodeRunner {
             process.destroyForcibly();
             outReader.join(200);
             errReader.join(200);
-            throw new TimeoutException("Tiempo límite excedido (" + timeoutSeconds + "s) en ejecución aislada JVM.");
+            throw new TimeoutException("Tiempo límite excedido (" + timeoutSeconds + "s) en ejecución local JVM.");
         }
 
         outReader.join(500);
@@ -412,17 +414,19 @@ public class SimulatedCodeRunner implements CodeRunner {
                 boolean ok = tc.matches(actual);
                 if (ok) {
                     passed++;
-                    outcomes.add(new CaseOutcome(true, label + " -> Salida correcta (\"" + actual + "\")"));
+                    String detail = tc.isHidden() ? label + " -> Salida correcta"
+                            : label + " -> Salida correcta (\"" + actual + "\")";
+                    outcomes.add(new CaseOutcome(true, detail));
                 } else {
                     String detail = tc.isHidden()
                             ? label + " -> Salida incorrecta en prueba oculta"
                             : label + " -> Se obtuvo \"" + actual + "\", se esperaba \"" + tc.getExpectedOutput() + "\"";
-                    outcomes.add(new CaseOutcome(false, detail));
+                    outcomes.add(new CaseOutcome(false, detail, AttemptResult.INCORRECT));
                 }
             } catch (TimeoutException ex) {
-                outcomes.add(new CaseOutcome(false, label + " -> TIMEOUT: " + ex.getMessage()));
+                outcomes.add(new CaseOutcome(false, label + " -> TIMEOUT: " + ex.getMessage(), AttemptResult.TIMEOUT));
             } catch (Exception ex) {
-                outcomes.add(new CaseOutcome(false, label + " -> ERROR: " + ex.getMessage()));
+                outcomes.add(new CaseOutcome(false, label + " -> ERROR: " + ex.getMessage(), AttemptResult.ERROR));
             }
         }
 
@@ -679,10 +683,16 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         private final boolean passed;
         private final String message;
+        private final AttemptResult failureResult;
 
         public CaseOutcome(boolean passed, String message) {
+            this(passed, message, passed ? null : AttemptResult.INCORRECT);
+        }
+
+        public CaseOutcome(boolean passed, String message, AttemptResult failureResult) {
             this.passed = passed;
             this.message = message;
+            this.failureResult = failureResult;
         }
 
         public boolean isPassed() {
@@ -691,6 +701,10 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         public String getMessage() {
             return message;
+        }
+
+        public AttemptResult getFailureResult() {
+            return failureResult;
         }
     }
 
@@ -738,7 +752,7 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         public String getExecutionModeDescription() {
             return sandboxedExecution
-                    ? "Ejecución real aislada en JVM (-Xmx64m)"
+                    ? "Ejecución local en JVM (-Xmx64m)"
                     : "Validación simulada de demostración (sin compilador nativo externo)";
         }
 

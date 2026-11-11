@@ -12,18 +12,27 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -45,6 +54,17 @@ public class LoginFrame {
     private TextField txtUsername;
     private TextField txtEmail;
     private PasswordField txtPassword;
+    private TextField txtVisiblePassword;
+    private CheckBox chkShowPassword;
+    private Label lblUsernameError;
+    private Label lblEmailError;
+    private Label lblPasswordError;
+    private Label lblPasswordHint;
+    private ProgressIndicator authProgress;
+    private VBox quickCard;
+    private boolean authenticating;
+    private Task<Optional<User>> authTask;
+    private Scene loginScene;
     private Label lblFeedback;
     private Label lblFormTitle;
     private Label lblFormSubtitle;
@@ -102,6 +122,7 @@ public class LoginFrame {
     public void show() {
         stage.show();
         stage.toFront();
+        txtEmail.requestFocus();
     }
 
     public void setVisible(boolean visible) {
@@ -113,19 +134,55 @@ public class LoginFrame {
     }
 
     private void initComponents() {
-        stage.setTitle("LevelUp Code — Plataforma de Aprendizaje Comparativo (JavaFX + CSS)");
-        stage.setMinWidth(980);
-        stage.setMinHeight(640);
+        stage.setTitle("LevelUp Code · Bienvenido");
+        stage.setMinWidth(360);
+        stage.setMinHeight(420);
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-shell");
 
-        root.setLeft(buildLeftShowcasePane());
-        root.setCenter(buildRightAuthPane());
+        VBox showcase = buildLeftShowcasePane();
+        VBox form = buildRightAuthPane();
+        StackPane formContainer = new StackPane(form);
+        formContainer.setMinWidth(0);
+        BorderPane content = new BorderPane();
+        content.setMinWidth(0);
+        content.setMinHeight(Region.USE_PREF_SIZE);
+        content.setCenter(formContainer);
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.getStyleClass().add("scroll-pane-clean");
+        scroll.setFitToWidth(true);
+        scroll.setFitToHeight(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        content.setLeft(showcase);
+        root.setCenter(scroll);
 
         Scene scene = new Scene(root, 1100, 690);
         Theme.applyCss(scene);
         stage.setScene(scene);
+        loginScene = scene;
+        scroll.viewportBoundsProperty().addListener((observable, oldBounds, bounds) -> {
+            boolean compact = bounds.getWidth() < 900;
+            if (compact && content.getBottom() != showcase) {
+                content.setLeft(null);
+                content.setBottom(showcase);
+            } else if (!compact && content.getLeft() != showcase) {
+                content.setBottom(null);
+                content.setLeft(showcase);
+            }
+            form.setPadding(new Insets(28, compact ? 20 : 32, 28, compact ? 20 : 32));
+        });
+        // Keep Tab navigation and validation focus visible even in short windows.
+        scene.focusOwnerProperty().addListener((observable, oldNode, node) -> {
+            if (node != null) {
+                Platform.runLater(() -> revealFocusedControl(scroll, content, node));
+            }
+        });
+        stage.showingProperty().addListener((observable, wasShowing, showing) -> {
+            if (!showing && authTask != null) {
+                authTask.cancel();
+            }
+        });
 
         selectLanguagePreview("JAVA");
     }
@@ -133,11 +190,12 @@ public class LoginFrame {
     private VBox buildLeftShowcasePane() {
         VBox leftPane = new VBox(16);
         leftPane.getStyleClass().add("sidebar");
-        leftPane.setPrefWidth(480);
+        leftPane.setPrefWidth(430);
+        leftPane.setMinWidth(0);
         leftPane.setPadding(new Insets(28, 28, 24, 28));
 
         // Encabezado de marca
-        HBox brandRow = new HBox(10);
+        FlowPane brandRow = new FlowPane(10, 8);
         brandRow.setAlignment(Pos.CENTER_LEFT);
         Label lblBrand = new Label("LevelUp Code");
         lblBrand.getStyleClass().add("page-title");
@@ -147,15 +205,15 @@ public class LoginFrame {
         brandRow.getChildren().addAll(lblBrand, badgeUpc);
 
         VBox heroBox = new VBox(2);
-        Label lblHero1 = new Label("Domina la lógica algorítmica");
+        Label lblHero1 = new Label("Aprende a programar");
         lblHero1.getStyleClass().add("hero-title");
-        Label lblHero2 = new Label("más allá de la sintaxis.");
+        lblHero1.setWrapText(true);
+        Label lblHero2 = new Label("paso a paso.");
         lblHero2.getStyleClass().add("hero-accent");
         heroBox.getChildren().addAll(lblHero1, lblHero2);
 
         Label lblDesc = new Label(
-                "Compara estructuras de datos, herencia y algoritmos en tiempo real entre "
-                + "Java, Python y C++ con validación dinámica contra Casos_Prueba."
+                "Practica con retos y compara cómo se resuelve un mismo problema en Java, Python y C++."
         );
         lblDesc.getStyleClass().add("body-text");
         lblDesc.setWrapText(true);
@@ -165,14 +223,11 @@ public class LoginFrame {
         codeCard.getStyleClass().add("surface-card");
         VBox.setVgrow(codeCard, Priority.ALWAYS);
 
-        HBox codeHeader = new HBox(8);
+        FlowPane codeHeader = new FlowPane(8, 8);
         codeHeader.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblSnippetTitle = new Label("BÚSQUEDA BINARIA · O(log n)");
+        Label lblSnippetTitle = new Label("UN EJEMPLO, TRES LENGUAJES");
         lblSnippetTitle.getStyleClass().add("section-caption");
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
 
         btnLangJava = new Button("Java");
         btnLangPython = new Button("Python");
@@ -182,10 +237,14 @@ public class LoginFrame {
         btnLangPython.setOnAction(e -> selectLanguagePreview("PYTHON"));
         btnLangCpp.setOnAction(e -> selectLanguagePreview("CPP"));
 
-        codeHeader.getChildren().addAll(lblSnippetTitle, spacer, btnLangJava, btnLangPython, btnLangCpp);
+        codeHeader.getChildren().addAll(btnLangJava, btnLangPython, btnLangCpp);
 
         txtCodePreview = new TextArea();
         txtCodePreview.setEditable(false);
+        txtCodePreview.setPrefColumnCount(24);
+        txtCodePreview.setPrefRowCount(12);
+        txtCodePreview.setMinWidth(0);
+        txtCodePreview.setAccessibleText("Ejemplo de búsqueda binaria. Selecciona un lenguaje para comparar.");
         txtCodePreview.getStyleClass().add("code-editor");
         VBox.setVgrow(txtCodePreview, Priority.ALWAYS);
 
@@ -195,25 +254,22 @@ public class LoginFrame {
         lblPreviewNote.setGraphicTextGap(6);
         lblPreviewNote.setWrapText(true);
 
-        codeCard.getChildren().addAll(codeHeader, txtCodePreview, lblPreviewNote);
+        codeCard.getChildren().addAll(lblSnippetTitle, codeHeader, txtCodePreview, lblPreviewNote);
 
         // Pie de estado de base de datos Oracle y seguridad PBKDF2
-        HBox footer = new HBox(8);
+        FlowPane footer = new FlowPane(8, 8);
         footer.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblSecurity = new Label("Hash PBKDF2-HMAC-SHA256");
+        Label lblSecurity = new Label("Contraseña protegida");
         lblSecurity.getStyleClass().add("muted-text");
         lblSecurity.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 14, Theme.HEX_GREEN));
         lblSecurity.setGraphicTextGap(6);
 
-        Region fSpacer = new Region();
-        HBox.setHgrow(fSpacer, Priority.ALWAYS);
-
-        String dbBadgeText = oracleConnected ? "ORACLE 18C XE · CONECTADO" : "MODO LOCAL EN MEMORIA";
+        String dbBadgeText = oracleConnected ? "EN LÍNEA" : "DEMO SIN CONEXIÓN";
         String dbBadgeClass = oracleConnected ? "badge-green" : "badge-amber";
         Label badgeDb = Theme.createPillBadge(dbBadgeText, dbBadgeClass);
 
-        footer.getChildren().addAll(lblSecurity, fSpacer, badgeDb);
+        footer.getChildren().addAll(lblSecurity, badgeDb);
 
         leftPane.getChildren().addAll(brandRow, heroBox, lblDesc, codeCard, footer);
         return leftPane;
@@ -221,17 +277,19 @@ public class LoginFrame {
 
     private VBox buildRightAuthPane() {
         VBox formColumn = new VBox(14);
+        formColumn.setMinWidth(0);
+        formColumn.setMaxWidth(600);
         formColumn.setPadding(new Insets(34, 48, 28, 48));
         formColumn.setAlignment(Pos.CENTER_LEFT);
 
         // Selector de modo: Iniciar Sesión / Crear Cuenta
         HBox modeSwitch = new HBox(10);
-        btnTabLogin = new Button("Iniciar Sesión");
+        btnTabLogin = new Button("Iniciar sesión");
         btnTabLogin.getStyleClass().add("btn-primary");
         btnTabLogin.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(btnTabLogin, Priority.ALWAYS);
 
-        btnTabRegister = new Button("Crear Cuenta");
+        btnTabRegister = new Button("Crear cuenta");
         btnTabRegister.getStyleClass().add("btn-secondary");
         btnTabRegister.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(btnTabRegister, Priority.ALWAYS);
@@ -242,133 +300,189 @@ public class LoginFrame {
 
         lblFormTitle = new Label("Bienvenido de nuevo");
         lblFormTitle.getStyleClass().add("hero-title");
+        lblFormTitle.setWrapText(true);
 
-        lblFormSubtitle = new Label("Ingresa tus credenciales para retomar tu racha y módulos activos.");
+        lblFormSubtitle = new Label("Entra para continuar aprendiendo.");
         lblFormSubtitle.getStyleClass().add("muted-text");
+        lblFormSubtitle.setWrapText(true);
 
         // Fila condicional de Nombre (solo visible en modo Registro)
         usernameRow = new VBox(6);
         usernameRow.setVisible(false);
         usernameRow.setManaged(false);
 
-        Label lblUsername = new Label("NOMBRE COMPLETO O ALIAS");
+        Label lblUsername = new Label("Nombre o alias");
         lblUsername.getStyleClass().add("section-caption");
 
         txtUsername = new TextField();
         txtUsername.setPromptText("Ej. Estudiante Nuevo");
         txtUsername.getStyleClass().add("input-field");
-        usernameRow.getChildren().addAll(lblUsername, txtUsername);
+        lblUsername.setLabelFor(txtUsername);
+        txtUsername.setAccessibleText("Nombre o alias");
+        txtUsername.setOnAction(e -> txtEmail.requestFocus());
+        lblUsernameError = createFieldError();
+        usernameRow.getChildren().addAll(lblUsername, txtUsername, lblUsernameError);
 
         // Campo de correo
         VBox emailBox = new VBox(6);
-        Label lblEmail = new Label("CORREO ELECTRÓNICO");
+        Label lblEmail = new Label("Correo electrónico");
         lblEmail.getStyleClass().add("section-caption");
         txtEmail = new TextField(oracleConnected ? "" : "estudiante@levelup.edu.co");
         txtEmail.setPromptText("usuario@levelup.edu.co");
         txtEmail.getStyleClass().add("input-field");
-        emailBox.getChildren().addAll(lblEmail, txtEmail);
+        lblEmail.setLabelFor(txtEmail);
+        txtEmail.setAccessibleText("Correo electrónico");
+        txtEmail.setOnAction(e -> passwordControl().requestFocus());
+        lblEmailError = createFieldError();
+        emailBox.getChildren().addAll(lblEmail, txtEmail, lblEmailError);
 
         // Campo de contraseña
         VBox passBox = new VBox(6);
-        Label lblPassword = new Label("CONTRASEÑA");
+        Label lblPassword = new Label("Contraseña");
         lblPassword.getStyleClass().add("section-caption");
         txtPassword = new PasswordField();
         txtPassword.setText(oracleConnected ? "" : "estudiante123");
-        txtPassword.setPromptText("Mínimo 8 caracteres");
+        txtPassword.setPromptText("Tu contraseña");
         txtPassword.getStyleClass().add("input-field");
+        txtPassword.setAccessibleText("Contraseña");
+        txtPassword.setAccessibleHelp("Usa la contraseña de tu cuenta.");
+        lblPassword.setLabelFor(txtPassword);
         txtPassword.setOnAction(e -> handlePrimaryAction());
-        passBox.getChildren().addAll(lblPassword, txtPassword);
+        txtVisiblePassword = new TextField();
+        txtVisiblePassword.getStyleClass().add("input-field");
+        txtVisiblePassword.setAccessibleText("Contraseña visible");
+        txtVisiblePassword.setAccessibleHelp("Usa la contraseña de tu cuenta.");
+        txtVisiblePassword.promptTextProperty().bind(txtPassword.promptTextProperty());
+        txtVisiblePassword.textProperty().bindBidirectional(txtPassword.textProperty());
+        txtVisiblePassword.setOnAction(e -> handlePrimaryAction());
+        chkShowPassword = new CheckBox("Mostrar contraseña");
+        txtVisiblePassword.visibleProperty().bind(chkShowPassword.selectedProperty());
+        txtVisiblePassword.managedProperty().bind(txtVisiblePassword.visibleProperty());
+        txtPassword.visibleProperty().bind(chkShowPassword.selectedProperty().not());
+        txtPassword.managedProperty().bind(txtPassword.visibleProperty());
+        chkShowPassword.selectedProperty().addListener((observable, oldValue, visible) -> {
+            TextField previous = visible ? txtPassword : txtVisiblePassword;
+            TextField current = passwordControl();
+            current.selectRange(previous.getAnchor(), previous.getCaretPosition());
+            lblPassword.setLabelFor(current);
+        });
+        StackPane passwordFields = new StackPane(txtPassword, txtVisiblePassword);
+        passwordFields.setMinWidth(0);
+        lblPasswordHint = new Label("Usa la contraseña de tu cuenta.");
+        lblPasswordHint.getStyleClass().add("muted-text");
+        lblPasswordHint.setWrapText(true);
+        lblPasswordError = createFieldError();
+        passBox.getChildren().addAll(lblPassword, passwordFields, chkShowPassword,
+                lblPasswordHint, lblPasswordError);
 
         // Mensajes de validación o error
-        lblFeedback = new Label(" ");
+        lblFeedback = new Label();
         lblFeedback.getStyleClass().add("muted-text");
         lblFeedback.setWrapText(true);
+        lblFeedback.setVisible(false);
+        lblFeedback.setManaged(false);
+        authProgress = new ProgressIndicator();
+        authProgress.setPrefSize(20, 20);
+        authProgress.setMaxSize(20, 20);
+        authProgress.setVisible(false);
+        authProgress.setManaged(false);
+        authProgress.setAccessibleText("Procesando solicitud");
+        HBox feedbackRow = new HBox(8, authProgress, lblFeedback);
+        feedbackRow.setAlignment(Pos.CENTER_LEFT);
+        feedbackRow.visibleProperty().bind(lblFeedback.visibleProperty());
+        feedbackRow.managedProperty().bind(feedbackRow.visibleProperty());
+        HBox.setHgrow(lblFeedback, Priority.ALWAYS);
 
         // Botón principal de acción
-        btnSubmit = new Button("Ingresar al Espacio de Trabajo");
+        btnSubmit = new Button("Iniciar sesión");
         btnSubmit.getStyleClass().add("btn-primary");
         btnSubmit.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
         btnSubmit.setGraphicTextGap(8);
         btnSubmit.setMaxWidth(Double.MAX_VALUE);
         btnSubmit.setOnAction(e -> handlePrimaryAction());
+        btnSubmit.setDefaultButton(true);
 
         formColumn.getChildren().addAll(
                 modeSwitch, lblFormTitle, lblFormSubtitle,
                 usernameRow, emailBox, passBox,
-                lblFeedback, btnSubmit
+                feedbackRow, btnSubmit
         );
 
         // El acceso rápido de demostración se restringe estrictamente al modo sin Oracle
         if (!oracleConnected) {
-            VBox quickCard = new VBox(10);
+            quickCard = new VBox(10);
             quickCard.getStyleClass().add("surface-card");
             VBox.setMargin(quickCard, new Insets(8, 0, 0, 0));
 
-            HBox quickHeader = Theme.createSectionHeader(
-                    "Acceso Rápido con 1 Clic",
-                    "Solo Modo Demo Local",
-                    "badge-amber"
-            );
+            Label quickHeader = new Label("Prueba una cuenta demo");
+            quickHeader.getStyleClass().add("card-title");
+            Label demoHint = new Label("Estás sin conexión. Las cuentas y los cambios de esta demo no se guardan al cerrar.");
+            demoHint.getStyleClass().add("muted-text");
+            demoHint.setWrapText(true);
 
-            HBox quickButtons = new HBox(10);
-            Button btnQuickStudent = new Button("Estudiante Demo · Nivel 5");
+            FlowPane quickButtons = new FlowPane(10, 10);
+            Button btnQuickStudent = new Button("Estudiante demo");
             btnQuickStudent.getStyleClass().add("btn-secondary");
             btnQuickStudent.setGraphic(Theme.createIcon(Theme.IconKind.USER, 14, Theme.HEX_INDIGO));
             btnQuickStudent.setGraphicTextGap(6);
             btnQuickStudent.setMaxWidth(Double.MAX_VALUE);
-            HBox.setHgrow(btnQuickStudent, Priority.ALWAYS);
             btnQuickStudent.setOnAction(e -> quickLoginAs("estudiante@levelup.edu.co", "estudiante123"));
 
-            Button btnQuickAdmin = new Button("Administrador Demo · Local");
+            Button btnQuickAdmin = new Button("Administrador demo");
             btnQuickAdmin.getStyleClass().add("btn-secondary");
             btnQuickAdmin.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 14, Theme.HEX_GREEN));
             btnQuickAdmin.setGraphicTextGap(6);
             btnQuickAdmin.setMaxWidth(Double.MAX_VALUE);
-            HBox.setHgrow(btnQuickAdmin, Priority.ALWAYS);
             btnQuickAdmin.setOnAction(e -> quickLoginAs("admin@levelup.edu.co", "admin12345"));
 
             quickButtons.getChildren().addAll(btnQuickStudent, btnQuickAdmin);
-            quickCard.getChildren().addAll(quickHeader, quickButtons);
+            quickCard.getChildren().addAll(quickHeader, demoHint, quickButtons);
             formColumn.getChildren().add(quickCard);
         }
+        installValidation(txtUsername, lblUsernameError, this::usernameError);
+        installValidation(txtEmail, lblEmailError, this::emailError);
+        installValidation(txtPassword, lblPasswordError, this::passwordError);
+        installValidation(txtVisiblePassword, lblPasswordError, this::passwordError);
         return formColumn;
     }
 
     private void setAuthMode(boolean register) {
+        if (authenticating || registerMode == register) {
+            return;
+        }
         this.registerMode = register;
         this.usernameRow.setVisible(register);
         this.usernameRow.setManaged(register);
-        this.lblFeedback.setText(" ");
+        clearFeedback();
+        chkShowPassword.setSelected(false);
+        txtPassword.clear();
+        lblPasswordHint.setText(register ? "Elige una contraseña de al menos 8 caracteres." : "Usa la contraseña de tu cuenta.");
+        setFieldError(txtUsername, lblUsernameError, "");
+        setFieldError(txtEmail, lblEmailError, "");
+        setFieldError(txtPassword, lblPasswordError, "");
 
-        btnTabLogin.getStyleClass().setAll(!register ? "btn-primary" : "btn-secondary");
-        btnTabRegister.getStyleClass().setAll(register ? "btn-primary" : "btn-secondary");
+        btnTabLogin.getStyleClass().setAll("button", !register ? "btn-primary" : "btn-secondary");
+        btnTabRegister.getStyleClass().setAll("button", register ? "btn-primary" : "btn-secondary");
+        txtPassword.setPromptText(register ? "Mínimo 8 caracteres" : "Tu contraseña");
 
         if (register) {
-            lblFormTitle.setText("Crea tu cuenta de estudiante");
-            lblFormSubtitle.setText("Regístrate en la tabla Usuarios con rol Estudiante y comienza en Nivel 1.");
-            btnSubmit.setText("Registrar Cuenta e Iniciar");
-            txtUsername.setText("");
-            txtEmail.setText("");
-            txtPassword.setText("");
+            lblFormTitle.setText("Crea tu cuenta");
+            lblFormSubtitle.setText("Empieza a aprender y sigue tu progreso.");
+            btnSubmit.setText("Crear cuenta");
             txtUsername.requestFocus();
         } else {
             lblFormTitle.setText("Bienvenido de nuevo");
-            lblFormSubtitle.setText("Ingresa tus credenciales para retomar tu racha y módulos activos.");
-            btnSubmit.setText("Ingresar al Espacio de Trabajo");
-            if (!oracleConnected) {
-                txtEmail.setText("estudiante@levelup.edu.co");
-                txtPassword.setText("estudiante123");
-            } else {
-                txtPassword.setText("");
-            }
+            lblFormSubtitle.setText("Entra para continuar aprendiendo.");
+            btnSubmit.setText("Iniciar sesión");
+            txtEmail.requestFocus();
         }
     }
 
     private void selectLanguagePreview(String lang) {
         if ("JAVA".equals(lang)) {
-            btnLangJava.getStyleClass().setAll("btn-java");
-            btnLangPython.getStyleClass().setAll("btn-secondary");
-            btnLangCpp.getStyleClass().setAll("btn-secondary");
+            btnLangJava.getStyleClass().setAll("button", "btn-java");
+            btnLangPython.getStyleClass().setAll("button", "btn-secondary");
+            btnLangCpp.getStyleClass().setAll("button", "btn-secondary");
             txtCodePreview.setText(
                     "// Java 21 LTS — Tipado estático y prevención de overflow\n"
                     + "public class BinarySearch {\n"
@@ -384,11 +498,11 @@ public class LoginFrame {
                     + "    }\n"
                     + "}"
             );
-            lblPreviewNote.setText("Java 21: Arreglos tipados en memoria contigua y verificación estricta en compilación.");
+            lblPreviewNote.setText("Java: indica el tipo de cada dato antes de usarlo.");
         } else if ("PYTHON".equals(lang)) {
-            btnLangJava.getStyleClass().setAll("btn-secondary");
-            btnLangPython.getStyleClass().setAll("btn-python");
-            btnLangCpp.getStyleClass().setAll("btn-secondary");
+            btnLangJava.getStyleClass().setAll("button", "btn-secondary");
+            btnLangPython.getStyleClass().setAll("button", "btn-python");
+            btnLangCpp.getStyleClass().setAll("button", "btn-secondary");
             txtCodePreview.setText(
                     "# Python 3.12 — Expresividad algorítmica y type hints\n"
                     + "def binary_search(arr: list[int], target: int) -> int:\n"
@@ -403,11 +517,11 @@ public class LoginFrame {
                     + "            high = mid - 1\n"
                     + "    return -1"
             );
-            lblPreviewNote.setText("Python 3.12: Enteros de precisión arbitraria y operador // de división entera.");
+            lblPreviewNote.setText("Python: usa la indentación para organizar los pasos.");
         } else {
-            btnLangJava.getStyleClass().setAll("btn-secondary");
-            btnLangPython.getStyleClass().setAll("btn-secondary");
-            btnLangCpp.getStyleClass().setAll("btn-cpp");
+            btnLangJava.getStyleClass().setAll("button", "btn-secondary");
+            btnLangPython.getStyleClass().setAll("button", "btn-secondary");
+            btnLangCpp.getStyleClass().setAll("button", "btn-cpp");
             txtCodePreview.setText(
                     "// ISO C++ 20 — Referencia constante sin copia (Zero-Overhead)\n"
                     + "#include <vector>\n\n"
@@ -423,62 +537,231 @@ public class LoginFrame {
                     + "    return -1;\n"
                     + "}"
             );
-            lblPreviewNote.setText("C++ 20: Paso por referencia constante (const std::vector<int>&) con latencia mínima.");
+            lblPreviewNote.setText("C++: consulta la lista sin copiarla ni modificarla.");
         }
     }
 
     private void handlePrimaryAction() {
-        String email = txtEmail.getText() != null ? txtEmail.getText().trim() : "";
-        String password = txtPassword.getText() != null ? txtPassword.getText() : "";
-
-        try {
-            if (registerMode) {
-                String username = txtUsername.getText() != null ? txtUsername.getText().trim() : "";
-                User created = authController.register(username, email, password);
-                showFeedback("¡Cuenta registrada exitosamente! Abriendo panel...", false);
-                openDashboard(created);
-            } else {
-                Optional<User> authResult = authController.login(email, password);
-                if (authResult.isPresent()) {
-                    showFeedback("¡Sesión verificada! Cargando cursos y telemetría...", false);
-                    openDashboard(authResult.get());
-                } else {
-                    String hint = oracleConnected
-                            ? "Credenciales incorrectas. Verifica tu correo electrónico y contraseña."
-                            : "Credenciales incorrectas. Verifica tu correo o usa un perfil de demostración local.";
-                    showFeedback(hint, true);
-                }
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error durante la autenticación o registro de usuario", ex);
-            showFeedback(ex.getMessage(), true);
+        if (authenticating || !validateForm()) {
+            return;
         }
+        // Capture input on the FX thread; the worker never reads or modifies controls.
+        String email = txtEmail.getText().trim();
+        String password = txtPassword.getText();
+        String username = txtUsername.getText().trim();
+        boolean registering = registerMode;
+        Task<Optional<User>> task = new Task<>() {
+            @Override
+            protected Optional<User> call() {
+                return registering
+                        ? Optional.of(authController.register(username, email, password))
+                        : authController.login(email, password);
+            }
+        };
+        authTask = task;
+        setAuthenticating(true);
+        showFeedback(registering ? "Creando tu cuenta…" : "Verificando tus datos…", false);
+        lblFeedback.getStyleClass().setAll("label", "muted-text");
+        task.setOnSucceeded(event -> {
+            authTask = null;
+            setAuthenticating(false);
+            if (!stage.isShowing() || stage.getScene() != loginScene) {
+                return;
+            }
+            Optional<User> result = task.getValue();
+            if (result.isEmpty()) {
+                showFeedback("El correo o la contraseña no coinciden. Revisa tus datos e intenta de nuevo.", true);
+                passwordControl().requestFocus();
+                passwordControl().selectAll();
+                return;
+            }
+            txtPassword.clear();
+            try {
+                showFeedback("¡Listo! Abriendo tu espacio…", false);
+                openDashboard(result.get());
+            } catch (RuntimeException ex) {
+                LOGGER.log(Level.WARNING, "No se pudo abrir el panel después de autenticar", ex);
+                // A successful registration must not be repeated when navigation fails.
+                if (registering) {
+                    setAuthMode(false);
+                }
+                showFeedback("Tu cuenta está lista, pero no pudimos abrir tu espacio. Intenta iniciar sesión de nuevo.", true);
+            }
+        });
+        task.setOnFailed(event -> {
+            authTask = null;
+            setAuthenticating(false);
+            Throwable failure = task.getException();
+            LOGGER.log(Level.WARNING, "Error durante la autenticación o registro de usuario", failure);
+            if (failure instanceof IllegalArgumentException
+                    && "Ya existe un usuario registrado con ese correo.".equals(failure.getMessage())) {
+                setFieldError(txtEmail, lblEmailError, "Este correo ya tiene una cuenta. Inicia sesión o usa otro.");
+                showFeedback("No se creó la cuenta. Revisa el correo.", true);
+                txtEmail.requestFocus();
+            } else {
+                showFeedback("No pudimos completar la solicitud. Intenta de nuevo en un momento.", true);
+                btnSubmit.requestFocus();
+            }
+        });
+        task.setOnCancelled(event -> {
+            authTask = null;
+            setAuthenticating(false);
+            clearFeedback();
+        });
+        Thread worker = new Thread(task, "levelup-login-auth");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private void quickLoginAs(String email, String password) {
-        if (oracleConnected) {
-            showFeedback("El acceso rápido está deshabilitado con Oracle activo. Inicia sesión con credenciales verificadas.", true);
+        if (oracleConnected || authenticating) {
             return;
         }
         setAuthMode(false);
         txtEmail.setText(email);
         txtPassword.setText(password);
-        try {
-            Optional<User> res = authController.login(email, password);
-            if (res.isPresent()) {
-                openDashboard(res.get());
-            } else {
-                showFeedback("No se pudo autenticar la cuenta de demostración solicitada.", true);
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Fallo en inicio rápido de demostración local", ex);
-            showFeedback("Error al iniciar sesión local: " + ex.getMessage(), true);
-        }
+        handlePrimaryAction();
     }
 
     private void showFeedback(String message, boolean isError) {
-        lblFeedback.getStyleClass().setAll(isError ? "text-danger" : "text-success");
+        lblFeedback.getStyleClass().setAll("label", isError ? "text-danger" : "text-success");
         lblFeedback.setText(message);
+        lblFeedback.setVisible(true);
+        lblFeedback.setManaged(true);
+    }
+
+    private void clearFeedback() {
+        lblFeedback.setText("");
+        lblFeedback.setVisible(false);
+        lblFeedback.setManaged(false);
+    }
+
+    private TextField passwordControl() {
+        return chkShowPassword.isSelected() ? txtVisiblePassword : txtPassword;
+    }
+
+    private Label createFieldError() {
+        Label error = new Label();
+        error.getStyleClass().add("text-danger");
+        error.setWrapText(true);
+        error.setMinHeight(Region.USE_PREF_SIZE);
+        error.setVisible(false);
+        error.setManaged(false);
+        return error;
+    }
+
+    private void setFieldError(TextField field, Label label, String message) {
+        label.setText(message);
+        label.setVisible(!message.isEmpty());
+        label.setManaged(!message.isEmpty());
+        field.setAccessibleHelp(message);
+        if (field == txtPassword || field == txtVisiblePassword) {
+            txtPassword.setAccessibleHelp(message.isEmpty() ? lblPasswordHint.getText() : message);
+            txtVisiblePassword.setAccessibleHelp(txtPassword.getAccessibleHelp());
+        }
+    }
+
+    private void installValidation(TextField field, Label error, java.util.function.Supplier<String> validate) {
+        field.focusedProperty().addListener((observable, wasFocused, focused) -> {
+            if (!focused && !authenticating && field.isVisible() && !field.getText().isEmpty()) {
+                setFieldError(field, error, validate.get());
+            }
+        });
+        field.textProperty().addListener((observable, oldText, newText) -> {
+            if (!authenticating) {
+                clearFeedback();
+                if (error.isVisible()) {
+                    setFieldError(field, error, validate.get());
+                }
+            }
+        });
+    }
+
+    private String usernameError() {
+        if (!registerMode) {
+            return "";
+        }
+        String username = txtUsername.getText().trim();
+        if (username.isEmpty()) {
+            return "Escribe tu nombre o un alias.";
+        }
+        return username.length() > 80 ? "Usa un nombre de hasta 80 caracteres." : "";
+    }
+
+    private String emailError() {
+        String email = txtEmail.getText().trim();
+        if (email.isEmpty()) {
+            return "Escribe el correo de tu cuenta.";
+        }
+        // Registration mirrors UserService; login does not add new account restrictions.
+        if (registerMode && (email.length() > UserService.MAX_EMAIL_LENGTH
+                || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
+            return "Usa un correo válido, por ejemplo nombre@correo.com (máximo 120 caracteres).";
+        }
+        return "";
+    }
+
+    private String passwordError() {
+        String password = txtPassword.getText();
+        if (password.isEmpty()) {
+            return "Escribe tu contraseña.";
+        }
+        return registerMode && password.length() < 8 ? "Usa al menos 8 caracteres." : "";
+    }
+
+    private boolean validateForm() {
+        String nameError = usernameError();
+        String mailError = emailError();
+        String passError = passwordError();
+        setFieldError(txtUsername, lblUsernameError, nameError);
+        setFieldError(txtEmail, lblEmailError, mailError);
+        setFieldError(txtPassword, lblPasswordError, passError);
+        TextField firstInvalid = !nameError.isEmpty() ? txtUsername
+                : !mailError.isEmpty() ? txtEmail : !passError.isEmpty() ? passwordControl() : null;
+        if (firstInvalid != null) {
+            showFeedback("Revisa los campos indicados para continuar.", true);
+            firstInvalid.requestFocus();
+            return false;
+        }
+        return true;
+    }
+
+    private void setAuthenticating(boolean busy) {
+        authenticating = busy;
+        chkShowPassword.setSelected(false);
+        txtUsername.setDisable(busy);
+        txtEmail.setDisable(busy);
+        txtPassword.setDisable(busy);
+        txtVisiblePassword.setDisable(busy);
+        chkShowPassword.setDisable(busy);
+        btnTabLogin.setDisable(busy);
+        btnTabRegister.setDisable(busy);
+        btnSubmit.setDisable(busy);
+        btnSubmit.setText(busy ? "Espera un momento…" : registerMode ? "Crear cuenta" : "Iniciar sesión");
+        authProgress.setVisible(busy);
+        authProgress.setManaged(busy);
+        if (quickCard != null) {
+            quickCard.setDisable(busy);
+        }
+    }
+
+    private void revealFocusedControl(ScrollPane scroll, Region content, Node node) {
+        if (node.getScene() != loginScene || loginScene.getFocusOwner() != node) {
+            return;
+        }
+        content.layout();
+        Bounds bounds = content.sceneToLocal(node.localToScene(node.getBoundsInLocal()));
+        double viewportHeight = scroll.getViewportBounds().getHeight();
+        double overflow = content.getHeight() - viewportHeight;
+        if (overflow <= 0) {
+            return;
+        }
+        double top = scroll.getVvalue() * overflow;
+        if (bounds.getMinY() < top + 12) {
+            scroll.setVvalue(Math.max(0, (bounds.getMinY() - 12) / overflow));
+        } else if (bounds.getMaxY() > top + viewportHeight - 12) {
+            scroll.setVvalue(Math.min(1, (bounds.getMaxY() + 12 - viewportHeight) / overflow));
+        }
     }
 
     private void openDashboard(User authenticatedUser) {

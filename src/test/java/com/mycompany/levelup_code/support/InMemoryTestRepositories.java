@@ -8,6 +8,7 @@ import com.mycompany.levelup_code.data.dao.ContentRepository;
 import com.mycompany.levelup_code.data.dao.EnrollmentRepository;
 import com.mycompany.levelup_code.data.dao.ProgressRepository;
 import com.mycompany.levelup_code.data.dao.UserRepository;
+import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -270,6 +271,17 @@ public final class InMemoryTestRepositories {
         @Override
         public Optional<LessonProgress> findByUserAndLesson(int userId, int lessonId) {
             return Optional.ofNullable(map.get(userId + ":" + lessonId));
+        }
+
+        @Override
+        public Map<Integer, ProgressStatus> findStatusesByUser(int userId) {
+            Map<Integer, ProgressStatus> statuses = new HashMap<>();
+            for (LessonProgress progress : map.values()) {
+                if (progress.getUser().getId() == userId) {
+                    statuses.put(progress.getLesson().getId(), progress.getStatus());
+                }
+            }
+            return statuses;
         }
 
         @Override
