@@ -180,6 +180,11 @@ public class ContentService {
             throw new IllegalArgumentException(
                     "No se puede cambiar el tipo de un reto que ya tiene historial.");
         }
+        if (persisted.getLesson() == null
+                || persisted.getLesson().getId() != challenge.getLesson().getId()) {
+            throw new IllegalArgumentException(
+                    "No se puede mover un reto existente a otra lección.");
+        }
         Lesson lesson = contentRepository.findLessonById(challenge.getLesson().getId())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "La lección asociada no existe."));

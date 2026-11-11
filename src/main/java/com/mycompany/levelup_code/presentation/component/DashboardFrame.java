@@ -139,6 +139,9 @@ public class DashboardFrame {
 
     // Formulario de Administración CRUD
     private ComboBox<String> cmbAdminLesson;
+    private ComboBox<String> cmbAdminChallenge;
+    private final List<CodeChallenge> adminEditableChallenges = new ArrayList<>();
+    private CodeChallenge adminEditingChallenge;
     private TextField txtAdminTitle;
     private TextField txtAdminReward;
     private TextArea txtAdminStatement;
@@ -1386,7 +1389,7 @@ public class DashboardFrame {
         headerCard.getStyleClass().add("surface-card");
         headerCard.setAlignment(Pos.CENTER_LEFT);
 
-        Label lblTitle = new Label("Crea una nueva práctica");
+        Label lblTitle = new Label("Gestiona prácticas de código");
         lblTitle.getStyleClass().add("page-title");
         lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 20, Theme.HEX_GREEN));
         lblTitle.setGraphicTextGap(8);
@@ -1400,6 +1403,13 @@ public class DashboardFrame {
         VBox formCard = new VBox(12);
         formCard.getStyleClass().add("surface-card");
         VBox.setVgrow(formCard, Priority.ALWAYS);
+
+        cmbAdminChallenge = new ComboBox<>();
+        cmbAdminChallenge.getStyleClass().add("combo-box-modern");
+        cmbAdminChallenge.setMaxWidth(Double.MAX_VALUE);
+        rebuildAdminChallengeChoices(null);
+        VBox challengeSelector = wrapLabeledField(
+                "MODO · CREA UNO NUEVO O EDITA UN RETO EXISTENTE", cmbAdminChallenge);
 
         HBox row1 = new HBox(14);
         cmbAdminLesson = new ComboBox<>();
@@ -1499,6 +1509,7 @@ public class DashboardFrame {
         btnCreateAndTest.setOnAction(e -> handleCreateAdminChallenge());
 
         Runnable invalidate = this::invalidateAdminValidation;
+        cmbAdminChallenge.valueProperty().addListener((obs, old, value) -> loadAdminChallengeSelection());
         cmbAdminLesson.valueProperty().addListener((obs, old, value) -> invalidate.run());
         for (javafx.beans.value.ObservableValue<String> value : List.of(
                 txtAdminTitle.textProperty(), txtAdminReward.textProperty(),
@@ -1510,7 +1521,7 @@ public class DashboardFrame {
 
         actionRow.getChildren().addAll(lblAdminStatus, sp, btnAdminValidate, btnCreateAndTest);
 
-        formCard.getChildren().addAll(row1, row2, casesRow, actionRow);
+        formCard.getChildren().addAll(challengeSelector, row1, row2, casesRow, actionRow);
         formCard.setMinHeight(580);
         view.getChildren().addAll(headerCard, formCard);
         return view;
@@ -1539,13 +1550,21 @@ public class DashboardFrame {
 
         Lesson targetLesson = prepared.lesson();
         CodeChallenge newCh = prepared.challenge();
+        CodeChallenge previous = adminEditingChallenge;
+        boolean editing = newCh.getId() > 0;
 
         btnAdminSave.setDisable(true);
         btnAdminValidate.setDisable(true);
-        btnAdminSave.setText("Publicando…");
-        lblAdminStatus.setText("Publicando el reto validado. Espera un momento.");
+        btnAdminSave.setText(editing ? "Guardando…" : "Publicando…");
+        lblAdminStatus.setText(editing
+                ? "Guardando los cambios validados. Espera un momento."
+                : "Publicando el reto validado. Espera un momento.");
         Task<Challenge> save = new Task<>() {
-            @Override protected Challenge call() { return controller.createAdminChallenge(targetLesson, newCh); }
+            @Override protected Challenge call() {
+                return editing
+                        ? controller.updateAdminChallenge(targetLesson, newCh)
+                        : controller.createAdminChallenge(targetLesson, newCh);
+            }
         };
         save.setOnSucceeded(e -> {
             if (disposed) return;
@@ -1553,14 +1572,22 @@ public class DashboardFrame {
             btnAdminValidate.setDisable(false);
             validatedAdminDraftFingerprint = null;
             btnAdminSave.setDisable(true);
-            btnAdminSave.setText("Publicar reto");
+            if (editing && previous != null && previous.getLesson() != null) {
+                previous.getLesson().getChallenges().removeIf(ch -> ch.getId() == previous.getId());
+            }
+            saved.setLesson(targetLesson);
             if (targetLesson != null) {
                 targetLesson.addChallenge(saved);
             }
+            adminEditingChallenge = saved instanceof CodeChallenge code ? code : null;
+            rebuildAdminChallengeChoices(saved);
+            btnAdminSave.setText(editing ? "Guardar cambios" : "Publicar reto");
             lblAdminStatus.getStyleClass().setAll("text-success");
-            lblAdminStatus.setText(oracleConnected && saved.getId() > 0
-                    ? "¡Reto publicado! Ya puedes probarlo."
-                    : "Reto validado y creado para esta sesión de prueba.");
+            lblAdminStatus.setText(editing
+                    ? "¡Cambios guardados! Los estudiantes verán la versión actualizada."
+                    : oracleConnected && saved.getId() > 0
+                            ? "¡Reto publicado! Ya puedes probarlo."
+                            : "Reto validado y creado para esta sesión de prueba.");
             populateLessonsForLanguage(activeLanguageKey);
             new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
         });
@@ -1568,9 +1595,11 @@ public class DashboardFrame {
             LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());
             btnAdminValidate.setDisable(false);
             btnAdminSave.setDisable(false);
-            btnAdminSave.setText("Reintentar publicación");
+            btnAdminSave.setText(editing ? "Reintentar guardado" : "Reintentar publicación");
             lblAdminStatus.getStyleClass().setAll("text-danger");
-            lblAdminStatus.setText("No pudimos publicar el reto. Tus datos y su validación siguen aquí; revisa la conexión y vuelve a intentarlo.");
+            lblAdminStatus.setText(editing
+                    ? "No pudimos guardar los cambios. Tus datos siguen aquí; revisa la conexión y vuelve a intentarlo."
+                    : "No pudimos publicar el reto. Tus datos y su validación siguen aquí; revisa la conexión y vuelve a intentarlo.");
         });
         startTask(save, "challenge-save");
     }
@@ -1623,7 +1652,7 @@ public class DashboardFrame {
         if (btnAdminSave == null) return;
         validatedAdminDraftFingerprint = null;
         btnAdminSave.setDisable(true);
-        btnAdminSave.setText("Publicar reto");
+        btnAdminSave.setText(adminEditingChallenge == null ? "Publicar reto" : "Guardar cambios");
     }
 
     private AdminChallengeDraft prepareAdminChallengeDraft() {
@@ -1667,7 +1696,7 @@ public class DashboardFrame {
         }
 
         CodeChallenge newCh = new CodeChallenge(
-                0,
+                adminEditingChallenge == null ? 0 : adminEditingChallenge.getId(),
                 title,
                 statement,
                 targetLesson,
@@ -1675,8 +1704,21 @@ public class DashboardFrame {
                 template,
                 2
         );
-        newCh.addTestCase(new TestCase(1, newCh, case1In, case1Out, false));
-        newCh.addTestCase(new TestCase(2, newCh, case2In, case2Out, false));
+        boolean firstHidden = adminEditingChallenge != null
+                && !adminEditingChallenge.getTestCases().isEmpty()
+                && adminEditingChallenge.getTestCases().get(0).isHidden();
+        boolean secondHidden = adminEditingChallenge != null
+                && adminEditingChallenge.getTestCases().size() > 1
+                && adminEditingChallenge.getTestCases().get(1).isHidden();
+        newCh.addTestCase(new TestCase(0, newCh, case1In, case1Out, firstHidden));
+        newCh.addTestCase(new TestCase(0, newCh, case2In, case2Out, secondHidden));
+        if (adminEditingChallenge != null) {
+            for (int i = 2; i < adminEditingChallenge.getTestCases().size(); i++) {
+                TestCase existing = adminEditingChallenge.getTestCases().get(i);
+                newCh.addTestCase(new TestCase(0, newCh, existing.getInput(),
+                        existing.getExpectedOutput(), existing.isHidden()));
+            }
+        }
         String fingerprint = targetLesson.getId() + "\n" + title + "\n" + statement + "\n"
                 + template + "\n" + reward + "\n" + case1In + "\n" + case1Out
                 + "\n" + case2In + "\n" + case2Out;
@@ -1684,6 +1726,72 @@ public class DashboardFrame {
     }
 
     private record AdminChallengeDraft(Lesson lesson, CodeChallenge challenge, String fingerprint) { }
+
+    private void rebuildAdminChallengeChoices(Challenge selected) {
+        if (cmbAdminChallenge == null) return;
+        adminEditableChallenges.clear();
+        cmbAdminChallenge.getItems().setAll("Crear un reto nuevo");
+        int selectedIndex = 0;
+        for (Lesson lesson : allLessonsForAdmin) {
+            for (Challenge challenge : lesson.getChallenges()) {
+                if (!(challenge instanceof CodeChallenge code)) continue;
+                adminEditableChallenges.add(code);
+                String language = lesson.getModule() != null && lesson.getModule().getLanguage() != null
+                        ? lesson.getModule().getLanguage().getName() : "Curso";
+                cmbAdminChallenge.getItems().add("Editar · " + language + " · " + code.getTitle());
+                if (selected != null && selected.getId() == code.getId()) {
+                    selectedIndex = adminEditableChallenges.size();
+                }
+            }
+        }
+        cmbAdminChallenge.getSelectionModel().select(selectedIndex);
+    }
+
+    private void loadAdminChallengeSelection() {
+        if (txtAdminTitle == null) return;
+        int selectedIndex = cmbAdminChallenge.getSelectionModel().getSelectedIndex();
+        if (selectedIndex <= 0 || selectedIndex > adminEditableChallenges.size()) {
+            adminEditingChallenge = null;
+            cmbAdminLesson.setDisable(false);
+            txtAdminTitle.clear();
+            txtAdminReward.setText("90");
+            txtAdminStatement.clear();
+            txtAdminTemplate.clear();
+            txtAdminCase1In.clear();
+            txtAdminCase1Out.clear();
+            txtAdminCase2In.clear();
+            txtAdminCase2Out.clear();
+            lblAdminStatus.getStyleClass().setAll("muted-text");
+            lblAdminStatus.setText("Completa y valida el nuevo reto antes de publicarlo.");
+            invalidateAdminValidation();
+            return;
+        }
+
+        CodeChallenge challenge = adminEditableChallenges.get(selectedIndex - 1);
+        adminEditingChallenge = challenge;
+        cmbAdminLesson.setDisable(true);
+        int lessonIndex = -1;
+        for (int i = 0; i < allLessonsForAdmin.size(); i++) {
+            if (allLessonsForAdmin.get(i).getId() == challenge.getLesson().getId()) {
+                lessonIndex = i;
+                break;
+            }
+        }
+        if (lessonIndex >= 0) cmbAdminLesson.getSelectionModel().select(lessonIndex);
+        txtAdminTitle.setText(challenge.getTitle());
+        txtAdminReward.setText(Integer.toString(challenge.getExpReward()));
+        txtAdminStatement.setText(challenge.getDescription());
+        txtAdminTemplate.setText(challenge.getInitialTemplate());
+        List<TestCase> cases = challenge.getTestCases();
+        txtAdminCase1In.setText(cases.isEmpty() ? "" : cases.get(0).getInput());
+        txtAdminCase1Out.setText(cases.isEmpty() ? "" : cases.get(0).getExpectedOutput());
+        txtAdminCase2In.setText(cases.size() < 2 ? "" : cases.get(1).getInput());
+        txtAdminCase2Out.setText(cases.size() < 2 ? "" : cases.get(1).getExpectedOutput());
+        lblAdminStatus.getStyleClass().setAll("muted-text");
+        lblAdminStatus.setText("Editando “" + challenge.getTitle()
+                + "”. Valida los cambios antes de guardarlos.");
+        invalidateAdminValidation();
+    }
 
     private void switchWorkspaceView(String cardKey) {
         if ("ADMIN".equals(cardKey) && (currentUser == null || !currentUser.isAdministrator())) {

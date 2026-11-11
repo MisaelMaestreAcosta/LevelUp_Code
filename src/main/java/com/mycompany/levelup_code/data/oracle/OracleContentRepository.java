@@ -479,17 +479,16 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Challenge updateChallenge(Challenge challenge) {
-        String baseSql = "UPDATE Retos SET id_leccion = ?, titulo_reto = ?, enunciado = ?, "
+        String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
                 + "exp_recompensa = ? WHERE id_reto = ?";
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
                 try (PreparedStatement stmt = conn.prepareStatement(baseSql)) {
-                    stmt.setInt(1, challenge.getLesson().getId());
-                    stmt.setString(2, challenge.getTitle());
-                    stmt.setString(3, challenge.getDescription());
-                    stmt.setInt(4, challenge.getExpReward());
-                    stmt.setInt(5, challenge.getId());
+                    stmt.setString(1, challenge.getTitle());
+                    stmt.setString(2, challenge.getDescription());
+                    stmt.setInt(3, challenge.getExpReward());
+                    stmt.setInt(4, challenge.getId());
                     if (stmt.executeUpdate() != 1) {
                         throw new SQLException("El reto ya no existe.");
                     }

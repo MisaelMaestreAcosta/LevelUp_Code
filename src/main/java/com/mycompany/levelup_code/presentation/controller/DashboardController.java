@@ -234,5 +234,19 @@ public class DashboardController {
         }
         return draft;
     }
+
+    public Challenge updateAdminChallenge(Lesson targetLesson, CodeChallenge draft) {
+        if (currentUser == null || !currentUser.isAdministrator()) {
+            throw new SecurityException("Acceso denegado: Se requiere rol de Administrador.");
+        }
+        if (draft == null || draft.getId() <= 0) {
+            throw new IllegalArgumentException("Selecciona un reto existente para actualizar.");
+        }
+        if (oracleConnected && targetLesson != null && targetLesson.getId() > 0
+                && contentService != null) {
+            return contentService.updateChallenge(currentUser, draft);
+        }
+        return draft;
+    }
 }
 
