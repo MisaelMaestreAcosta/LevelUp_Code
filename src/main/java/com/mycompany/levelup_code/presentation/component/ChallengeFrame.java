@@ -17,7 +17,6 @@ import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -413,9 +412,10 @@ public class ChallengeFrame extends Stage {
             refresh.setDisable(false);
             entries.getChildren().clear();
             List<Attempt> attempts = new ArrayList<>(query.getValue());
-            Collections.reverse(attempts);
             status.setText(attempts.isEmpty() ? "Todavía no hay intentos guardados para este reto."
-                    : attempts.size() + " intento(s) guardado(s), del más reciente al más antiguo.");
+                    : attempts.size() + " intento(s) reciente(s), del más reciente al más antiguo."
+                    + (attempts.size() == ChallengeService.ATTEMPT_HISTORY_LIMIT
+                            ? " Se muestran como máximo los últimos 50." : ""));
             for (Attempt attempt : attempts) {
                 VBox card = new VBox(6);
                 card.getStyleClass().add("surface-subtle");

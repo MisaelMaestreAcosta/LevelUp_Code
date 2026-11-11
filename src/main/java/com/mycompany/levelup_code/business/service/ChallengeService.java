@@ -21,6 +21,8 @@ import java.util.UUID;
 /** Coordina la evaluación, el registro y la recompensa de los intentos. */
 public class ChallengeService {
 
+    public static final int ATTEMPT_HISTORY_LIMIT = 50;
+
     private final ChallengeRepository challengeRepository;
     private final AttemptRepository attemptRepository;
     private final Map<ChallengeType, ChallengeEvaluator> evaluators;
@@ -144,7 +146,8 @@ public class ChallengeService {
         }
 
         List<Attempt> history =
-                attemptRepository.findByUserAndChallenge(userId, challengeId);
+                attemptRepository.findRecentByUserAndChallenge(
+                        userId, challengeId, ATTEMPT_HISTORY_LIMIT);
         if (history == null) {
             throw new IllegalStateException("El repositorio devolvió un historial inválido.");
         }

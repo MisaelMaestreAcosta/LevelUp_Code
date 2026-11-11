@@ -120,10 +120,19 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public List<Attempt> findByUserAndChallenge(int userId, int challengeId) {
+        List<Attempt> recent = findRecentByUserAndChallenge(userId, challengeId, Integer.MAX_VALUE);
+        java.util.Collections.reverse(recent);
+        return recent;
+    }
+
+    @Override
+    public List<Attempt> findRecentByUserAndChallenge(int userId, int challengeId, int limit) {
+        if (limit <= 0) throw new IllegalArgumentException("El límite debe ser mayor que cero.");
         List<Attempt> list = new ArrayList<>();
-        String sql = "SELECT id_intento, id_usuario, id_reto, codigo_enviado, salida_obtenida, "
+        String sql = "SELECT * FROM (SELECT id_intento, id_usuario, id_reto, codigo_enviado, salida_obtenida, "
                 + "es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento "
-                + "FROM Intentos WHERE id_usuario = ? AND id_reto = ? ORDER BY fecha_intento ASC";
+                + "FROM Intentos WHERE id_usuario = ? AND id_reto = ? "
+                + "ORDER BY fecha_intento DESC) WHERE ROWNUM <= ?";
 
         User user = userDAO.findById(userId).orElse(null);
         Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
@@ -132,6 +141,7 @@ public class OracleAttemptRepository implements AttemptRepository {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, userId);
             stmt.setInt(2, challengeId);
+            stmt.setInt(3, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     AttemptResult result = rs.getInt("es_correcto") == 1
