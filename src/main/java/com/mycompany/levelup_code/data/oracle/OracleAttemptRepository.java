@@ -17,6 +17,8 @@ import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Implementación Oracle JDBC de {@link AttemptRepository} sobre la tabla {@code Intentos}.
@@ -24,6 +26,8 @@ import java.util.List;
  * {@code PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO} confirmando la transacción desde el cliente.
  */
 public class OracleAttemptRepository implements AttemptRepository {
+
+    private static final Logger LOGGER = Logger.getLogger(OracleAttemptRepository.class.getName());
 
     private final OracleChallengeRepository challengeRepository = new OracleChallengeRepository();
     private final UserDAO userDAO = new UserDAO();
@@ -84,10 +88,20 @@ public class OracleAttemptRepository implements AttemptRepository {
                     attempt.getUser().setLevel(nuevoNivel);
                     attempt.getUser().setExperience(nuevaExp);
                     attempt.getUser().setLives(vidasRestantes);
-                    userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
-                        attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
-                        attempt.getUser().setMaxStreak(fresh.getMaxStreak());
-                    });
+                    // The attempt is already committed at this point. A secondary
+                    // statistics refresh must never turn that confirmed save into
+                    // a failure that invites the student to submit it again.
+                    try {
+                        userDAO.findById(attempt.getUser().getId()).ifPresent(fresh -> {
+                            attempt.getUser().setCurrentStreak(fresh.getCurrentStreak());
+                            attempt.getUser().setMaxStreak(fresh.getMaxStreak());
+                        });
+                    } catch (RuntimeException refreshError) {
+                        LOGGER.log(Level.WARNING,
+                                "Attempt #{0} was saved, but user streak refresh failed",
+                                idIntentoCreado);
+                        LOGGER.log(Level.FINE, "User streak refresh details", refreshError);
+                    }
                 }
                 return attempt;
             } catch (SQLException ex) {
