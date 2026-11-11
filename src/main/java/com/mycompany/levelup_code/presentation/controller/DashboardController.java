@@ -141,6 +141,12 @@ public class DashboardController {
         return ProgressStatus.PENDING;
     }
 
+    public Map<Integer, ProgressStatus> loadLessonProgressStatuses() {
+        if (!oracleConnected || currentUser.getId() <= 0) return Map.of();
+        if (progressRepository == null) throw new IllegalStateException("Progreso Oracle no configurado.");
+        return progressRepository.findStatusesByUser(currentUser.getId());
+    }
+
     public Map<LocalDate, Integer> loadRecentActivityHistory() {
         if (oracleConnected && currentUser.getId() > 0) {
             Map<LocalDate, Integer> fromDb = new HashMap<>();

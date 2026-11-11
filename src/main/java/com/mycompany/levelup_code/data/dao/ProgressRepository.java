@@ -1,6 +1,8 @@
 package com.mycompany.levelup_code.data.dao;
 
 import com.mycompany.levelup_code.domain.model.LessonProgress;
+import com.mycompany.levelup_code.domain.enums.ProgressStatus;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -14,6 +16,9 @@ public interface ProgressRepository {
      * Devuelve Optional.empty() si aún no existe un registro.
      */
     Optional<LessonProgress> findByUserAndLesson(int userId, int lessonId);
+
+    /** Returns every saved lesson status with one repository call. Missing lessons are pending. */
+    Map<Integer, ProgressStatus> findStatusesByUser(int userId);
 
     /**
      * Guarda un progreso nuevo o actualiza el existente.

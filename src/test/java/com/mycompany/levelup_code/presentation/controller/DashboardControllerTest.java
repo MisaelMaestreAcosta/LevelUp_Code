@@ -9,6 +9,7 @@ import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
 import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.LessonProgress;
 import com.mycompany.levelup_code.domain.model.Role;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeAchievementRepository;
@@ -19,6 +20,7 @@ import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeEnrollmen
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeProgressRepository;
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeUserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -96,6 +98,11 @@ class DashboardControllerTest {
         // 1. Sin registros en Progreso_Leccion -> ambas lecciones son PENDIENTE (no COMPLETADA ni EN_CURSO)
         assertEquals(ProgressStatus.PENDING, controller.resolveLessonProgressStatus(lesson1, 0));
         assertEquals(ProgressStatus.PENDING, controller.resolveLessonProgressStatus(lesson2, 1));
+        assertTrue(controller.loadLessonProgressStatuses().isEmpty());
+        progressRepo.saveOrUpdate(new LessonProgress(0, newStudent, lesson1,
+                ProgressStatus.IN_PROGRESS, null));
+        assertEquals(Map.of(lesson1.getId(), ProgressStatus.IN_PROGRESS),
+                controller.loadLessonProgressStatuses());
 
         // 2. Sin registros en Actividad_Diaria -> mapa vacío (sin datos de demostración)
         assertTrue(controller.loadRecentActivityHistory().isEmpty());

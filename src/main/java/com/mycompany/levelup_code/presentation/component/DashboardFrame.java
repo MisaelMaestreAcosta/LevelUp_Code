@@ -228,12 +228,15 @@ public class DashboardFrame {
     private DashboardState fetchDashboardState(int offlineSolved) {
         int solved = controller.syncTelemetryAndGetSolvedChallenges(offlineSolved);
         Map<Lesson, ProgressStatus> progress = new HashMap<>();
+        Map<Integer, ProgressStatus> savedStatuses = controller.loadLessonProgressStatuses();
         for (List<Lesson> lessons : List.of(javaLessons, pythonLessons, cppLessons)) {
             for (int i = 0; i < lessons.size(); i++) {
                 Lesson lesson = lessons.get(i);
                 ProgressStatus status = LessonFrame.isLocallyCompleted(currentUser, lesson)
                         ? ProgressStatus.COMPLETED
-                        : controller.resolveLessonProgressStatus(lesson, i);
+                        : oracleConnected
+                                ? savedStatuses.getOrDefault(lesson.getId(), ProgressStatus.PENDING)
+                                : controller.resolveLessonProgressStatus(lesson, i);
                 progress.put(lesson, status);
             }
         }
