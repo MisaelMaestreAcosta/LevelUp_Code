@@ -11,6 +11,30 @@
 -- Ejecutar conectado en Oracle SQL Developer con el usuario: LEVELUP_ADMIN
 -- =============================================================================
 
+-- Migración compatible para bases existentes: cada envío nuevo recibe una
+-- clave estable que evita duplicados cuando el cliente reintenta tras perder
+-- la confirmación de red. Los intentos históricos conservan NULL.
+DECLARE
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+    FROM USER_TAB_COLUMNS
+    WHERE TABLE_NAME = 'INTENTOS' AND COLUMN_NAME = 'ID_SOLICITUD';
+    IF v_count = 0 THEN
+        EXECUTE IMMEDIATE 'ALTER TABLE Intentos ADD (id_solicitud VARCHAR2(64) DEFAULT RAWTOHEX(SYS_GUID()))';
+    ELSE
+        EXECUTE IMMEDIATE 'ALTER TABLE Intentos MODIFY (id_solicitud DEFAULT RAWTOHEX(SYS_GUID()))';
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+    FROM USER_INDEXES
+    WHERE INDEX_NAME = 'UQ_INTENTOS_SOLICITUD';
+    IF v_count = 0 THEN
+        EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX UQ_INTENTOS_SOLICITUD ON Intentos (id_solicitud)';
+    END IF;
+END;
+/
+
 -- =============================================================================
 -- 1. TRIGGER A NIVEL DE FILA: TRG_AUDIT_USUARIOS
 -- Actualiza automáticamente la estampa de última actividad y previene vidas < 0.
@@ -99,6 +123,7 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
         p_codigo_enviado     IN  CLOB,
         p_salida_obtenida    IN  CLOB,
         p_tiempo_ms          IN  NUMBER,
+        p_id_solicitud       IN  VARCHAR2,
         p_nuevo_nivel        OUT NUMBER,
         p_nueva_exp          OUT NUMBER,
         p_vidas_restantes    OUT NUMBER,
@@ -300,6 +325,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         p_codigo_enviado     IN  CLOB,
         p_salida_obtenida    IN  CLOB,
         p_tiempo_ms          IN  NUMBER,
+        p_id_solicitud       IN  VARCHAR2,
         p_nuevo_nivel        OUT NUMBER,
         p_nueva_exp          OUT NUMBER,
         p_vidas_restantes    OUT NUMBER,
@@ -313,12 +339,18 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         v_racha_max          NUMBER := 0;
         v_ya_aprobado_antes  NUMBER := 0;
         v_id_intento         NUMBER;
+        v_intento_existente  NUMBER;
+        v_exp_existente      NUMBER;
     BEGIN
         SAVEPOINT sp_proc_intento;
 
         -- 1. Validar parámetros requeridos
         IF p_id_usuario IS NULL OR p_id_reto IS NULL THEN
             RAISE_APPLICATION_ERROR(-20001, 'Los identificadores de usuario y reto son obligatorios.');
+        END IF;
+        IF p_id_solicitud IS NULL OR LENGTH(TRIM(p_id_solicitud)) = 0
+                OR LENGTH(p_id_solicitud) > 64 THEN
+            RAISE_APPLICATION_ERROR(-20005, 'El identificador único del envío es obligatorio.');
         END IF;
 
         -- 2. Consultar y bloquear fila del usuario para concurrencia segura
@@ -331,6 +363,27 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
                 RAISE_APPLICATION_ERROR(-20002, 'El usuario #' || p_id_usuario || ' no existe en la base de datos.');
+        END;
+
+        -- Un reintento con la misma clave devuelve el resultado ya confirmado.
+        -- Esta comprobación ocurre antes del bloqueo por cero vidas porque el
+        -- primer intento pudo haber consumido la última vida.
+        BEGIN
+            SELECT id_intento, exp_obtenida
+            INTO v_intento_existente, v_exp_existente
+            FROM Intentos
+            WHERE id_solicitud = p_id_solicitud
+              AND id_usuario = p_id_usuario
+              AND id_reto = p_id_reto;
+
+            p_id_intento_creado := v_intento_existente;
+            p_exp_otorgada := v_exp_existente;
+            p_nueva_exp := v_exp_actual;
+            p_nuevo_nivel := FN_CALCULAR_NIVEL(v_exp_actual);
+            p_vidas_restantes := v_vidas_actuales;
+            RETURN;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
         END;
 
         IF v_vidas_actuales <= 0 THEN
@@ -366,10 +419,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         -- 5. Insertar en la tabla Intentos
         INSERT INTO Intentos (
             id_usuario, id_reto, codigo_enviado, salida_obtenida,
-            es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento
+            es_correcto, tiempo_ejecucion_ms, exp_obtenida, id_solicitud, fecha_intento
         ) VALUES (
             p_id_usuario, p_id_reto, p_codigo_enviado, p_salida_obtenida,
-            p_es_correcto, p_tiempo_ms, p_exp_otorgada, SYSTIMESTAMP
+            p_es_correcto, p_tiempo_ms, p_exp_otorgada, p_id_solicitud, SYSTIMESTAMP
         ) RETURNING id_intento INTO v_id_intento;
 
         p_id_intento_creado := v_id_intento;

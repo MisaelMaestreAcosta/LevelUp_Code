@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /** Coordina la evaluación, el registro y la recompensa de los intentos. */
 public class ChallengeService {
@@ -63,7 +64,15 @@ public class ChallengeService {
     public record SubmissionResult(Attempt attempt, ChallengeEvaluation evaluation) { }
 
     public SubmissionResult submitAttemptDetailed(User user, int challengeId, String submission) {
+        return submitAttemptDetailed(user, challengeId, submission, UUID.randomUUID().toString());
+    }
+
+    public SubmissionResult submitAttemptDetailed(
+            User user, int challengeId, String submission, String requestId) {
         validateSubmission(user, challengeId, submission);
+        if (requestId == null || requestId.isBlank() || requestId.length() > 64) {
+            throw new IllegalArgumentException("El identificador del envío debe ser válido.");
+        }
         if (user.getLives() <= 0) {
             throw new IllegalStateException("El usuario no dispone de vidas suficientes para enviar intentos.");
         }
@@ -100,6 +109,7 @@ public class ChallengeService {
         attempt.setResult(evaluation.getResult());
         attempt.setExecutionTimeMs(evaluation.getExecutionTimeMs());
         attempt.setEarnedExperience(firstCorrectAttempt ? challenge.getExpReward() : 0);
+        attempt.setRequestId(requestId.trim());
 
         Attempt savedAttempt = attemptRepository.save(attempt);
         if (savedAttempt == null) {

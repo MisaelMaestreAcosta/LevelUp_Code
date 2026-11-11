@@ -32,6 +32,8 @@ DECLARE
     v_vidas_restantes  NUMBER;
     v_exp_otorgada     NUMBER;
     v_id_intento       NUMBER;
+    v_id_original      NUMBER;
+    v_request_id       VARCHAR2(64);
     v_vidas_rest       NUMBER;
 
     -- Estado inicial y posterior al ROLLBACK para verificar aislamiento transaccional
@@ -129,6 +131,7 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('3. PROCEDIMIENTO: PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO (EXITOSO)');
     DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');
 
+    v_request_id := RAWTOHEX(SYS_GUID());
     PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(
         p_id_usuario         => 1,
         p_id_reto            => 101,
@@ -136,6 +139,7 @@ BEGIN
         p_codigo_enviado     => 'public class SolucionPrueba { /* código correcto */ }',
         p_salida_obtenida    => 'Aprobado: 3/3 casos',
         p_tiempo_ms          => 32,
+        p_id_solicitud       => v_request_id,
         p_nuevo_nivel        => v_nuevo_nivel,
         p_nueva_exp          => v_nueva_exp,
         p_vidas_restantes    => v_vidas_restantes,
@@ -146,6 +150,18 @@ BEGIN
     REGISTRAR_TEST('Generación de ID Intento', v_id_intento > 0, 'ID Intento generado: #' || v_id_intento);
     REGISTRAR_TEST('Integridad de Vidas', v_vidas_restantes = 5, 'Vidas tras acierto: ' || v_vidas_restantes);
     REGISTRAR_TEST('Cálculo reactivo de nivel', v_nuevo_nivel >= 5, 'Nivel tras envío: ' || v_nuevo_nivel);
+    v_id_original := v_id_intento;
+
+    PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(
+        p_id_usuario => 1, p_id_reto => 101, p_es_correcto => 1,
+        p_codigo_enviado => 'reintento seguro', p_salida_obtenida => 'CORRECT', p_tiempo_ms => 32,
+        p_id_solicitud => v_request_id,
+        p_nuevo_nivel => v_nuevo_nivel, p_nueva_exp => v_nueva_exp,
+        p_vidas_restantes => v_vidas_restantes, p_exp_otorgada => v_exp_otorgada,
+        p_id_intento_creado => v_id_intento
+    );
+    REGISTRAR_TEST('Reintento idempotente', v_id_intento = v_id_original,
+                   'ID original/reintento: ' || v_id_original || '/' || v_id_intento);
 
     -- =========================================================================
     -- CASO 4: PROCEDIMIENTO SP_REGISTRAR_INTENTO_RETO (INTENTO FALLIDO)
@@ -161,6 +177,7 @@ BEGIN
         p_codigo_enviado     => 'public class SolucionErronea { /* error */ }',
         p_salida_obtenida    => 'INCORRECT',
         p_tiempo_ms          => 18,
+        p_id_solicitud       => RAWTOHEX(SYS_GUID()),
         p_nuevo_nivel        => v_nuevo_nivel,
         p_nueva_exp          => v_nueva_exp,
         p_vidas_restantes    => v_vidas_restantes,
@@ -197,6 +214,7 @@ BEGIN
         PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(
             p_id_usuario => 1, p_id_reto => 101, p_es_correcto => 1,
             p_codigo_enviado => 'test', p_salida_obtenida => 'test', p_tiempo_ms => 10,
+            p_id_solicitud => RAWTOHEX(SYS_GUID()),
             p_nuevo_nivel => v_nuevo_nivel, p_nueva_exp => v_nueva_exp,
             p_vidas_restantes => v_vidas_restantes, p_exp_otorgada => v_exp_otorgada,
             p_id_intento_creado => v_id_intento
@@ -242,6 +260,7 @@ BEGIN
             p_codigo_enviado     => 'test',
             p_salida_obtenida    => 'test',
             p_tiempo_ms          => 10,
+            p_id_solicitud       => RAWTOHEX(SYS_GUID()),
             p_nuevo_nivel        => v_nuevo_nivel,
             p_nueva_exp          => v_nueva_exp,
             p_vidas_restantes    => v_vidas_restantes,

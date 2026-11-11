@@ -27,6 +27,11 @@ import java.time.format.DateTimeFormatter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -94,6 +99,8 @@ public class ChallengeFrame extends Stage {
     private boolean viewLoaded;
     private boolean busy;
     private boolean saveUncertain;
+    private String pendingRequestId;
+    private String pendingPayloadHash;
     private ProgressIndicator busyIndicator;
     private Label lblBusy;
     private TitledPane consolePane;
@@ -726,13 +733,16 @@ public class ChallengeFrame extends Stage {
             try {
                 draft = draftStore.load(draftMode(), currentUser.getEmail(), challenge.getId())
                         .map(saved -> new Draft(saved.code(), saved.quizIndex(), saved.caret(),
-                                saved.scrollTop(), false, saved.saveUncertain()))
+                                saved.scrollTop(), false, saved.saveUncertain(),
+                                saved.pendingRequestId(), saved.pendingPayloadHash()))
                         .orElse(null);
             } catch (IOException ex) {
                 LOGGER.log(Level.WARNING, "No se pudo leer el borrador del reto", ex);
             }
         }
         this.saveUncertain = draft != null && draft.saveUncertain();
+        this.pendingRequestId = draft != null ? draft.pendingRequestId() : null;
+        this.pendingPayloadHash = draft != null ? draft.pendingPayloadHash() : null;
         this.xpAwardedForCurrent = draft != null && draft.xpAwarded();
         this.selectedQuizIndex = draft != null ? draft.quizIndex() : -1;
         if (btnSubmit != null) {
@@ -833,7 +843,7 @@ public class ChallengeFrame extends Stage {
                 : "Resuelve el reto y envía tu respuesta. Tu borrador se guarda en este equipo.", "body-text");
         if (saveUncertain && !isPracticeOnly()) {
             btnSubmit.setText("Volver a enviar");
-            showFeedback("El guardado anterior sigue sin confirmar. Revisa tu historial antes de reenviar.", "text-warning");
+            showFeedback("El guardado anterior sigue sin confirmar. Puedes reintentar con seguridad: Oracle no duplicará el mismo envío.", "text-warning");
         }
         viewLoaded = true;
     }
@@ -841,13 +851,15 @@ public class ChallengeFrame extends Stage {
     private void rememberDraft() {
         if (viewLoaded) {
             Draft draft = new Draft(txtEditor.getText(), selectedQuizIndex,
-                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent, saveUncertain);
+                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent,
+                    saveUncertain, pendingRequestId, pendingPayloadHash);
             drafts.put(activeChallenge, draft);
             if (canPersistDraft(activeChallenge)) {
                 try {
                     draftStore.save(draftMode(), currentUser.getEmail(), activeChallenge.getId(),
                             new ChallengeDraftStore.DraftData(draft.code(), draft.quizIndex(),
-                                    draft.caret(), draft.scrollTop(), draft.saveUncertain()));
+                                    draft.caret(), draft.scrollTop(), draft.saveUncertain(),
+                                    draft.pendingRequestId(), draft.pendingPayloadHash()));
                 } catch (IOException ex) {
                     LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
                     showFeedback("No pudimos guardar el borrador en este equipo. Conserva una copia de tu respuesta.",
@@ -871,7 +883,8 @@ public class ChallengeFrame extends Stage {
     }
 
     private record Draft(String code, int quizIndex, int caret, double scrollTop,
-            boolean xpAwarded, boolean saveUncertain) { }
+            boolean xpAwarded, boolean saveUncertain, String pendingRequestId,
+            String pendingPayloadHash) { }
 
     private void showFeedback(String message, String style) {
         lblResultBanner.setGraphic(null);
@@ -1367,8 +1380,8 @@ public class ChallengeFrame extends Stage {
             retry.initOwner(this);
             retry.setTitle("Confirmar nuevo envío");
             retry.setHeaderText("El guardado anterior no pudo confirmarse");
-            retry.setContentText("Consulta tu historial en el panel antes de reenviar: si Oracle ya lo guardó, se creará otro intento y podrían descontarse vidas otra vez.");
-            ButtonType resend = new ButtonType("Enviar otro intento");
+            retry.setContentText("Si mantienes la misma respuesta, Oracle comprobará la clave del envío y devolverá el intento existente sin duplicarlo.");
+            ButtonType resend = new ButtonType("Comprobar y reintentar");
             retry.getButtonTypes().setAll(ButtonType.CANCEL, resend);
             Theme.applyCss(retry.getDialogPane().getScene());
             if (retry.showAndWait().filter(resend::equals).isEmpty()) {
@@ -1402,7 +1415,8 @@ public class ChallengeFrame extends Stage {
                     try {
                         ChallengeService.SubmissionResult saved = AppContext.getInstance()
                                 .getChallengeService().submitAttemptDetailed(
-                                        submission.user().toUser(), submission.challengeId(), submission.payload());
+                                        submission.user().toUser(), submission.challengeId(),
+                                        submission.payload(), submission.requestId());
                         SimulatedCodeRunner.ExecutionSummary detail = saved.evaluation().getExecutionSummary();
                         return new EvaluationOutcome(detail, saved.attempt().isCorrect(),
                                 PersistenceOutcome.saved(saved.attempt()));
@@ -1446,7 +1460,7 @@ public class ChallengeFrame extends Stage {
             LOGGER.log(Level.SEVERE, "Error al evaluar el reto #" + submission.challengeId(), task.getException());
             txtConsoleOutput.setText(exceptionDetails(task.getException()));
             consolePane.setExpanded(true);
-            showFeedback(saveUncertain ? "Envío sin confirmar. Revisa tu historial antes de reenviar."
+            showFeedback(saveUncertain ? "Envío sin confirmar. Puedes comprobarlo y reintentarlo sin duplicar el intento."
                     : "No se pudo evaluar. Conservamos tu borrador; revisa los detalles.", "text-warning");
             rememberDraft();
             finishSubmission();
@@ -1510,13 +1524,35 @@ public class ChallengeFrame extends Stage {
         boolean practiceOnly = isPracticeOnly();
         boolean saveToOracle = !practiceOnly && AppContext.getInstance().isOracleConnected()
                 && user != null && user.id() > 0 && activeChallenge.getId() > 0;
+        String requestId = null;
+        if (saveToOracle) {
+            String payloadHash = hashPayload(payload);
+            boolean samePendingSubmission = saveUncertain && pendingRequestId != null
+                    && payloadHash.equals(pendingPayloadHash);
+            requestId = samePendingSubmission ? pendingRequestId : UUID.randomUUID().toString();
+            pendingRequestId = requestId;
+            pendingPayloadHash = payloadHash;
+            // Persist this state before the network operation. If the app closes
+            // before receiving Oracle's response, the same key is reused later.
+            saveUncertain = true;
+        }
         return new Submission(activeChallenge.getId(), payload, code, selectedQuizIndex,
-                correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly);
+                correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly, requestId);
     }
 
     private record Submission(int challengeId, String payload, CodeSnapshot code, int quizIndex,
             int correctQuizIndex, String correctAnswer, UserSnapshot user,
-            boolean saveToOracle, boolean practiceOnly) { }
+            boolean saveToOracle, boolean practiceOnly, String requestId) { }
+
+    private static String hashPayload(String payload) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((payload == null ? "" : payload).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 no está disponible.", ex);
+        }
+    }
 
     private boolean isPracticeOnly() {
         AppContext context = AppContext.getInstance();
@@ -1677,14 +1713,19 @@ public class ChallengeFrame extends Stage {
         StringBuilder fullConsole = new StringBuilder(consoleMessage);
         if (!practiceOnly) saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
 
+        if (persistence.savedToOracle) {
+            pendingRequestId = null;
+            pendingPayloadHash = null;
+        }
+
         if (saveUncertain && !practiceOnly) {
             fullConsole.append("\n[ERROR DE GUARDADO EN ORACLE] ").append(persistence.errorMessage).append("\n")
-                    .append("> No se pudo confirmar el guardado. Consulta el historial en el panel antes de reenviar; el intento podría haberse registrado.");
+                    .append("> No se pudo confirmar el guardado. Reintentar la misma respuesta reutiliza su clave y no crea un duplicado.");
             txtConsoleOutput.setText(fullConsole.toString());
             consolePane.setExpanded(true);
             btnSubmit.setText("Volver a enviar");
             showFeedback((localSuccess ? "Aprobado localmente. " : "Evaluación terminada. ")
-                    + "Guardado sin confirmar: revisa tu historial antes de reenviar.", "text-warning");
+                    + "Guardado sin confirmar: puedes comprobarlo y reintentarlo con seguridad.", "text-warning");
             return;
         }
 

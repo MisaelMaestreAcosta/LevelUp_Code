@@ -16,7 +16,8 @@ class ChallengeDraftStoreTest {
     void preservesUnicodeDraftAndSeparatesUsersModesAndChallenges() throws IOException {
         ChallengeDraftStore store = new ChallengeDraftStore(temp.resolve("drafts"));
         ChallengeDraftStore.DraftData saved = new ChallengeDraftStore.DraftData(
-                "System.out.println(\"¡Hola!\");\n", -1, 15, 32.5, true);
+                "System.out.println(\"¡Hola!\");\n", -1, 15, 32.5, true,
+                "request-123", "payload-hash-123");
 
         store.save("oracle", "Estudiante@Ejemplo.com", 101, saved);
         assertEquals(saved, store.load("oracle", "estudiante@ejemplo.com", 101).orElseThrow());
@@ -24,7 +25,8 @@ class ChallengeDraftStoreTest {
         assertTrue(store.load("oracle", "otra@ejemplo.com", 101).isEmpty());
         assertTrue(store.load("oracle", "estudiante@ejemplo.com", 102).isEmpty());
 
-        ChallengeDraftStore.DraftData updated = new ChallengeDraftStore.DraftData("nuevo", 2, 5, 0, false);
+        ChallengeDraftStore.DraftData updated = new ChallengeDraftStore.DraftData(
+                "nuevo", 2, 5, 0, false, null, null);
         store.save("oracle", "estudiante@ejemplo.com", 101, updated);
         assertEquals(updated, store.load("oracle", "estudiante@ejemplo.com", 101).orElseThrow());
     }

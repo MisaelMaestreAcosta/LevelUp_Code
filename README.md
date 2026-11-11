@@ -31,7 +31,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
-   Si ya tienes una base de datos creada, vuelve a ejecutar solo `database/03_plsql_gamificacion.sql` para activar la recuperación diaria de vidas y el bloqueo de intentos sin vidas. No necesitas borrar ni volver a cargar los datos.
+   Si ya tienes una base de datos creada, vuelve a ejecutar solo `database/03_plsql_gamificacion.sql` para activar la recuperación diaria de vidas, el bloqueo de intentos sin vidas y los reintentos idempotentes. No necesitas borrar ni volver a cargar los datos.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:

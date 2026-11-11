@@ -54,7 +54,7 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public Attempt save(Attempt attempt) {
-        String plsql = "{call PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
+        String plsql = "{call PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try (CallableStatement cstmt = conn.prepareCall(plsql)) {
@@ -64,20 +64,21 @@ public class OracleAttemptRepository implements AttemptRepository {
                 cstmt.setString(4, attempt.getSubmittedContent() != null ? attempt.getSubmittedContent() : "");
                 cstmt.setString(5, attempt.getResult() != null ? attempt.getResult().name() : AttemptResult.INCORRECT.name());
                 cstmt.setInt(6, (int) Math.max(0, attempt.getExecutionTimeMs()));
+                cstmt.setString(7, attempt.getRequestId());
 
-                cstmt.registerOutParameter(7, Types.NUMERIC);  // p_nuevo_nivel
-                cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nueva_exp
-                cstmt.registerOutParameter(9, Types.NUMERIC);  // p_vidas_restantes
-                cstmt.registerOutParameter(10, Types.NUMERIC); // p_exp_otorgada
-                cstmt.registerOutParameter(11, Types.NUMERIC); // p_id_intento_creado
+                cstmt.registerOutParameter(8, Types.NUMERIC);  // p_nuevo_nivel
+                cstmt.registerOutParameter(9, Types.NUMERIC);  // p_nueva_exp
+                cstmt.registerOutParameter(10, Types.NUMERIC); // p_vidas_restantes
+                cstmt.registerOutParameter(11, Types.NUMERIC); // p_exp_otorgada
+                cstmt.registerOutParameter(12, Types.NUMERIC); // p_id_intento_creado
 
                 cstmt.execute();
 
-                int nuevoNivel = cstmt.getInt(7);
-                int nuevaExp = cstmt.getInt(8);
-                int vidasRestantes = cstmt.getInt(9);
-                int expOtorgada = cstmt.getInt(10);
-                int idIntentoCreado = cstmt.getInt(11);
+                int nuevoNivel = cstmt.getInt(8);
+                int nuevaExp = cstmt.getInt(9);
+                int vidasRestantes = cstmt.getInt(10);
+                int expOtorgada = cstmt.getInt(11);
+                int idIntentoCreado = cstmt.getInt(12);
 
                 conn.commit();
 

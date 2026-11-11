@@ -101,11 +101,13 @@ class GamificationAndChallengeServiceTest {
         challenge.addTestCase(new TestCase(1, challenge, "entrada", "salida", false));
         challenges.register(challenge);
 
-        ChallengeService.SubmissionResult saved = service.submitAttemptDetailed(student, 7, "código");
+        ChallengeService.SubmissionResult saved = service.submitAttemptDetailed(
+                student, 7, "código", "request-test-7");
         assertEquals(1, evaluations[0]);
         assertTrue(saved.attempt().isCorrect());
         assertTrue(saved.evaluation().getExecutionSummary().isAllPassed());
         assertEquals(50, saved.attempt().getEarnedExperience());
+        assertEquals("request-test-7", saved.attempt().getRequestId());
     }
 
     @Test
