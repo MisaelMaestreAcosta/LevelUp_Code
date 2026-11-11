@@ -45,6 +45,7 @@ import javafx.util.Duration;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
@@ -761,13 +762,23 @@ public class ChallengeFrame extends Stage {
         viewLoaded = false;
         this.activeChallenge = challenge;
         Draft draft = drafts.get(challenge);
+        boolean outdatedDraftSkipped = false;
         if (draft == null && canPersistDraft(challenge)) {
             try {
-                draft = draftStore.load(draftMode(), currentUser.getEmail(), challenge.getId())
-                        .map(saved -> new Draft(saved.code(), saved.quizIndex(), saved.caret(),
-                                saved.scrollTop(), false, saved.saveUncertain(),
-                                saved.pendingRequestId(), saved.pendingPayloadHash()))
+                ChallengeDraftStore.DraftData saved = draftStore
+                        .load(draftMode(), currentUser.getEmail(), challenge.getId())
                         .orElse(null);
+                if (saved != null && saved.challengeFingerprint() != null
+                        && !saved.challengeFingerprint().equals(challengeFingerprint(challenge))
+                        && !confirmOutdatedDraftRecovery()) {
+                    saved = null;
+                    outdatedDraftSkipped = true;
+                }
+                if (saved != null) {
+                    draft = new Draft(saved.code(), saved.quizIndex(), saved.caret(),
+                            saved.scrollTop(), false, saved.saveUncertain(),
+                            saved.pendingRequestId(), saved.pendingPayloadHash());
+                }
             } catch (IOException ex) {
                 LOGGER.log(Level.WARNING, "No se pudo leer el borrador del reto", ex);
             }
@@ -874,6 +885,7 @@ public class ChallengeFrame extends Stage {
         consolePane.setExpanded(false);
         showFeedback(isPracticeOnly()
                 ? practiceModeMessage()
+                : outdatedDraftSkipped ? "El reto cambió. Se cargó su contenido actualizado y el borrador anterior se conservó en este equipo."
                 : draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
                 : "Resuelve el reto y envía tu respuesta. Tu borrador se guarda en este equipo.", "body-text");
         if (saveUncertain && !isPracticeOnly()) {
@@ -899,7 +911,8 @@ public class ChallengeFrame extends Stage {
                 draftRevisions.put(challengeToSave, revision);
                 ChallengeDraftStore.DraftData data = new ChallengeDraftStore.DraftData(
                         draft.code(), draft.quizIndex(), draft.caret(), draft.scrollTop(),
-                        draft.saveUncertain(), draft.pendingRequestId(), draft.pendingPayloadHash());
+                        draft.saveUncertain(), draft.pendingRequestId(), draft.pendingPayloadHash(),
+                        challengeFingerprint(challengeToSave));
                 lblDraftStatus.setText("Guardando borrador…");
                 Thread writer = new Thread(() -> saveDraftInBackground(
                         challengeToSave, revision, mode, email, challengeId, data),
@@ -943,6 +956,47 @@ public class ChallengeFrame extends Stage {
 
     private String draftMode() {
         return AppContext.getInstance().isOracleConnected() ? "oracle" : "demo";
+    }
+
+    private boolean confirmOutdatedDraftRecovery() {
+        ButtonType recover = new ButtonType("Recuperar mi respuesta", ButtonBar.ButtonData.OK_DONE);
+        ButtonType useCurrent = new ButtonType("Usar contenido actualizado", ButtonBar.ButtonData.CANCEL_CLOSE);
+        Alert alert = new Alert(Alert.AlertType.WARNING,
+                "El contenido de este reto cambió desde que guardaste tu borrador. "
+                + "Puedes recuperar tu respuesta para copiarla o empezar con la versión actual.",
+                recover, useCurrent);
+        alert.initOwner(this);
+        alert.setTitle("El reto fue actualizado");
+        alert.setHeaderText("Tu borrador pertenece a una versión anterior");
+        return alert.showAndWait().orElse(useCurrent) == recover;
+    }
+
+    private String challengeFingerprint(Challenge challenge) {
+        StringBuilder content = new StringBuilder();
+        appendFingerprintField(content, challenge.getType());
+        appendFingerprintField(content, challenge.getTitle());
+        appendFingerprintField(content, challenge.getDescription());
+        if (challenge instanceof CodeChallenge code) {
+            appendFingerprintField(content, code.getInitialTemplate());
+            appendFingerprintField(content, code.getTimeLimitSeconds());
+            appendFingerprintField(content, resolveChallengeLanguageName(code));
+            for (TestCase testCase : code.getTestCases()) {
+                appendFingerprintField(content, testCase.getInput());
+                appendFingerprintField(content, testCase.getExpectedOutput());
+                appendFingerprintField(content, testCase.isHidden());
+            }
+        } else if (challenge instanceof QuizChallenge quiz) {
+            for (String option : quiz.getOptions()) {
+                appendFingerprintField(content, option);
+            }
+            appendFingerprintField(content, quiz.getCorrectAnswer());
+        }
+        return hashPayload(content.toString());
+    }
+
+    private static void appendFingerprintField(StringBuilder target, Object value) {
+        String text = value == null ? "<null>" : value.toString();
+        target.append(text.length()).append(':').append(text).append(';');
     }
 
     private void scheduleDraftSave() {

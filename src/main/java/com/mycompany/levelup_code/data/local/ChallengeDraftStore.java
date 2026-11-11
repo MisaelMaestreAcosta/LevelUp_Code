@@ -17,12 +17,13 @@ import java.util.Optional;
 /** Keeps a student's unfinished answer on this computer across app restarts. */
 public final class ChallengeDraftStore {
 
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     private static final int MAX_CODE_BYTES = 1_048_576;
     private final Path directory;
 
     public record DraftData(String code, int quizIndex, int caret, double scrollTop,
-            boolean saveUncertain, String pendingRequestId, String pendingPayloadHash) { }
+            boolean saveUncertain, String pendingRequestId, String pendingPayloadHash,
+            String challengeFingerprint) { }
 
     public ChallengeDraftStore() {
         this(Path.of(System.getProperty("user.home"), ".levelup-code", "drafts"));
@@ -48,8 +49,10 @@ public final class ChallengeDraftStore {
             boolean saveUncertain = input.readBoolean();
             String requestId = version >= 2 ? emptyToNull(input.readUTF()) : null;
             String payloadHash = version >= 2 ? emptyToNull(input.readUTF()) : null;
+            String challengeFingerprint = version >= 3 ? emptyToNull(input.readUTF()) : null;
             return Optional.of(new DraftData(new String(code, StandardCharsets.UTF_8),
-                    quizIndex, caret, scrollTop, saveUncertain, requestId, payloadHash));
+                    quizIndex, caret, scrollTop, saveUncertain, requestId, payloadHash,
+                    challengeFingerprint));
         }
     }
 
@@ -70,6 +73,7 @@ public final class ChallengeDraftStore {
                 output.writeBoolean(draft.saveUncertain());
                 output.writeUTF(draft.pendingRequestId() == null ? "" : draft.pendingRequestId());
                 output.writeUTF(draft.pendingPayloadHash() == null ? "" : draft.pendingPayloadHash());
+                output.writeUTF(draft.challengeFingerprint() == null ? "" : draft.challengeFingerprint());
             }
             try {
                 Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE,
