@@ -10,6 +10,7 @@ import com.mycompany.levelup_code.data.dao.ProgressRepository;
 import com.mycompany.levelup_code.data.dao.UserRepository;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
+import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.DailyActivity;
 import com.mycompany.levelup_code.domain.model.Language;
