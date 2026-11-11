@@ -97,6 +97,7 @@ public class ChallengeFrame extends Stage {
     private int selectedQuizIndex = -1;
     // Session-only drafts: challenge identity also keeps unsaved/demo IDs separate.
     private final Map<Challenge, Draft> drafts = new IdentityHashMap<>();
+    private final Map<Challenge, Integer> hintStages = new IdentityHashMap<>();
     private final Map<Challenge, Long> draftRevisions = new IdentityHashMap<>();
     private final Object draftWriteLock = new Object();
     private long nextDraftRevision;
@@ -123,6 +124,7 @@ public class ChallengeFrame extends Stage {
     private VBox quizCard;
     private Button btnNextChallenge;
     private Button btnSubmit;
+    private Button btnHint;
 
     // Editor de código y numeración de líneas
     private TextArea txtEditor;
@@ -491,13 +493,9 @@ public class ChallengeFrame extends Stage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button btnHint = new Button("Ver Pista Didáctica");
+        btnHint = new Button("Ver pista 1 de 3");
         btnHint.getStyleClass().add("btn-ghost-green");
         btnHint.setOnAction(e -> showPedagogicalHint());
-
-        Button btnSolutionHint = new Button("Insertar Solución Modelo");
-        btnSolutionHint.getStyleClass().add("btn-ghost");
-        btnSolutionHint.setOnAction(e -> fillReferenceSolution());
 
         Button btnResetCode = new Button("Restaurar Plantilla");
         btnResetCode.getStyleClass().add("btn-secondary");
@@ -517,8 +515,7 @@ public class ChallengeFrame extends Stage {
         btnFontUp.setTooltip(new Tooltip("Aumentar tamaño del código"));
         btnFontUp.setOnAction(event -> adjustEditorFontSize(1));
 
-        toolbar.getChildren().addAll(lblFileTab, btnHint, btnSolutionHint,
-                btnResetCode, btnFontDown, btnFontUp);
+        toolbar.getChildren().addAll(lblFileTab, btnHint, btnResetCode, btnFontDown, btnFontUp);
 
         // Contenedor con numeración de líneas (gutter) y área de edición
         HBox editorContainer = new HBox(0);
@@ -780,6 +777,9 @@ public class ChallengeFrame extends Stage {
         this.pendingPayloadHash = draft != null ? draft.pendingPayloadHash() : null;
         this.xpAwardedForCurrent = draft != null && draft.xpAwarded();
         this.selectedQuizIndex = draft != null ? draft.quizIndex() : -1;
+        int revealedHints = hintStages.getOrDefault(challenge, 0);
+        btnHint.setText(revealedHints >= 3 ? "Pistas completas"
+                : "Ver pista " + (revealedHints + 1) + " de 3");
         if (btnSubmit != null) {
             btnSubmit.setText(isPracticeOnly()
                     ? "Practicar sin XP" : "Enviar solución");
@@ -1081,12 +1081,19 @@ public class ChallengeFrame extends Stage {
         String title = activeChallenge != null && activeChallenge.getTitle() != null
                 ? activeChallenge.getTitle().toLowerCase(Locale.ROOT)
                 : "";
+        int stage = Math.min(3, hintStages.getOrDefault(activeChallenge, 0) + 1);
+        hintStages.put(activeChallenge, stage);
+        btnHint.setText(stage >= 3 ? "Pistas completas" : "Ver pista " + (stage + 1) + " de 3");
         String hint;
         if (activeChallenge instanceof QuizChallenge) {
             String lessonTheory = (activeChallenge.getLesson() != null && activeChallenge.getLesson().getTheory() != null)
                     ? activeChallenge.getLesson().getTheory()
                     : "Revisa el concepto clave de la lección antes de elegir una opción.";
-            hint = "> [PISTA CONCEPTUAL]\n> Repasa el fundamento de la lección:\n" + lessonTheory;
+            hint = stage == 1
+                    ? "> [PISTA 1 · CONCEPTO]\n> Identifica la definición principal que pregunta el enunciado antes de mirar las opciones."
+                    : stage == 2
+                            ? "> [PISTA 2 · DESCARTE]\n> Compara cada opción con el contrato explicado en la lección y descarta las que usan afirmaciones absolutas o conceptos distintos."
+                            : "> [PISTA 3 · REPASO]\n" + lessonTheory;
         } else if (title.contains("binaria")) {
             hint = "> [PISTA DIDÁCTICA — BÚSQUEDA BINARIA]\n"
                     + "> 1. Mantén dos límites: low = 0 y high = n - 1 mientras low <= high.\n"
@@ -1108,6 +1115,11 @@ public class ChallengeFrame extends Stage {
             hint = "> [PISTA DIDÁCTICA — POLIMORFISMO Y CONTRATOS]\n"
                     + "> 1. Normaliza la cadena de entrada ignorando diferencias entre mayúsculas y minúsculas.\n"
                     + "> 2. Retorna exactamente la cadena esperada por cada caso de prueba visible y oculto.";
+        }
+        if (!(activeChallenge instanceof QuizChallenge)) {
+            String[] lines = hint.split("\n");
+            int visibleLines = Math.min(lines.length, stage + 1);
+            hint = String.join("\n", Arrays.copyOf(lines, visibleLines));
         }
         txtConsoleOutput.setText(hint);
         consolePane.setExpanded(true);
