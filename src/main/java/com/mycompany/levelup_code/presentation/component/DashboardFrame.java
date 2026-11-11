@@ -1346,17 +1346,32 @@ public class DashboardFrame {
         lblDesc.setWrapText(true);
 
         String ruleText = "Meta del logro";
+        int currentValue = 0;
+        int targetValue = Math.max(1, ach.getTargetValue());
         if (ach instanceof StreakAchievement) {
             ruleText = "Practica " + ((StreakAchievement) ach).getRequiredDays() + " días consecutivos";
+            currentValue = currentUser.getCurrentStreak();
         } else if (ach instanceof ExperienceAchievement) {
             ruleText = "Consigue " + ((ExperienceAchievement) ach).getRequiredExp() + " XP";
+            currentValue = currentUser.getTotalExp();
         } else if (ach instanceof ChallengeCountAchievement) {
             ruleText = "Supera " + ((ChallengeCountAchievement) ach).getRequiredChallenges() + " retos";
+            currentValue = solvedChallengesCount;
         }
         Label lblRule = new Label(ruleText);
         lblRule.getStyleClass().add(unlocked ? "text-success" : "muted-text");
 
-        body.getChildren().addAll(top, lblDesc, lblRule);
+        int visibleProgress = Math.min(Math.max(0, currentValue), targetValue);
+        Label lblProgress = new Label(unlocked ? "Meta cumplida"
+                : visibleProgress + " de " + targetValue + " · faltan "
+                + (targetValue - visibleProgress));
+        lblProgress.getStyleClass().add(unlocked ? "text-success" : "muted-text");
+        ProgressBar achievementProgress = new ProgressBar(
+                Math.min(1.0, visibleProgress / (double) targetValue));
+        achievementProgress.setMaxWidth(Double.MAX_VALUE);
+        achievementProgress.setAccessibleText(lblProgress.getText());
+
+        body.getChildren().addAll(top, lblDesc, lblRule, achievementProgress, lblProgress);
         card.getChildren().addAll(Theme.createIcon(kind, 24, iconHex), body);
         return card;
     }
