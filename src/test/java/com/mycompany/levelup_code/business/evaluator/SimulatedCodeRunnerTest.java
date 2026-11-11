@@ -65,6 +65,8 @@ class SimulatedCodeRunnerTest {
         assertTrue(okSummary.isSandboxedExecution());
         assertTrue(okSummary.isAllPassed());
         assertEquals(2, okSummary.getPassedCount());
+        assertFalse(okSummary.getCaseOutcomes().get(1).getMessage().contains("-1"),
+                "La salida de un caso oculto no debe mostrarse al estudiante");
     }
 
     @Test

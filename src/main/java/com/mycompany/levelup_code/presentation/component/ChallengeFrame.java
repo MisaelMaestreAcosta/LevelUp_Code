@@ -2,6 +2,7 @@ package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
+import com.mycompany.levelup_code.business.service.ChallengeService;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Attempt;
@@ -1338,16 +1339,36 @@ public class ChallengeFrame extends Stage {
         Task<EvaluationOutcome> task = new Task<>() {
             @Override
             protected EvaluationOutcome call() {
-                updateMessage("Evaluando respuesta…");
+                updateMessage(submission.saveToOracle()
+                        ? "Evaluando y guardando en Oracle…" : "Evaluando respuesta…");
+                if (submission.saveToOracle()) {
+                    try {
+                        ChallengeService.SubmissionResult saved = AppContext.getInstance()
+                                .getChallengeService().submitAttemptDetailed(
+                                        submission.user().toUser(), submission.challengeId(), submission.payload());
+                        SimulatedCodeRunner.ExecutionSummary detail = saved.evaluation().getExecutionSummary();
+                        return new EvaluationOutcome(detail, saved.attempt().isCorrect(),
+                                PersistenceOutcome.saved(saved.attempt()));
+                    } catch (Exception ex) {
+                        LOGGER.log(Level.SEVERE, "Error al evaluar o guardar el reto #" + submission.challengeId(), ex);
+                        SimulatedCodeRunner.ExecutionSummary local = submission.code() == null ? null
+                                : codeRunner.runAndValidate(submission.code().toChallenge(), submission.payload());
+                        boolean correct = local != null ? local.isAllPassed()
+                                : submission.quizIndex() == submission.correctQuizIndex()
+                                || (submission.correctAnswer() != null
+                                && submission.correctAnswer().trim().equalsIgnoreCase(submission.payload().trim()));
+                        return new EvaluationOutcome(local, correct,
+                                PersistenceOutcome.failed(exceptionDetails(ex)));
+                    }
+                }
                 SimulatedCodeRunner.ExecutionSummary summary = submission.code() == null ? null
                         : codeRunner.runAndValidate(submission.code().toChallenge(), submission.payload());
                 boolean correct = summary != null ? summary.isAllPassed()
                         : submission.quizIndex() == submission.correctQuizIndex()
                         || (submission.correctAnswer() != null
                         && submission.correctAnswer().trim().equalsIgnoreCase(submission.payload().trim()));
-                updateMessage(submission.saveToOracle() ? "Validando y guardando en Oracle…" : "Preparando resultado…");
-                PersistenceOutcome persistence = persistAttemptIfConnected(submission);
-                return new EvaluationOutcome(summary, correct, persistence);
+                updateMessage("Preparando resultado…");
+                return new EvaluationOutcome(summary, correct, PersistenceOutcome.localOnly());
             }
         };
         setBusy(true);
@@ -1489,6 +1510,12 @@ public class ChallengeFrame extends Stage {
         if (submission.code() != null) {
 
             SimulatedCodeRunner.ExecutionSummary summary = result.summary();
+            if (summary == null) {
+                lblExecutionMetrics.setText("Evaluación sin detalle de casos");
+                handleEvaluationOutcome(result.correct(), false,
+                        "> No se recibió el detalle de los casos de prueba.\n", result.persistence());
+                return;
+            }
             List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
             latestCaseOutcomes.clear();
             latestCaseOutcomes.addAll(outcomes);
@@ -1561,23 +1588,6 @@ public class ChallengeFrame extends Stage {
                     : "La opción seleccionada no corresponde al contrato esperado. Revisa la pista conceptual e inténtalo de nuevo.");
 
             handleEvaluationOutcome(correct, true, msg + "\n", result.persistence());
-        }
-    }
-
-    private static PersistenceOutcome persistAttemptIfConnected(Submission submission) {
-        if (!submission.saveToOracle()) {
-            return PersistenceOutcome.localOnly();
-        }
-
-        try {
-            // The service remains authoritative. Reusing the detailed local evaluation
-            // requires a coordinated service API change outside this frame's scope.
-            Attempt saved = AppContext.getInstance().getChallengeService().submitAttempt(
-                    submission.user().toUser(), submission.challengeId(), submission.payload());
-            return PersistenceOutcome.saved(saved);
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "Error al persistir intento del reto #" + submission.challengeId() + " en Oracle", ex);
-            return PersistenceOutcome.failed(exceptionDetails(ex));
         }
     }
 

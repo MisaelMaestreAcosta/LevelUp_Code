@@ -57,6 +57,12 @@ public class ChallengeService {
      * se concede una sola vez, en el primer resultado correcto del usuario.
      */
     public Attempt submitAttempt(User user, int challengeId, String submission) {
+        return submitAttemptDetailed(user, challengeId, submission).attempt();
+    }
+
+    public record SubmissionResult(Attempt attempt, ChallengeEvaluation evaluation) { }
+
+    public SubmissionResult submitAttemptDetailed(User user, int challengeId, String submission) {
         validateSubmission(user, challengeId, submission);
         if (!attemptRepository.managesGamificationTransactionally() && user.getLives() <= 0) {
             throw new IllegalStateException("El usuario no dispone de vidas suficientes para enviar intentos.");
@@ -111,7 +117,7 @@ public class ChallengeService {
                 gamificationService.penalizeFailedAttempt(user);
             }
         }
-        return savedAttempt;
+        return new SubmissionResult(savedAttempt, evaluation);
     }
 
     /** Consulta el historial de intentos para un usuario y un reto. */

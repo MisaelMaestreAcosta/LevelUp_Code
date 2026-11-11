@@ -7,8 +7,14 @@ public final class ChallengeEvaluation {
 
     private final AttemptResult result;
     private final long executionTimeMs;
+    private final SimulatedCodeRunner.ExecutionSummary executionSummary;
 
     public ChallengeEvaluation(AttemptResult result, long executionTimeMs) {
+        this(result, executionTimeMs, null);
+    }
+
+    public ChallengeEvaluation(AttemptResult result, long executionTimeMs,
+            SimulatedCodeRunner.ExecutionSummary executionSummary) {
         if (result == null) {
             throw new IllegalArgumentException("El resultado de evaluación es obligatorio.");
         }
@@ -17,6 +23,7 @@ public final class ChallengeEvaluation {
         }
         this.result = result;
         this.executionTimeMs = executionTimeMs;
+        this.executionSummary = executionSummary;
     }
 
     public AttemptResult getResult() {
@@ -25,5 +32,9 @@ public final class ChallengeEvaluation {
 
     public long getExecutionTimeMs() {
         return executionTimeMs;
+    }
+
+    public SimulatedCodeRunner.ExecutionSummary getExecutionSummary() {
+        return executionSummary;
     }
 }
