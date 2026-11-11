@@ -297,7 +297,7 @@ public class ChallengeFrame extends Stage {
 
         badgeType = Theme.createPillBadge("CÓDIGO", "badge-indigo");
         badgeDifficulty = Theme.createDifficultyBadge(60);
-        badgeExecutionMode = Theme.createPillBadge("EJECUCIÓN AISLADA JVM", "badge-green");
+        badgeExecutionMode = Theme.createPillBadge("EJECUCIÓN LOCAL JVM", "badge-green");
         badgeReward = Theme.createPillBadge("+60 XP", "badge-amber");
 
         Region spacer = new Region();
@@ -736,7 +736,7 @@ public class ChallengeFrame extends Stage {
             String langName = resolveChallengeLanguageName(codeChallenge);
             boolean realJvm = codeRunner.supportsRealIsolatedExecution(langName);
             badgeExecutionMode.setText(realJvm
-                    ? "EJECUCIÓN REAL AISLADA JVM"
+                    ? "EJECUCIÓN LOCAL JVM"
                     : "MODO DEMO SIMULADO (" + langName.toUpperCase(Locale.ROOT) + ")");
             badgeExecutionMode.getStyleClass().setAll(realJvm ? "badge-green" : "badge-amber");
             badgeExecutionMode.setVisible(true);
@@ -791,7 +791,7 @@ public class ChallengeFrame extends Stage {
         txtConsoleOutput.getStyleClass().setAll("console-output");
         String modeNote = (challenge instanceof CodeChallenge)
                 ? (codeRunner.supportsRealIsolatedExecution(resolveChallengeLanguageName(challenge))
-                        ? "> Motor activo: Compilación real JavaCompiler + subproceso JVM aislado (-Xmx64m)."
+                        ? "> Motor activo: Compilación JavaCompiler + subproceso JVM local (-Xmx64m)."
                         : "> Aviso: Este lenguaje se evalúa en modo simulación académica de demostración (sin compilador nativo externo).")
                 : "> Motor activo: Verificación conceptual de selección única.";
         txtConsoleOutput.setText("> Reto cargado: " + challenge.getTitle() + "\n" + modeNote + "\n> Esperando envío del estudiante...");

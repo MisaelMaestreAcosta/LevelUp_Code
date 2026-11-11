@@ -277,7 +277,7 @@ public class SimulatedCodeRunner implements CodeRunner {
             process.destroyForcibly();
             outReader.join(200);
             errReader.join(200);
-            throw new TimeoutException("Tiempo límite excedido (" + timeoutSeconds + "s) en ejecución aislada JVM.");
+            throw new TimeoutException("Tiempo límite excedido (" + timeoutSeconds + "s) en ejecución local JVM.");
         }
 
         outReader.join(500);
@@ -738,7 +738,7 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         public String getExecutionModeDescription() {
             return sandboxedExecution
-                    ? "Ejecución real aislada en JVM (-Xmx64m)"
+                    ? "Ejecución local en JVM (-Xmx64m)"
                     : "Validación simulada de demostración (sin compilador nativo externo)";
         }
 
