@@ -45,6 +45,7 @@ public final class AppContext {
     private static AppContext instance;
 
     private final boolean oracleConnected;
+    private volatile boolean oracleAvailable;
     private final UserRepository userRepository;
     private final ContentRepository contentRepository;
     private final ChallengeRepository challengeRepository;
@@ -64,7 +65,12 @@ public final class AppContext {
     private final SimulatedCodeRunner codeRunner;
 
     private AppContext() {
-        this.oracleConnected = DatabaseConnection.isDatabaseReady();
+        this(DatabaseConnection.isDatabaseReady());
+    }
+
+    private AppContext(boolean oracleConnected) {
+        this.oracleConnected = oracleConnected;
+        this.oracleAvailable = oracleConnected;
         this.userRepository = new OracleUserRepository();
         this.contentRepository = new OracleContentRepository();
         this.challengeRepository = new OracleChallengeRepository();
@@ -107,8 +113,24 @@ public final class AppContext {
         return instance;
     }
 
+    /** Rebuilds the demo context only after Oracle responds, before a real login. */
+    public static synchronized boolean reconnectOracle() {
+        if (!DatabaseConnection.isDatabaseReady()) return false;
+        if (instance == null || !instance.oracleConnected) instance = new AppContext(true);
+        else instance.setOracleAvailable(true);
+        return true;
+    }
+
     public boolean isOracleConnected() {
         return oracleConnected;
+    }
+
+    public boolean isOracleAvailable() {
+        return oracleAvailable;
+    }
+
+    public void setOracleAvailable(boolean available) {
+        this.oracleAvailable = oracleConnected && available;
     }
 
     public UserService getUserService() {

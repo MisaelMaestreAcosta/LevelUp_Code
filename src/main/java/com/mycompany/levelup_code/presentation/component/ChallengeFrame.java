@@ -708,7 +708,7 @@ public class ChallengeFrame extends Stage {
         this.xpAwardedForCurrent = draft != null && draft.xpAwarded();
         this.selectedQuizIndex = draft != null ? draft.quizIndex() : -1;
         if (btnSubmit != null) {
-            btnSubmit.setText(currentUser != null && currentUser.getLives() <= 0
+            btnSubmit.setText(isPracticeOnly()
                     ? "Practicar sin XP" : "Enviar solución");
         }
         if (btnNextChallenge != null) {
@@ -799,11 +799,11 @@ public class ChallengeFrame extends Stage {
         txtConsoleOutput.setText("> Reto cargado: " + challenge.getTitle() + "\n" + modeNote + "\n> Esperando envío del estudiante...");
         lblExecutionMetrics.setText("Tiempo: -- ms");
         consolePane.setExpanded(false);
-        showFeedback(currentUser != null && currentUser.getLives() <= 0
-                ? "Sin vidas: puedes practicar. Este intento no se guardará ni otorgará XP."
+        showFeedback(isPracticeOnly()
+                ? "Modo práctica: este intento no se guardará ni otorgará XP. Recupera la conexión o las vidas para volver a enviar."
                 : draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
                 : "Resuelve el reto y envía tu respuesta. Los borradores se conservan durante esta sesión.", "body-text");
-        if (saveUncertain) {
+        if (saveUncertain && !isPracticeOnly()) {
             btnSubmit.setText("Volver a enviar");
             showFeedback("El guardado anterior sigue sin confirmar. Revisa tu historial antes de reenviar.", "text-warning");
         }
@@ -1308,7 +1308,7 @@ public class ChallengeFrame extends Stage {
         if (busy) {
             return;
         }
-        if (saveUncertain) {
+        if (saveUncertain && !isPracticeOnly()) {
             Alert retry = new Alert(Alert.AlertType.CONFIRMATION);
             retry.initOwner(this);
             retry.setTitle("Confirmar nuevo envío");
@@ -1376,7 +1376,9 @@ public class ChallengeFrame extends Stage {
         };
         setBusy(true);
         lblBusy.textProperty().bind(task.messageProperty());
-        showFeedback("Envío en curso. Espera el resultado antes de cambiar de reto o cerrar.", "body-text");
+        showFeedback(submission.practiceOnly()
+                ? "Práctica en curso: no se guardará ni otorgará XP."
+                : "Envío en curso. Espera el resultado antes de cambiar de reto o cerrar.", "body-text");
         task.setOnSucceeded(event -> {
             try {
                 renderEvaluation(submission, task.getValue());
@@ -1386,7 +1388,7 @@ public class ChallengeFrame extends Stage {
             }
         });
         task.setOnFailed(event -> {
-            saveUncertain = submission.saveToOracle();
+            if (submission.saveToOracle()) saveUncertain = true;
             LOGGER.log(Level.SEVERE, "Error al evaluar el reto #" + submission.challengeId(), task.getException());
             txtConsoleOutput.setText(exceptionDetails(task.getException()));
             consolePane.setExpanded(true);
@@ -1451,7 +1453,7 @@ public class ChallengeFrame extends Stage {
         UserSnapshot user = currentUser == null ? null : new UserSnapshot(currentUser.getId(),
                 currentUser.getExperience(), currentUser.getLevel(), currentUser.getLives(),
                 currentUser.getCurrentStreak(), currentUser.getMaxStreak());
-        boolean practiceOnly = user != null && user.lives() <= 0;
+        boolean practiceOnly = isPracticeOnly();
         boolean saveToOracle = !practiceOnly && AppContext.getInstance().isOracleConnected()
                 && user != null && user.id() > 0 && activeChallenge.getId() > 0;
         return new Submission(activeChallenge.getId(), payload, code, selectedQuizIndex,
@@ -1461,6 +1463,12 @@ public class ChallengeFrame extends Stage {
     private record Submission(int challengeId, String payload, CodeSnapshot code, int quizIndex,
             int correctQuizIndex, String correctAnswer, UserSnapshot user,
             boolean saveToOracle, boolean practiceOnly) { }
+
+    private boolean isPracticeOnly() {
+        AppContext context = AppContext.getInstance();
+        return (currentUser != null && currentUser.getLives() <= 0)
+                || (context.isOracleConnected() && !context.isOracleAvailable());
+    }
 
     private record CaseSnapshot(int id, String input, String expected, boolean hidden) { }
 
@@ -1613,9 +1621,9 @@ public class ChallengeFrame extends Stage {
             boolean practiceOnly) {
 
         StringBuilder fullConsole = new StringBuilder(consoleMessage);
-        saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
+        if (!practiceOnly) saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
 
-        if (saveUncertain) {
+        if (saveUncertain && !practiceOnly) {
             fullConsole.append("\n[ERROR DE GUARDADO EN ORACLE] ").append(persistence.errorMessage).append("\n")
                     .append("> No se pudo confirmar el guardado. Consulta el historial en el panel antes de reenviar; el intento podría haberse registrado.");
             txtConsoleOutput.setText(fullConsole.toString());
@@ -1626,7 +1634,7 @@ public class ChallengeFrame extends Stage {
             return;
         }
 
-        btnSubmit.setText(currentUser != null && currentUser.getLives() <= 0
+        btnSubmit.setText(isPracticeOnly()
                 ? "Practicar sin XP" : "Enviar solución");
         boolean effectiveSuccess = persistence.savedToOracle && persistence.attempt != null
                 ? persistence.attempt.isCorrect()
