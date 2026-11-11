@@ -166,6 +166,28 @@ public class ContentService {
         return contentRepository.saveChallenge(challenge);
     }
 
+    /** Updates an existing challenge without allowing its persisted subtype to change. */
+    public Challenge updateChallenge(User administrator, Challenge challenge) {
+        requireAdministrator(administrator);
+        validateChallenge(challenge);
+        if (challenge.getId() <= 0) {
+            throw new IllegalArgumentException("El reto que intenta actualizar no existe.");
+        }
+        Challenge persisted = contentRepository.findChallengeById(challenge.getId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El reto que intenta actualizar no existe."));
+        if (!persisted.getClass().equals(challenge.getClass())) {
+            throw new IllegalArgumentException(
+                    "No se puede cambiar el tipo de un reto que ya tiene historial.");
+        }
+        Lesson lesson = contentRepository.findLessonById(challenge.getLesson().getId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "La lección asociada no existe."));
+        challenge.setTitle(challenge.getTitle().trim());
+        challenge.setLesson(lesson);
+        return contentRepository.updateChallenge(challenge);
+    }
+
     /**
      * Devuelve los lenguajes activos que pueden mostrarse a los estudiantes.
      */
