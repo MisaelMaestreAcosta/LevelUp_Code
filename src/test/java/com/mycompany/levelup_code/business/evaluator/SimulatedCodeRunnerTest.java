@@ -8,6 +8,7 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,22 @@ class SimulatedCodeRunnerTest {
                 + "}";
 
         assertThrows(TimeoutException.class, () -> runner.run("Java", hangingJava, "Perro", 1));
+    }
+
+    @Test
+    void blocksStudentCodeFromReadingFilesOutsideTheSandbox() {
+        String fileReader =
+                "import java.nio.file.*;\n"
+                + "public class FileReaderSolver {\n"
+                + "    public static String solve(String input) throws Exception {\n"
+                + "        return Files.readString(Path.of(System.getProperty(\"user.home\"), \"secret.txt\"));\n"
+                + "    }\n"
+                + "}";
+
+        IOException denied = assertThrows(IOException.class,
+                () -> runner.run("Java", fileReader, "x", 2));
+        assertTrue(denied.getMessage().contains("API no permitida"),
+                "El proceso debe negar el acceso a archivos externos");
     }
 
     @Test
