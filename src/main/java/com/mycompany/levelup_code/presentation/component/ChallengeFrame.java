@@ -2,6 +2,7 @@ package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
+import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -14,11 +15,13 @@ import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.time.format.DateTimeFormatter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.logging.Level;
@@ -66,6 +69,7 @@ import javafx.stage.WindowEvent;
 public class ChallengeFrame extends Stage {
 
     private static final Logger LOGGER = Logger.getLogger(ChallengeFrame.class.getName());
+    private static final DateTimeFormatter ATTEMPT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final Pattern JAVA_CLASS_PATTERN = Pattern.compile("(?:public\\s+)?class\\s+([A-Za-z_][A-Za-z0-9_]*)");
     private static final Pattern JAVA_METHOD_PATTERN = Pattern.compile(
             "public\\s+static\\s+[A-Za-z0-9_<>\\[\\]]+\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^\\)]*)\\)");
@@ -300,6 +304,13 @@ public class ChallengeFrame extends Stage {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         topRow.getChildren().addAll(badgeType, badgeDifficulty, badgeExecutionMode, badgeReward);
+        if (currentUser != null && currentUser.getId() > 0
+                && AppContext.getInstance().isOracleConnected()) {
+            Button history = new Button("Ver historial");
+            history.getStyleClass().add("btn-secondary");
+            history.setOnAction(event -> showAttemptHistory());
+            topRow.getChildren().add(history);
+        }
         headerCard.getChildren().addAll(lblChallengeTitle, topRow);
 
         switcherButtons.clear();
@@ -329,6 +340,90 @@ public class ChallengeFrame extends Stage {
 
         headerCard.getChildren().add(lblStatement);
         return headerCard;
+    }
+
+    private void showAttemptHistory() {
+        if (activeChallenge == null || activeChallenge.getId() <= 0) return;
+        int challengeId = activeChallenge.getId();
+        Alert dialog = new Alert(Alert.AlertType.INFORMATION);
+        dialog.initOwner(this);
+        dialog.setTitle("Historial de intentos");
+        dialog.setHeaderText("Tus intentos en " + activeChallenge.getTitle());
+        dialog.getButtonTypes().setAll(ButtonType.CLOSE);
+        dialog.setResizable(true);
+
+        Label status = new Label("Consultando intentos guardados…");
+        status.getStyleClass().add("muted-text");
+        VBox entries = new VBox(10);
+        ScrollPane scroll = new ScrollPane(entries);
+        scroll.setFitToWidth(true);
+        scroll.setPrefViewportWidth(540);
+        scroll.setPrefViewportHeight(350);
+        scroll.getStyleClass().add("scroll-pane-clean");
+        Button refresh = new Button("Actualizar historial");
+        refresh.getStyleClass().add("btn-secondary");
+        VBox content = new VBox(12, status, scroll, refresh);
+        dialog.getDialogPane().setContent(content);
+        refresh.setOnAction(event -> loadAttemptHistory(challengeId, status, entries, refresh));
+        dialog.show();
+        Theme.applyCss(dialog.getDialogPane().getScene());
+        loadAttemptHistory(challengeId, status, entries, refresh);
+    }
+
+    private void loadAttemptHistory(int challengeId, Label status, VBox entries, Button refresh) {
+        refresh.setDisable(true);
+        status.setText("Consultando intentos guardados…");
+        Task<List<Attempt>> query = new Task<>() {
+            @Override protected List<Attempt> call() {
+                return AppContext.getInstance().getChallengeService()
+                        .getAttemptHistory(currentUser.getId(), challengeId);
+            }
+        };
+        query.setOnSucceeded(event -> {
+            refresh.setDisable(false);
+            entries.getChildren().clear();
+            List<Attempt> attempts = new ArrayList<>(query.getValue());
+            Collections.reverse(attempts);
+            status.setText(attempts.isEmpty() ? "Todavía no hay intentos guardados para este reto."
+                    : attempts.size() + " intento(s) guardado(s), del más reciente al más antiguo.");
+            for (Attempt attempt : attempts) {
+                VBox card = new VBox(6);
+                card.getStyleClass().add("surface-subtle");
+                String date = attempt.getAttemptDate() == null ? "Fecha desconocida"
+                        : ATTEMPT_DATE.format(attempt.getAttemptDate());
+                Label summary = new Label(date + " · " + attemptResultLabel(attempt.getResult())
+                        + " · +" + attempt.getEarnedExperience() + " XP"
+                        + " · " + attempt.getExecutionTimeMs() + " ms");
+                summary.setWrapText(true);
+                summary.getStyleClass().add(attempt.isCorrect() ? "text-success" : "text-warning");
+                TextArea submission = new TextArea(attempt.getSubmittedContent() == null
+                        ? "" : attempt.getSubmittedContent());
+                submission.setEditable(false);
+                submission.setWrapText(true);
+                submission.setPrefRowCount(4);
+                submission.setAccessibleText("Respuesta enviada el " + date);
+                card.getChildren().addAll(summary, submission);
+                entries.getChildren().add(card);
+            }
+        });
+        query.setOnFailed(event -> {
+            LOGGER.log(Level.WARNING, "No se pudo cargar el historial de intentos", query.getException());
+            refresh.setDisable(false);
+            status.setText("No pudimos consultar el historial. Comprueba la conexión y pulsa Actualizar historial.");
+        });
+        Thread worker = new Thread(query, "challenge-attempt-history");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private static String attemptResultLabel(AttemptResult result) {
+        if (result == null) return "Sin resultado";
+        return switch (result) {
+            case CORRECT -> "Correcto";
+            case INCORRECT -> "Por corregir";
+            case ERROR -> "Error de ejecución";
+            case TIMEOUT -> "Tiempo agotado";
+        };
     }
 
     private SplitPane buildWorkspaceSplit() {
