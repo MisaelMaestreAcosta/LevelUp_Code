@@ -111,6 +111,7 @@ public class DashboardFrame {
     private Label lblLivesVal;
     private Label lblLivesSub;
     private ProgressBar livesProgressBar;
+    private Button btnRecoverLives;
 
     // Árbol de habilidades y cursos
     private Label lblLessonsHeader;
@@ -594,7 +595,10 @@ public class DashboardFrame {
         livesProgressBar = new ProgressBar(currentUser.getLives() / 5.0);
         livesProgressBar.getStyleClass().add("progress-bar-rose");
         livesProgressBar.setMaxWidth(Double.MAX_VALUE);
-        cardLives.getChildren().addAll(livTop, livMid, lblLivesSub, livesProgressBar);
+        btnRecoverLives = new Button("Recuperar vidas");
+        btnRecoverLives.getStyleClass().add("btn-secondary");
+        btnRecoverLives.setOnAction(event -> recoverLives());
+        cardLives.getChildren().addAll(livTop, livMid, lblLivesSub, livesProgressBar, btnRecoverLives);
 
         telemetryBar.getChildren().addAll(cardLevel, cardExp, cardStreak, cardLives);
         for (Node card : telemetryBar.getChildren()) {
@@ -1610,6 +1614,36 @@ public class DashboardFrame {
         startTask(refresh, "dashboard-refresh");
     }
 
+    private void recoverLives() {
+        if (currentUser.getLives() > 0 || btnRecoverLives.isDisable()) return;
+        if (!oracleConnected) {
+            currentUser.setLives(5);
+            refreshGamificationTelemetry();
+            syncStatus.setText("Vidas recuperadas en modo de prueba; los cambios duran esta sesión.");
+            return;
+        }
+        btnRecoverLives.setDisable(true);
+        syncStatus.setText("Comprobando si ya puedes recuperar tus vidas…");
+        Task<Integer> task = new Task<>() {
+            @Override protected Integer call() {
+                return AppContext.getInstance().getGamificationService().recoverLivesIfEligible(currentUser);
+            }
+        };
+        task.setOnSucceeded(event -> {
+            btnRecoverLives.setDisable(false);
+            refreshGamificationTelemetry();
+            syncStatus.setText(task.getValue() > 0
+                    ? "¡Vidas recuperadas! Ya puedes volver a enviar retos."
+                    : "Las vidas se recuperan al comenzar un nuevo día. Puedes practicar sin XP mientras tanto.");
+        });
+        task.setOnFailed(event -> {
+            btnRecoverLives.setDisable(false);
+            LOGGER.log(Level.WARNING, "No se pudieron recuperar las vidas", task.getException());
+            syncStatus.setText("No pudimos comprobar las vidas. Revisa la conexión e inténtalo de nuevo.");
+        });
+        startTask(task, "recover-lives");
+    }
+
     private void refreshGamificationTelemetry() {
         int exp = currentUser.getTotalExp();
         int computedLevel = Math.max(currentUser.getLevel(), 1 + exp / 300);
@@ -1631,7 +1665,10 @@ public class DashboardFrame {
         badgeMaxStreak.setText("Máx: " + currentUser.getMaxStreak() + "d");
 
         lblLivesVal.setText(currentUser.getLives() + " / 5");
-        lblLivesSub.setText(currentUser.getLives() > 0 ? "Energía lista" : "Sin vidas disponibles");
+        lblLivesSub.setText(currentUser.getLives() > 0 ? "Energía lista"
+                : "Sin vidas · practica sin XP");
         livesProgressBar.setProgress(currentUser.getLives() / 5.0);
+        btnRecoverLives.setVisible(currentUser.getLives() <= 0);
+        btnRecoverLives.setManaged(currentUser.getLives() <= 0);
     }
 }

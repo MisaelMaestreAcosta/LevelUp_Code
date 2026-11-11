@@ -76,6 +76,14 @@ public final class InMemoryTestRepositories {
         public User update(User user) {
             return save(user);
         }
+
+        @Override
+        public int recoverLivesIfEligible(int userId) {
+            User user = byId.get(userId);
+            if (user == null) throw new IllegalArgumentException("Usuario desconocido");
+            user.setLives(5);
+            return user.getLives();
+        }
     }
 
     public static final class FakeContentRepository implements ContentRepository {

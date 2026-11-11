@@ -118,7 +118,8 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
     );
 
     /**
-     * Restaura las vidas del estudiante al valor máximo permitido (5 vidas).
+     * Restaura las vidas agotadas al inicio de un nuevo día (máximo 5).
+     * Devuelve 0 cuando todavía hubo intentos durante el día actual.
      */
     PROCEDURE SP_RECUPERAR_VIDAS(
         p_id_usuario          IN  NUMBER,
@@ -331,6 +332,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
                 RAISE_APPLICATION_ERROR(-20002, 'El usuario #' || p_id_usuario || ' no existe en la base de datos.');
         END;
 
+        IF v_vidas_actuales <= 0 THEN
+            RAISE_APPLICATION_ERROR(-20004, 'Sin vidas disponibles. Practica sin guardar y vuelve mañana.');
+        END IF;
+
         -- 3. Consultar datos y recompensa del reto
         BEGIN
             SELECT exp_recompensa
@@ -524,6 +529,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         p_id_usuario          IN  NUMBER,
         p_vidas_restauradas   OUT NUMBER
     ) IS
+        v_vidas_actuales NUMBER;
+        v_intentos_hoy NUMBER;
     BEGIN
         SAVEPOINT sp_proc_vidas;
 
@@ -531,14 +538,30 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
             RAISE_APPLICATION_ERROR(-20020, 'El ID de usuario es obligatorio.');
         END IF;
 
-        UPDATE Usuarios
-        SET vidas = C_VIDAS_MAXIMAS,
-            ultima_actividad = SYSTIMESTAMP
-        WHERE id_usuario = p_id_usuario;
+        BEGIN
+            SELECT vidas INTO v_vidas_actuales
+            FROM Usuarios WHERE id_usuario = p_id_usuario FOR UPDATE;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE_APPLICATION_ERROR(-20021, 'Usuario #' || p_id_usuario || ' no encontrado.');
+        END;
 
-        IF SQL%ROWCOUNT = 0 THEN
-            RAISE_APPLICATION_ERROR(-20021, 'Usuario #' || p_id_usuario || ' no encontrado.');
+        IF v_vidas_actuales > 0 THEN
+            p_vidas_restauradas := v_vidas_actuales;
+            RETURN;
         END IF;
+
+        SELECT COUNT(*) INTO v_intentos_hoy
+        FROM Intentos
+        WHERE id_usuario = p_id_usuario
+          AND fecha_intento >= TRUNC(SYSDATE);
+
+        IF v_intentos_hoy > 0 THEN
+            p_vidas_restauradas := 0;
+            RETURN;
+        END IF;
+
+        UPDATE Usuarios SET vidas = C_VIDAS_MAXIMAS WHERE id_usuario = p_id_usuario;
 
         p_vidas_restauradas := C_VIDAS_MAXIMAS;
     EXCEPTION

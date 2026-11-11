@@ -215,6 +215,13 @@ class GamificationAndChallengeServiceTest {
 
         challengeService.submitAttempt(student, 77, "Incorrecta");
         assertEquals(4, student.getLives(), "La vida debe descontarse exactamente una vez por el motor transaccional");
+
+        student.setLives(0);
+        assertThrows(IllegalStateException.class,
+                () -> challengeService.submitAttempt(student, 77, "Correcta"),
+                "Oracle tampoco debe recibir intentos sin vidas");
+        assertEquals(5, gamificationService.recoverLivesIfEligible(student));
+        assertEquals(5, student.getLives());
     }
 }
 

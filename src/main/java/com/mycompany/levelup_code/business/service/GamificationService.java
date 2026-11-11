@@ -83,6 +83,16 @@ public class GamificationService {
         userRepository.update(user);
     }
 
+    /** Applies the daily recovery rule in the repository and updates the session user. */
+    public int recoverLivesIfEligible(User user) {
+        if (user == null || user.getId() <= 0) {
+            throw new IllegalArgumentException("El usuario debe ser válido.");
+        }
+        int lives = userRepository.recoverLivesIfEligible(user.getId());
+        user.setLives(lives);
+        return lives;
+    }
+
     /** Continúa la racha si hubo actividad ayer; si no, la inicia de nuevo. */
     private void updateStreak(User user, LocalDate today) {
         LocalDate yesterday = today.minusDays(1);
