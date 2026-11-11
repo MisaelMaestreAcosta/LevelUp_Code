@@ -22,6 +22,8 @@ import javax.crypto.spec.PBEKeySpec;
  */
 public class UserService {
 
+    public static final int MAX_EMAIL_LENGTH = 120;
+
     private static final int SALT_BYTES = 16;
     private static final int KEY_BITS = 256;
     private static final int ITERATIONS = 120_000;
@@ -117,7 +119,7 @@ public class UserService {
             );
         }
 
-        if (email == null || email.trim().length() > 254
+        if (email == null || email.trim().length() > MAX_EMAIL_LENGTH
                 || !email.trim().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
             throw new IllegalArgumentException(
                     "El correo electrónico no es válido."

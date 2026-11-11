@@ -694,8 +694,9 @@ public class LoginFrame {
             return "Escribe el correo de tu cuenta.";
         }
         // Registration mirrors UserService; login does not add new account restrictions.
-        if (registerMode && (email.length() > 254 || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
-            return "Usa un correo válido, por ejemplo nombre@correo.com (máximo 254 caracteres).";
+        if (registerMode && (email.length() > UserService.MAX_EMAIL_LENGTH
+                || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) {
+            return "Usa un correo válido, por ejemplo nombre@correo.com (máximo 120 caracteres).";
         }
         return "";
     }
