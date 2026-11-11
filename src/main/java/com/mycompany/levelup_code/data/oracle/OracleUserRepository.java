@@ -1,7 +1,13 @@
 package com.mycompany.levelup_code.data.oracle;
 
+import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.data.dao.UserRepository;
 import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.exception.BusinessException;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Types;
 import java.util.Optional;
 
 /**
@@ -39,6 +45,26 @@ public class OracleUserRepository implements UserRepository {
     public User update(User user) {
         userDAO.update(user);
         return user;
+    }
+
+    @Override
+    public int recoverLivesIfEligible(int userId) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try (CallableStatement stmt = conn.prepareCall("{call PKG_GAMIFICACION.SP_RECUPERAR_VIDAS(?, ?)}")) {
+                stmt.setInt(1, userId);
+                stmt.registerOutParameter(2, Types.NUMERIC);
+                stmt.execute();
+                int restored = stmt.getInt(2);
+                conn.commit();
+                return restored;
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            }
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudieron recuperar las vidas en Oracle: " + ex.getMessage(), ex);
+        }
     }
 }
 

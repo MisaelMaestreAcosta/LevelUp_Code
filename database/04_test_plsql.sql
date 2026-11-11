@@ -183,7 +183,31 @@ BEGIN
         p_vidas_restauradas => v_vidas_rest
     );
 
-    REGISTRAR_TEST('Restauración a 5 vidas máximas', v_vidas_rest = 5, 'Vidas restauradas: ' || v_vidas_rest);
+    REGISTRAR_TEST('Sin restauración mientras aún quedan vidas', v_vidas_rest = 4, 'Vidas restantes: ' || v_vidas_rest);
+
+    UPDATE Usuarios SET vidas = 0 WHERE id_usuario = 1;
+    PKG_GAMIFICACION.SP_RECUPERAR_VIDAS(
+        p_id_usuario => 1,
+        p_vidas_restauradas => v_vidas_rest
+    );
+    REGISTRAR_TEST('Sin recuperación el mismo día', v_vidas_rest = 0,
+                   'Vidas tras intentar recuperar: ' || v_vidas_rest);
+
+    BEGIN
+        PKG_GAMIFICACION.SP_REGISTRAR_INTENTO_RETO(
+            p_id_usuario => 1, p_id_reto => 101, p_es_correcto => 1,
+            p_codigo_enviado => 'test', p_salida_obtenida => 'test', p_tiempo_ms => 10,
+            p_nuevo_nivel => v_nuevo_nivel, p_nueva_exp => v_nueva_exp,
+            p_vidas_restantes => v_vidas_restantes, p_exp_otorgada => v_exp_otorgada,
+            p_id_intento_creado => v_id_intento
+        );
+        REGISTRAR_TEST('Bloqueo de intento sin vidas', FALSE, 'No debió guardar el intento');
+    EXCEPTION
+        WHEN OTHERS THEN
+            REGISTRAR_TEST('Bloqueo de intento sin vidas', SQLCODE = -20004,
+                           'Código esperado: -20004 | Error: ' || SQLERRM);
+    END;
+    UPDATE Usuarios SET vidas = 4 WHERE id_usuario = 1;
 
     -- =========================================================================
     -- CASO 6: PROCEDIMIENTO SP_COMPLETAR_LECCION

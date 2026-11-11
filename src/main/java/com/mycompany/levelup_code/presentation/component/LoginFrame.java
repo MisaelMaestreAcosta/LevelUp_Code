@@ -436,7 +436,34 @@ public class LoginFrame {
             btnQuickAdmin.setOnAction(e -> quickLoginAs("admin@levelup.edu.co", "admin12345"));
 
             quickButtons.getChildren().addAll(btnQuickStudent, btnQuickAdmin);
-            quickCard.getChildren().addAll(quickHeader, demoHint, quickButtons);
+            Button reconnect = new Button("Comprobar conexión con Oracle");
+            reconnect.getStyleClass().add("btn-ghost-green");
+            Label reconnectStatus = new Label();
+            reconnectStatus.getStyleClass().add("muted-text");
+            reconnectStatus.setWrapText(true);
+            reconnect.setOnAction(event -> {
+                if (authenticating) return;
+                reconnect.setDisable(true);
+                reconnectStatus.setText("Comprobando Oracle…");
+                Task<Boolean> check = new Task<>() {
+                    @Override protected Boolean call() { return AppContext.reconnectOracle(); }
+                };
+                check.setOnSucceeded(done -> {
+                    reconnect.setDisable(false);
+                    if (!stage.isShowing() || stage.getScene() != loginScene) return;
+                    if (check.getValue()) new LoginFrame(stage).show();
+                    else reconnectStatus.setText("Oracle todavía no responde. Puedes continuar en modo demo.");
+                });
+                check.setOnFailed(done -> {
+                    reconnect.setDisable(false);
+                    LOGGER.log(Level.WARNING, "No se pudo reconectar con Oracle", check.getException());
+                    reconnectStatus.setText("No pudimos comprobar Oracle. Inténtalo de nuevo.");
+                });
+                Thread worker = new Thread(check, "login-oracle-reconnect");
+                worker.setDaemon(true);
+                worker.start();
+            });
+            quickCard.getChildren().addAll(quickHeader, demoHint, quickButtons, reconnect, reconnectStatus);
             formColumn.getChildren().add(quickCard);
         }
         installValidation(txtUsername, lblUsernameError, this::usernameError);

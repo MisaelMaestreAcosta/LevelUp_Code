@@ -64,7 +64,7 @@ public class ChallengeService {
 
     public SubmissionResult submitAttemptDetailed(User user, int challengeId, String submission) {
         validateSubmission(user, challengeId, submission);
-        if (!attemptRepository.managesGamificationTransactionally() && user.getLives() <= 0) {
+        if (user.getLives() <= 0) {
             throw new IllegalStateException("El usuario no dispone de vidas suficientes para enviar intentos.");
         }
 

@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
+import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
@@ -30,6 +31,9 @@ import java.util.logging.Logger;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.concurrent.Task;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.FlowPane;
@@ -111,6 +115,7 @@ public class DashboardFrame {
     private Label lblLivesVal;
     private Label lblLivesSub;
     private ProgressBar livesProgressBar;
+    private Button btnRecoverLives;
 
     // Árbol de habilidades y cursos
     private Label lblLessonsHeader;
@@ -149,6 +154,12 @@ public class DashboardFrame {
     private Label continueSummary;
     private Button continueButton;
     private Label syncStatus;
+    private Label badgeConn;
+    private Button btnRetryConnection;
+    private Timeline connectionWatch;
+    private boolean healthChecking;
+    private boolean connectionAvailable;
+    private boolean dataStale;
     private final Map<String, VBox> languageCards = new HashMap<>();
     private Map<Lesson, ProgressStatus> lessonStatuses = Map.of();
     private Set<Integer> unlockedAchievementIds = Set.of();
@@ -165,6 +176,7 @@ public class DashboardFrame {
         this.currentUser = user != null ? user : DemoSeedCatalog.createDefaultStudent();
         AppContext ctx = AppContext.getInstance();
         this.oracleConnected = ctx.isOracleConnected();
+        this.connectionAvailable = ctx.isOracleAvailable();
         this.controller = new DashboardController(this.currentUser, ctx);
         this.lastKnownOfflineExp = this.currentUser.getTotalExp();
 
@@ -210,6 +222,7 @@ public class DashboardFrame {
             loadComparisonTopic("POLYMORPHISM");
             refreshAchievementsGrid();
             refreshGamificationTelemetry();
+            startConnectionWatch();
         });
         task.setOnFailed(e -> {
             LOGGER.log(Level.WARNING, "Unable to load dashboard", task.getException());
@@ -326,7 +339,10 @@ public class DashboardFrame {
         stage.setTitle("LevelUp Code · Tu espacio de aprendizaje");
         stage.setMinWidth(900);
         stage.setMinHeight(640);
-        stage.setOnCloseRequest(event -> disposed = true);
+        stage.setOnCloseRequest(event -> {
+            disposed = true;
+            if (connectionWatch != null) connectionWatch.stop();
+        });
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-shell");
@@ -352,7 +368,18 @@ public class DashboardFrame {
         syncStatus = new Label(oracleConnected ? "Tu progreso se guarda automáticamente."
                 : "Modo de prueba · Los cambios duran esta sesión.");
         syncStatus.getStyleClass().add("muted-text");
-        centerShell.getChildren().addAll(syncStatus, topTelemetry, workspaceContainer);
+        syncStatus.setWrapText(true);
+        btnRetryConnection = new Button("Reintentar");
+        btnRetryConnection.getStyleClass().add("btn-secondary");
+        btnRetryConnection.setOnAction(event -> {
+            if (oracleConnected) checkConnection();
+            else refreshAllDashboardState();
+        });
+        btnRetryConnection.setVisible(false);
+        btnRetryConnection.setManaged(false);
+        HBox syncBar = new HBox(10, syncStatus, btnRetryConnection);
+        syncBar.setAlignment(Pos.CENTER_LEFT);
+        centerShell.getChildren().addAll(syncBar, topTelemetry, workspaceContainer);
         centerShell.setMinWidth(0);
         ScrollPane centerScroll = new ScrollPane(centerShell);
         centerScroll.setFitToWidth(true);
@@ -465,7 +492,7 @@ public class DashboardFrame {
 
         String connLabel = oracleConnected ? "CONECTADO" : "MODO DE PRUEBA";
         String connClass = oracleConnected ? "badge-green" : "badge-amber";
-        Label badgeConn = Theme.createPillBadge(connLabel, connClass);
+        badgeConn = Theme.createPillBadge(connLabel, connClass);
 
         Button btnLogout = new Button("Cerrar Sesión");
         btnLogout.getStyleClass().add("btn-secondary");
@@ -474,6 +501,7 @@ public class DashboardFrame {
         btnLogout.setMaxWidth(Double.MAX_VALUE);
         btnLogout.setOnAction(e -> {
             disposed = true;
+            if (connectionWatch != null) connectionWatch.stop();
             LoginFrame loginFrame = new LoginFrame(stage);
             loginFrame.show();
         });
@@ -594,7 +622,10 @@ public class DashboardFrame {
         livesProgressBar = new ProgressBar(currentUser.getLives() / 5.0);
         livesProgressBar.getStyleClass().add("progress-bar-rose");
         livesProgressBar.setMaxWidth(Double.MAX_VALUE);
-        cardLives.getChildren().addAll(livTop, livMid, lblLivesSub, livesProgressBar);
+        btnRecoverLives = new Button("Recuperar vidas");
+        btnRecoverLives.getStyleClass().add("btn-secondary");
+        btnRecoverLives.setOnAction(event -> recoverLives());
+        cardLives.getChildren().addAll(livTop, livMid, lblLivesSub, livesProgressBar, btnRecoverLives);
 
         telemetryBar.getChildren().addAll(cardLevel, cardExp, cardStreak, cardLives);
         for (Node card : telemetryBar.getChildren()) {
@@ -1593,21 +1624,108 @@ public class DashboardFrame {
             refreshing = false;
             if (disposed) return;
             applyDashboardState(refresh.getValue());
+            dataStale = false;
+            setConnectionState(true, "CONECTADO", "Tu progreso está actualizado.", false);
             rebuildHeatmapCells();
             refreshGamificationTelemetry();
             populateLessonsForLanguage(activeLanguageKey);
             refreshCourseProgressBars();
             refreshAchievementsGrid();
-            syncStatus.setText(oracleConnected ? "Tu progreso está actualizado."
-                    : "Modo de prueba · Los cambios duran esta sesión.");
+            if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
             if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
         });
         refresh.setOnFailed(e -> {
             refreshing = false;
             LOGGER.log(Level.WARNING, "Dashboard refresh failed", refresh.getException());
-            if (!disposed) syncStatus.setText("No pudimos actualizar el progreso. Conservamos la última información disponible.");
+            dataStale = true;
+            if (!disposed) setConnectionState(connectionAvailable,
+                    connectionAvailable ? "SIN SINCRONIZAR" : "SIN CONEXIÓN",
+                    "No pudimos actualizar el progreso. Conservamos la última información disponible.", true);
         });
         startTask(refresh, "dashboard-refresh");
+    }
+
+    private void startConnectionWatch() {
+        if (!oracleConnected || connectionWatch != null) return;
+        connectionWatch = new Timeline(new KeyFrame(Duration.seconds(30), event -> checkConnection()));
+        connectionWatch.setCycleCount(Timeline.INDEFINITE);
+        connectionWatch.play();
+    }
+
+    private void checkConnection() {
+        if (!oracleConnected || disposed || healthChecking) return;
+        healthChecking = true;
+        btnRetryConnection.setDisable(true);
+        Task<Boolean> check = new Task<>() {
+            @Override protected Boolean call() { return DatabaseConnection.isDatabaseReady(); }
+        };
+        check.setOnSucceeded(event -> {
+            healthChecking = false;
+            btnRetryConnection.setDisable(false);
+            if (disposed) return;
+            if (check.getValue()) {
+                boolean needsRefresh = !connectionAvailable || dataStale;
+                setConnectionState(true, needsRefresh ? "SINCRONIZANDO" : "CONECTADO",
+                        needsRefresh ? "Oracle responde. Actualizando tu progreso…"
+                                : "Tu progreso se guarda automáticamente.", false);
+                if (needsRefresh) refreshAllDashboardState();
+            } else {
+                setConnectionState(false, "SIN CONEXIÓN",
+                        "Oracle no responde. Mostramos la última información cargada; pulsa Reintentar.", true);
+            }
+        });
+        check.setOnFailed(event -> {
+            healthChecking = false;
+            btnRetryConnection.setDisable(false);
+            LOGGER.log(Level.WARNING, "Connection check failed", check.getException());
+            if (!disposed) setConnectionState(false, "SIN CONEXIÓN",
+                    "No pudimos comprobar Oracle. Pulsa Reintentar.", true);
+        });
+        startTask(check, "oracle-health-check");
+    }
+
+    private void setConnectionState(boolean available, String badgeText, String message, boolean showRetry) {
+        connectionAvailable = available;
+        AppContext.getInstance().setOracleAvailable(available);
+        if (badgeConn != null && oracleConnected) {
+            badgeConn.setText(badgeText);
+            badgeConn.getStyleClass().setAll("CONECTADO".equals(badgeText) ? "badge-green" : "badge-amber");
+        }
+        if (syncStatus != null) syncStatus.setText(message);
+        if (btnRetryConnection != null) {
+            btnRetryConnection.setVisible(showRetry);
+            btnRetryConnection.setManaged(showRetry);
+        }
+    }
+
+    private void recoverLives() {
+        if (currentUser.getLives() > 0 || btnRecoverLives.isDisable()) return;
+        if (!oracleConnected) {
+            currentUser.setLives(5);
+            refreshGamificationTelemetry();
+            syncStatus.setText("Vidas recuperadas en modo de prueba; los cambios duran esta sesión.");
+            return;
+        }
+        btnRecoverLives.setDisable(true);
+        syncStatus.setText("Comprobando si ya puedes recuperar tus vidas…");
+        Task<Integer> task = new Task<>() {
+            @Override protected Integer call() {
+                return AppContext.getInstance().getGamificationService().recoverLivesIfEligible(currentUser);
+            }
+        };
+        task.setOnSucceeded(event -> {
+            btnRecoverLives.setDisable(false);
+            refreshGamificationTelemetry();
+            syncStatus.setText(task.getValue() > 0
+                    ? "¡Vidas recuperadas! Ya puedes volver a enviar retos."
+                    : "Las vidas se recuperan al comenzar un nuevo día. Puedes practicar sin XP mientras tanto.");
+        });
+        task.setOnFailed(event -> {
+            btnRecoverLives.setDisable(false);
+            LOGGER.log(Level.WARNING, "No se pudieron recuperar las vidas", task.getException());
+            syncStatus.setText("No pudimos comprobar las vidas. Revisa la conexión e inténtalo de nuevo.");
+        });
+        startTask(task, "recover-lives");
     }
 
     private void refreshGamificationTelemetry() {
@@ -1631,7 +1749,10 @@ public class DashboardFrame {
         badgeMaxStreak.setText("Máx: " + currentUser.getMaxStreak() + "d");
 
         lblLivesVal.setText(currentUser.getLives() + " / 5");
-        lblLivesSub.setText(currentUser.getLives() > 0 ? "Energía lista" : "Sin vidas disponibles");
+        lblLivesSub.setText(currentUser.getLives() > 0 ? "Energía lista"
+                : "Sin vidas · practica sin XP");
         livesProgressBar.setProgress(currentUser.getLives() / 5.0);
+        btnRecoverLives.setVisible(currentUser.getLives() <= 0);
+        btnRecoverLives.setManaged(currentUser.getLives() <= 0);
     }
 }

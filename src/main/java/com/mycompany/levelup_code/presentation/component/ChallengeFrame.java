@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.business.service.ChallengeService;
+import com.mycompany.levelup_code.data.local.ChallengeDraftStore;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.model.Attempt;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import java.time.format.DateTimeFormatter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -33,6 +35,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.concurrent.Task;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -79,6 +83,8 @@ public class ChallengeFrame extends Stage {
     private final List<Challenge> availableChallenges;
     private final Runnable onSolvedCallback;
     private final SimulatedCodeRunner codeRunner = AppContext.getInstance().getCodeRunner();
+    private final ChallengeDraftStore draftStore = new ChallengeDraftStore();
+    private final PauseTransition draftSaveDelay = new PauseTransition(Duration.millis(900));
 
     private Challenge activeChallenge;
     private boolean xpAwardedForCurrent = false;
@@ -130,6 +136,7 @@ public class ChallengeFrame extends Stage {
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback) {
         this.currentUser = user;
+        draftSaveDelay.setOnFinished(event -> rememberDraft());
         this.onSolvedCallback = onSolvedCallback;
         this.availableChallenges = new ArrayList<>();
         if (challenge != null) {
@@ -171,6 +178,8 @@ public class ChallengeFrame extends Stage {
 
     private boolean allowClose() {
         if (!busy) {
+            draftSaveDelay.stop();
+            rememberDraft();
             return true;
         }
         showFeedback("Espera a que termine el envío antes de cerrar. El guardado sigue en curso.", "text-warning");
@@ -496,13 +505,16 @@ public class ChallengeFrame extends Stage {
 
         txtEditor = new TextArea();
         txtEditor.setAccessibleText("Código de la solución");
-        txtEditor.setAccessibleHelp("Ctrl+Enter para enviar. El borrador se conserva al cambiar de reto durante esta sesión.");
+        txtEditor.setAccessibleHelp("Ctrl+Enter para enviar. El borrador se conserva al cerrar y volver a abrir.");
         txtEditor.setMinWidth(0);
         txtEditor.setPrefRowCount(12);
         txtEditor.getStyleClass().add("code-editor");
         HBox.setHgrow(txtEditor, Priority.ALWAYS);
 
-        txtEditor.textProperty().addListener((obs, oldVal, newVal) -> updateLineGutter(newVal));
+        txtEditor.textProperty().addListener((obs, oldVal, newVal) -> {
+            updateLineGutter(newVal);
+            scheduleDraftSave();
+        });
         txtEditor.scrollTopProperty().addListener((obs, oldVal, newVal) -> txtLineGutter.setScrollTop(newVal.doubleValue()));
 
         editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
@@ -700,15 +712,27 @@ public class ChallengeFrame extends Stage {
         if (busy || (viewLoaded && activeChallenge == challenge)) {
             return;
         }
+        draftSaveDelay.stop();
         rememberDraft();
         viewLoaded = false;
         this.activeChallenge = challenge;
         Draft draft = drafts.get(challenge);
+        if (draft == null && canPersistDraft(challenge)) {
+            try {
+                draft = draftStore.load(draftMode(), currentUser.getEmail(), challenge.getId())
+                        .map(saved -> new Draft(saved.code(), saved.quizIndex(), saved.caret(),
+                                saved.scrollTop(), false, saved.saveUncertain()))
+                        .orElse(null);
+            } catch (IOException ex) {
+                LOGGER.log(Level.WARNING, "No se pudo leer el borrador del reto", ex);
+            }
+        }
         this.saveUncertain = draft != null && draft.saveUncertain();
         this.xpAwardedForCurrent = draft != null && draft.xpAwarded();
         this.selectedQuizIndex = draft != null ? draft.quizIndex() : -1;
         if (btnSubmit != null) {
-            btnSubmit.setText("Enviar solución");
+            btnSubmit.setText(isPracticeOnly()
+                    ? "Practicar sin XP" : "Enviar solución");
         }
         if (btnNextChallenge != null) {
             btnNextChallenge.getStyleClass().setAll("btn-ghost");
@@ -798,9 +822,11 @@ public class ChallengeFrame extends Stage {
         txtConsoleOutput.setText("> Reto cargado: " + challenge.getTitle() + "\n" + modeNote + "\n> Esperando envío del estudiante...");
         lblExecutionMetrics.setText("Tiempo: -- ms");
         consolePane.setExpanded(false);
-        showFeedback(draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
-                : "Resuelve el reto y envía tu respuesta. Los borradores se conservan durante esta sesión.", "body-text");
-        if (saveUncertain) {
+        showFeedback(isPracticeOnly()
+                ? "Modo práctica: este intento no se guardará ni otorgará XP. Recupera la conexión o las vidas para volver a enviar."
+                : draft != null ? "Borrador recuperado. Puedes continuar y enviar tu respuesta."
+                : "Resuelve el reto y envía tu respuesta. Tu borrador se guarda en este equipo.", "body-text");
+        if (saveUncertain && !isPracticeOnly()) {
             btnSubmit.setText("Volver a enviar");
             showFeedback("El guardado anterior sigue sin confirmar. Revisa tu historial antes de reenviar.", "text-warning");
         }
@@ -809,9 +835,34 @@ public class ChallengeFrame extends Stage {
 
     private void rememberDraft() {
         if (viewLoaded) {
-            drafts.put(activeChallenge, new Draft(txtEditor.getText(), selectedQuizIndex,
-                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent, saveUncertain));
+            Draft draft = new Draft(txtEditor.getText(), selectedQuizIndex,
+                    txtEditor.getCaretPosition(), txtEditor.getScrollTop(), xpAwardedForCurrent, saveUncertain);
+            drafts.put(activeChallenge, draft);
+            if (canPersistDraft(activeChallenge)) {
+                try {
+                    draftStore.save(draftMode(), currentUser.getEmail(), activeChallenge.getId(),
+                            new ChallengeDraftStore.DraftData(draft.code(), draft.quizIndex(),
+                                    draft.caret(), draft.scrollTop(), draft.saveUncertain()));
+                } catch (IOException ex) {
+                    LOGGER.log(Level.WARNING, "No se pudo guardar el borrador del reto", ex);
+                    showFeedback("No pudimos guardar el borrador en este equipo. Conserva una copia de tu respuesta.",
+                            "text-warning");
+                }
+            }
         }
+    }
+
+    private boolean canPersistDraft(Challenge challenge) {
+        return currentUser != null && currentUser.getEmail() != null
+                && !currentUser.getEmail().isBlank() && challenge != null && challenge.getId() > 0;
+    }
+
+    private String draftMode() {
+        return AppContext.getInstance().isOracleConnected() ? "oracle" : "demo";
+    }
+
+    private void scheduleDraftSave() {
+        if (viewLoaded && !busy) draftSaveDelay.playFromStart();
     }
 
     private record Draft(String code, int quizIndex, int caret, double scrollTop,
@@ -1032,6 +1083,7 @@ public class ChallengeFrame extends Stage {
             card.getStyleClass().setAll("radio-button", i == index ? "quiz-option-card-selected" : "quiz-option-card");
         }
         showFeedback("Respuesta seleccionada. Envía con Ctrl+Enter o con el botón.", "body-text");
+        scheduleDraftSave();
     }
 
     /**
@@ -1305,7 +1357,7 @@ public class ChallengeFrame extends Stage {
         if (busy) {
             return;
         }
-        if (saveUncertain) {
+        if (saveUncertain && !isPracticeOnly()) {
             Alert retry = new Alert(Alert.AlertType.CONFIRMATION);
             retry.initOwner(this);
             retry.setTitle("Confirmar nuevo envío");
@@ -1373,7 +1425,9 @@ public class ChallengeFrame extends Stage {
         };
         setBusy(true);
         lblBusy.textProperty().bind(task.messageProperty());
-        showFeedback("Envío en curso. Espera el resultado antes de cambiar de reto o cerrar.", "body-text");
+        showFeedback(submission.practiceOnly()
+                ? "Práctica en curso: no se guardará ni otorgará XP."
+                : "Envío en curso. Espera el resultado antes de cambiar de reto o cerrar.", "body-text");
         task.setOnSucceeded(event -> {
             try {
                 renderEvaluation(submission, task.getValue());
@@ -1383,7 +1437,7 @@ public class ChallengeFrame extends Stage {
             }
         });
         task.setOnFailed(event -> {
-            saveUncertain = submission.saveToOracle();
+            if (submission.saveToOracle()) saveUncertain = true;
             LOGGER.log(Level.SEVERE, "Error al evaluar el reto #" + submission.challengeId(), task.getException());
             txtConsoleOutput.setText(exceptionDetails(task.getException()));
             consolePane.setExpanded(true);
@@ -1448,14 +1502,22 @@ public class ChallengeFrame extends Stage {
         UserSnapshot user = currentUser == null ? null : new UserSnapshot(currentUser.getId(),
                 currentUser.getExperience(), currentUser.getLevel(), currentUser.getLives(),
                 currentUser.getCurrentStreak(), currentUser.getMaxStreak());
-        boolean saveToOracle = AppContext.getInstance().isOracleConnected()
+        boolean practiceOnly = isPracticeOnly();
+        boolean saveToOracle = !practiceOnly && AppContext.getInstance().isOracleConnected()
                 && user != null && user.id() > 0 && activeChallenge.getId() > 0;
         return new Submission(activeChallenge.getId(), payload, code, selectedQuizIndex,
-                correctQuizIndex, correctAnswer, user, saveToOracle);
+                correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly);
     }
 
     private record Submission(int challengeId, String payload, CodeSnapshot code, int quizIndex,
-            int correctQuizIndex, String correctAnswer, UserSnapshot user, boolean saveToOracle) { }
+            int correctQuizIndex, String correctAnswer, UserSnapshot user,
+            boolean saveToOracle, boolean practiceOnly) { }
+
+    private boolean isPracticeOnly() {
+        AppContext context = AppContext.getInstance();
+        return (currentUser != null && currentUser.getLives() <= 0)
+                || (context.isOracleConnected() && !context.isOracleAvailable());
+    }
 
     private record CaseSnapshot(int id, String input, String expected, boolean hidden) { }
 
@@ -1504,7 +1566,8 @@ public class ChallengeFrame extends Stage {
             currentUser.setLives(savedUser.getLives());
             currentUser.setCurrentStreak(savedUser.getCurrentStreak());
             currentUser.setMaxStreak(savedUser.getMaxStreak());
-        } else if (!result.persistence().attemptedOracleSave && !result.correct() && currentUser != null) {
+        } else if (!submission.practiceOnly() && !result.persistence().attemptedOracleSave
+                && !result.correct() && currentUser != null) {
             currentUser.loseLife();
         }
         if (submission.code() != null) {
@@ -1513,7 +1576,8 @@ public class ChallengeFrame extends Stage {
             if (summary == null) {
                 lblExecutionMetrics.setText("Evaluación sin detalle de casos");
                 handleEvaluationOutcome(result.correct(), false,
-                        "> No se recibió el detalle de los casos de prueba.\n", result.persistence());
+                        "> No se recibió el detalle de los casos de prueba.\n", result.persistence(),
+                        submission.practiceOnly());
                 return;
             }
             List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
@@ -1564,7 +1628,8 @@ public class ChallengeFrame extends Stage {
                     summary.getPassedCount(),
                     summary.getTotalCount()));
 
-            handleEvaluationOutcome(summary.isAllPassed(), summary.isSandboxedExecution(), log.toString(), result.persistence());
+            handleEvaluationOutcome(summary.isAllPassed(), summary.isSandboxedExecution(), log.toString(),
+                    result.persistence(), submission.practiceOnly());
 
         } else {
             boolean correct = result.persistence().savedToOracle
@@ -1587,7 +1652,7 @@ public class ChallengeFrame extends Stage {
                     ? "Has identificado correctamente el fundamento técnico evaluado en este reto."
                     : "La opción seleccionada no corresponde al contrato esperado. Revisa la pista conceptual e inténtalo de nuevo.");
 
-            handleEvaluationOutcome(correct, true, msg + "\n", result.persistence());
+            handleEvaluationOutcome(correct, true, msg + "\n", result.persistence(), submission.practiceOnly());
         }
     }
 
@@ -1601,12 +1666,13 @@ public class ChallengeFrame extends Stage {
             boolean localSuccess,
             boolean sandboxedValidation,
             String consoleMessage,
-            PersistenceOutcome persistence) {
+            PersistenceOutcome persistence,
+            boolean practiceOnly) {
 
         StringBuilder fullConsole = new StringBuilder(consoleMessage);
-        saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
+        if (!practiceOnly) saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
 
-        if (saveUncertain) {
+        if (saveUncertain && !practiceOnly) {
             fullConsole.append("\n[ERROR DE GUARDADO EN ORACLE] ").append(persistence.errorMessage).append("\n")
                     .append("> No se pudo confirmar el guardado. Consulta el historial en el panel antes de reenviar; el intento podría haberse registrado.");
             txtConsoleOutput.setText(fullConsole.toString());
@@ -1617,7 +1683,8 @@ public class ChallengeFrame extends Stage {
             return;
         }
 
-        btnSubmit.setText("Enviar solución");
+        btnSubmit.setText(isPracticeOnly()
+                ? "Practicar sin XP" : "Enviar solución");
         boolean effectiveSuccess = persistence.savedToOracle && persistence.attempt != null
                 ? persistence.attempt.isCorrect()
                 : localSuccess;
@@ -1626,6 +1693,8 @@ public class ChallengeFrame extends Stage {
             fullConsole.append("> Persistencia: Intento #")
                     .append(persistence.attempt != null ? persistence.attempt.getId() : 0)
                     .append(" guardado transaccionalmente en Oracle (Intentos).\n");
+        } else if (practiceOnly) {
+            fullConsole.append("> Modo práctica: resultado local sin guardado ni XP.\n");
         } else {
             fullConsole.append("> Modo local: este intento no se envió a Oracle.\n");
         }
@@ -1637,7 +1706,7 @@ public class ChallengeFrame extends Stage {
                 btnNextChallenge.getStyleClass().setAll("btn-primary");
                 Theme.playPulse(btnNextChallenge);
             }
-            int reward = persistence.savedToOracle && persistence.attempt != null
+            int reward = practiceOnly ? 0 : persistence.savedToOracle && persistence.attempt != null
                     ? persistence.attempt.getEarnedExperience()
                     : activeChallenge.getExpReward();
 
@@ -1646,15 +1715,18 @@ public class ChallengeFrame extends Stage {
                 currentUser.addExperience(reward);
                 currentUser.setLevel(Math.max(1, 1 + currentUser.getTotalExp() / 300));
             }
-            xpAwardedForCurrent = true;
+            if (!practiceOnly) xpAwardedForCurrent = true;
             String rewardMessage = currentUser != null && reward > 0 && (persistence.savedToOracle || awardLocal)
                     ? " +" + reward + " XP." : "";
-            showFeedback((persistence.savedToOracle ? "¡Aprobado y guardado!" : "¡Aprobado en modo local!")
+            showFeedback((persistence.savedToOracle ? "¡Aprobado y guardado!"
+                    : practiceOnly ? "¡Práctica aprobada! Sin vidas, el intento no se guardó ni dio XP."
+                    : "¡Aprobado en modo local!")
                     + (sandboxedValidation ? "" : " (Simulación)") + rewardMessage
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");
             Theme.playPulse(lblResultBanner);
         } else {
-            showFeedback((persistence.savedToOracle ? "Intento guardado. " : "Evaluado en modo local. ")
+            showFeedback((persistence.savedToOracle ? "Intento guardado. "
+                    : practiceOnly ? "Práctica sin XP. " : "Evaluado en modo local. ")
                     + (activeChallenge instanceof QuizChallenge
                     ? "Revisa la pista y elige otra respuesta." : "Revisa los casos fallidos y corrige tu código."), "text-danger");
             Theme.playPulse(lblResultBanner);
