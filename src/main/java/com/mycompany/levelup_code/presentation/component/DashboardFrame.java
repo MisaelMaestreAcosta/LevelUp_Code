@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
+import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
@@ -148,6 +149,8 @@ public class DashboardFrame {
     private TextField txtAdminCase2Out;
     private Label lblAdminStatus;
     private Button btnAdminSave;
+    private Button btnAdminValidate;
+    private String validatedAdminDraftFingerprint;
     private TextField lessonSearch;
     private CheckBox hideCompleted;
     private Label lessonResults;
@@ -1483,14 +1486,29 @@ public class DashboardFrame {
         Region sp = new Region();
         HBox.setHgrow(sp, Priority.ALWAYS);
 
-        Button btnCreateAndTest = new Button("Guardar y probar");
+        btnAdminValidate = new Button("Validar reto");
+        btnAdminValidate.getStyleClass().add("btn-secondary");
+        btnAdminValidate.setOnAction(e -> handleValidateAdminChallenge());
+
+        Button btnCreateAndTest = new Button("Publicar reto");
         btnAdminSave = btnCreateAndTest;
         btnCreateAndTest.getStyleClass().add("btn-success");
         btnCreateAndTest.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
         btnCreateAndTest.setGraphicTextGap(8);
+        btnCreateAndTest.setDisable(true);
         btnCreateAndTest.setOnAction(e -> handleCreateAdminChallenge());
 
-        actionRow.getChildren().addAll(lblAdminStatus, sp, btnCreateAndTest);
+        Runnable invalidate = this::invalidateAdminValidation;
+        cmbAdminLesson.valueProperty().addListener((obs, old, value) -> invalidate.run());
+        for (javafx.beans.value.ObservableValue<String> value : List.of(
+                txtAdminTitle.textProperty(), txtAdminReward.textProperty(),
+                txtAdminStatement.textProperty(), txtAdminTemplate.textProperty(),
+                txtAdminCase1In.textProperty(), txtAdminCase1Out.textProperty(),
+                txtAdminCase2In.textProperty(), txtAdminCase2Out.textProperty())) {
+            value.addListener((obs, old, current) -> invalidate.run());
+        }
+
+        actionRow.getChildren().addAll(lblAdminStatus, sp, btnAdminValidate, btnCreateAndTest);
 
         formCard.getChildren().addAll(row1, row2, casesRow, actionRow);
         formCard.setMinHeight(580);
@@ -1510,10 +1528,109 @@ public class DashboardFrame {
     }
 
     private void handleCreateAdminChallenge() {
+        AdminChallengeDraft prepared = prepareAdminChallengeDraft();
+        if (prepared == null) return;
+        if (!prepared.fingerprint().equals(validatedAdminDraftFingerprint)) {
+            invalidateAdminValidation();
+            lblAdminStatus.getStyleClass().setAll("text-warning");
+            lblAdminStatus.setText("Valida esta versión del reto antes de publicarla.");
+            return;
+        }
+
+        Lesson targetLesson = prepared.lesson();
+        CodeChallenge newCh = prepared.challenge();
+
+        btnAdminSave.setDisable(true);
+        btnAdminValidate.setDisable(true);
+        btnAdminSave.setText("Publicando…");
+        lblAdminStatus.setText("Publicando el reto validado. Espera un momento.");
+        Task<Challenge> save = new Task<>() {
+            @Override protected Challenge call() { return controller.createAdminChallenge(targetLesson, newCh); }
+        };
+        save.setOnSucceeded(e -> {
+            if (disposed) return;
+            Challenge saved = save.getValue();
+            btnAdminValidate.setDisable(false);
+            validatedAdminDraftFingerprint = null;
+            btnAdminSave.setDisable(true);
+            btnAdminSave.setText("Publicar reto");
+            if (targetLesson != null) {
+                targetLesson.addChallenge(saved);
+            }
+            lblAdminStatus.getStyleClass().setAll("text-success");
+            lblAdminStatus.setText(oracleConnected && saved.getId() > 0
+                    ? "¡Reto publicado! Ya puedes probarlo."
+                    : "Reto validado y creado para esta sesión de prueba.");
+            populateLessonsForLanguage(activeLanguageKey);
+            new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
+        });
+        save.setOnFailed(e -> {
+            LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());
+            btnAdminValidate.setDisable(false);
+            btnAdminSave.setDisable(false);
+            btnAdminSave.setText("Reintentar publicación");
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("No pudimos publicar el reto. Tus datos y su validación siguen aquí; revisa la conexión y vuelve a intentarlo.");
+        });
+        startTask(save, "challenge-save");
+    }
+
+    private void handleValidateAdminChallenge() {
+        AdminChallengeDraft prepared = prepareAdminChallengeDraft();
+        if (prepared == null) return;
+        btnAdminValidate.setDisable(true);
+        btnAdminSave.setDisable(true);
+        lblAdminStatus.getStyleClass().setAll("muted-text");
+        lblAdminStatus.setText("Compilando y comprobando los casos del reto…");
+        Task<SimulatedCodeRunner.ExecutionSummary> validation = new Task<>() {
+            @Override protected SimulatedCodeRunner.ExecutionSummary call() {
+                return AppContext.getInstance().getCodeRunner()
+                        .runAndValidate(prepared.challenge(), prepared.challenge().getInitialTemplate());
+            }
+        };
+        validation.setOnSucceeded(event -> {
+            btnAdminValidate.setDisable(false);
+            SimulatedCodeRunner.ExecutionSummary result = validation.getValue();
+            if (result.isAllPassed()) {
+                validatedAdminDraftFingerprint = prepared.fingerprint();
+                btnAdminSave.setDisable(false);
+                lblAdminStatus.getStyleClass().setAll("text-success");
+                lblAdminStatus.setText(result.isSandboxedExecution()
+                        ? "Validación aprobada: todos los casos pasaron. Ya puedes publicar."
+                        : "Validación simulada aprobada. El reto se publicará en modo práctica sin XP.");
+            } else {
+                validatedAdminDraftFingerprint = null;
+                btnAdminSave.setDisable(true);
+                lblAdminStatus.getStyleClass().setAll("text-danger");
+                String firstFailure = result.getCaseOutcomes().stream()
+                        .filter(outcome -> !outcome.isPassed())
+                        .map(SimulatedCodeRunner.CaseOutcome::getMessage)
+                        .findFirst().orElse("Revisa el código y los resultados esperados.");
+                lblAdminStatus.setText("El reto todavía no puede publicarse: " + firstFailure);
+            }
+        });
+        validation.setOnFailed(event -> {
+            btnAdminValidate.setDisable(false);
+            validatedAdminDraftFingerprint = null;
+            btnAdminSave.setDisable(true);
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("No se pudo validar: " + validation.getException().getMessage());
+        });
+        startTask(validation, "challenge-validation");
+    }
+
+    private void invalidateAdminValidation() {
+        if (btnAdminSave == null) return;
+        validatedAdminDraftFingerprint = null;
+        btnAdminSave.setDisable(true);
+        btnAdminSave.setText("Publicar reto");
+    }
+
+    private AdminChallengeDraft prepareAdminChallengeDraft() {
         if (currentUser == null || !currentUser.isAdministrator()) {
             lblAdminStatus.getStyleClass().setAll("text-danger");
             lblAdminStatus.setText("Acceso denegado: Se requiere rol de Administrador.");
-            return;
+            return null;
         }
 
         int lessonIdx = cmbAdminLesson.getSelectionModel().getSelectedIndex();
@@ -1530,17 +1647,23 @@ public class DashboardFrame {
         } catch (NumberFormatException ex) {
             lblAdminStatus.getStyleClass().setAll("text-danger");
             lblAdminStatus.setText("La recompensa XP debe ser un número entero válido.");
-            return;
+            return null;
         }
 
-        if (targetLesson == null || title.isBlank() || statement.isBlank() || template.isBlank() || reward <= 0) {
+        String case1In = txtAdminCase1In.getText().trim();
+        String case1Out = txtAdminCase1Out.getText().trim();
+        String case2In = txtAdminCase2In.getText().trim();
+        String case2Out = txtAdminCase2Out.getText().trim();
+        if (targetLesson == null || title.isBlank() || statement.isBlank() || template.isBlank()
+                || reward <= 0 || reward > 500 || case1In.isBlank() || case1Out.isBlank()
+                || case2In.isBlank() || case2Out.isBlank() || case1In.equals(case2In)) {
             lblAdminStatus.getStyleClass().setAll("text-danger");
-            lblAdminStatus.setText("Selecciona una lección y completa el título, enunciado y código. La recompensa debe ser mayor que cero.");
+            lblAdminStatus.setText("Completa todos los campos, usa dos entradas distintas y una recompensa entre 1 y 500 XP.");
             if (title.isBlank()) txtAdminTitle.requestFocus();
             else if (statement.isBlank()) txtAdminStatement.requestFocus();
             else if (template.isBlank()) txtAdminTemplate.requestFocus();
             else txtAdminReward.requestFocus();
-            return;
+            return null;
         }
 
         CodeChallenge newCh = new CodeChallenge(
@@ -1552,39 +1675,15 @@ public class DashboardFrame {
                 template,
                 2
         );
-        newCh.addTestCase(new TestCase(1, newCh, txtAdminCase1In.getText().trim(), txtAdminCase1Out.getText().trim(), false));
-        newCh.addTestCase(new TestCase(2, newCh, txtAdminCase2In.getText().trim(), txtAdminCase2Out.getText().trim(), false));
-
-        btnAdminSave.setDisable(true);
-        btnAdminSave.setText("Guardando…");
-        lblAdminStatus.setText("Estamos guardando tu reto. Espera un momento.");
-        Task<Challenge> save = new Task<>() {
-            @Override protected Challenge call() { return controller.createAdminChallenge(targetLesson, newCh); }
-        };
-        save.setOnSucceeded(e -> {
-            if (disposed) return;
-            Challenge saved = save.getValue();
-            btnAdminSave.setDisable(false);
-            btnAdminSave.setText("Guardar y probar");
-            if (targetLesson != null) {
-                targetLesson.addChallenge(saved);
-            }
-            lblAdminStatus.getStyleClass().setAll("text-success");
-            lblAdminStatus.setText(oracleConnected && saved.getId() > 0
-                    ? "¡Reto guardado! Ya puedes probarlo."
-                    : "Reto creado para esta sesión de prueba.");
-            populateLessonsForLanguage(activeLanguageKey);
-            new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
-        });
-        save.setOnFailed(e -> {
-            LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());
-            btnAdminSave.setDisable(false);
-            btnAdminSave.setText("Reintentar guardado");
-            lblAdminStatus.getStyleClass().setAll("text-danger");
-            lblAdminStatus.setText("No pudimos guardar el reto. Tus datos siguen aquí; revisa la conexión y vuelve a intentarlo.");
-        });
-        startTask(save, "challenge-save");
+        newCh.addTestCase(new TestCase(1, newCh, case1In, case1Out, false));
+        newCh.addTestCase(new TestCase(2, newCh, case2In, case2Out, false));
+        String fingerprint = targetLesson.getId() + "\n" + title + "\n" + statement + "\n"
+                + template + "\n" + reward + "\n" + case1In + "\n" + case1Out
+                + "\n" + case2In + "\n" + case2Out;
+        return new AdminChallengeDraft(targetLesson, newCh, fingerprint);
     }
+
+    private record AdminChallengeDraft(Lesson lesson, CodeChallenge challenge, String fingerprint) { }
 
     private void switchWorkspaceView(String cardKey) {
         if ("ADMIN".equals(cardKey) && (currentUser == null || !currentUser.isAdministrator())) {
