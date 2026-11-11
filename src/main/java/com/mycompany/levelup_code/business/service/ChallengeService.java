@@ -113,7 +113,7 @@ public class ChallengeService {
                 } else {
                     achievementService.evaluateAndUnlock(user);
                 }
-            } else {
+            } else if (savedAttempt.getResult() == AttemptResult.INCORRECT) {
                 gamificationService.penalizeFailedAttempt(user);
             }
         }

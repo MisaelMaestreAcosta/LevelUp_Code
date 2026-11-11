@@ -159,7 +159,7 @@ BEGIN
         p_id_reto            => 101,
         p_es_correcto        => 0,
         p_codigo_enviado     => 'public class SolucionErronea { /* error */ }',
-        p_salida_obtenida    => 'Error: caso 2 falló',
+        p_salida_obtenida    => 'INCORRECT',
         p_tiempo_ms          => 18,
         p_nuevo_nivel        => v_nuevo_nivel,
         p_nueva_exp          => v_nueva_exp,

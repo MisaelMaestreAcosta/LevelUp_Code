@@ -87,8 +87,9 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
      *      - Registra/acumula en Actividad_Diaria (MERGE).
      *      - Evalúa y actualiza la racha actual y máxima.
      *      - Evalúa y desbloquea logros en Usuario_Logro si se cumplen condiciones.
-     *   3. Si es incorrecto:
+     *   3. Si la respuesta evaluada es incorrecta:
      *      - Resta 1 vida en Usuarios (mínimo 0).
+     *      - Los errores internos, de compilación o de infraestructura no consumen vidas.
      *   4. Retorna los estados resultantes en parámetros OUT para el cliente Java.
      */
     PROCEDURE SP_REGISTRAR_INTENTO_RETO(
@@ -406,10 +407,15 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
             EVALUAR_LOGROS_USUARIO(p_id_usuario, p_nueva_exp, v_racha_actual);
 
         ELSE
-            -- Si falló, restar 1 vida
+            -- Solo una respuesta realmente incorrecta consume una vida. ERROR y
+            -- TIMEOUT se registran para diagnóstico sin penalizar al estudiante.
             p_nueva_exp := v_exp_actual;
             p_nuevo_nivel := FN_CALCULAR_NIVEL(p_nueva_exp);
-            p_vidas_restantes := GREATEST(0, v_vidas_actuales - 1);
+            IF UPPER(TRIM(p_salida_obtenida)) = 'INCORRECT' THEN
+                p_vidas_restantes := GREATEST(0, v_vidas_actuales - 1);
+            ELSE
+                p_vidas_restantes := v_vidas_actuales;
+            END IF;
 
             UPDATE Usuarios
             SET vidas = p_vidas_restantes,

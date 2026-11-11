@@ -1,10 +1,12 @@
 package com.mycompany.levelup_code.business.service;
 
 import com.mycompany.levelup_code.business.evaluator.ChallengeEvaluator;
+import com.mycompany.levelup_code.business.evaluator.ChallengeEvaluation;
 import com.mycompany.levelup_code.business.evaluator.CodeChallengeEvaluator;
 import com.mycompany.levelup_code.business.evaluator.QuizChallengeEvaluator;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.enums.AttemptResult;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
@@ -38,6 +40,34 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GamificationAndChallengeServiceTest {
+
+    @Test
+    void evaluatorErrorsAreRecordedWithoutTakingAStudentLife() {
+        FakeUserRepository users = new FakeUserRepository();
+        FakeAttemptRepository attempts = new FakeAttemptRepository(false);
+        FakeChallengeRepository challenges = new FakeChallengeRepository();
+        AchievementService achievements = new AchievementService(new FakeAchievementRepository(users, attempts));
+        GamificationService gamification = new GamificationService(users,
+                new FakeActivityRepository(), new StandardLevelPolicy(), achievements);
+        Map<ChallengeType, ChallengeEvaluator> evaluators = new EnumMap<>(ChallengeType.class);
+        evaluators.put(ChallengeType.QUIZ,
+                (challenge, submission) -> new ChallengeEvaluation(AttemptResult.ERROR, 0));
+        ChallengeService service = new ChallengeService(challenges, attempts,
+                evaluators, gamification, achievements);
+
+        QuizChallenge quiz = new QuizChallenge(91, "Quiz", "Pregunta", null, 20,
+                List.of("A", "B"), "A");
+        challenges.register(quiz);
+        User student = new User();
+        student.setId(91);
+        student.setLives(3);
+        users.save(student);
+
+        Attempt saved = service.submitAttempt(student, 91, "A");
+
+        assertEquals(AttemptResult.ERROR, saved.getResult());
+        assertEquals(3, student.getLives(), "Un error del evaluador no debe castigar al estudiante");
+    }
 
     @Test
     void detailedSubmissionReturnsTheSingleEvaluationUsedForPersistence() {
