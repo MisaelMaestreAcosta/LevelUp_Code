@@ -216,7 +216,7 @@ public class DashboardFrame {
                 loadDomainDataFromOracleOrSeed();
                 loadEnrollmentsFromOracle();
                 loadAchievementsFromOracleOrSeed();
-                return fetchDashboardState(0);
+                return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
             }
         };
         task.setOnSucceeded(e -> {
@@ -228,6 +228,9 @@ public class DashboardFrame {
             loadComparisonTopic("POLYMORPHISM");
             refreshAchievementsGrid();
             refreshGamificationTelemetry();
+            if (task.getValue().livesRecovered()) {
+                syncStatus.setText("¡Tus 5 vidas diarias se recuperaron automáticamente!");
+            }
             startConnectionWatch();
         });
         task.setOnFailed(e -> {
@@ -242,9 +245,10 @@ public class DashboardFrame {
     }
 
     private record DashboardState(int solved, Map<LocalDate, Integer> activity,
-            Map<Lesson, ProgressStatus> progress, Set<Integer> achievements) { }
+            Map<Lesson, ProgressStatus> progress, Set<Integer> achievements,
+            boolean livesRecovered) { }
 
-    private DashboardState fetchDashboardState(int offlineSolved) {
+    private DashboardState fetchDashboardState(int offlineSolved, boolean livesRecovered) {
         int solved = controller.syncTelemetryAndGetSolvedChallenges(offlineSolved);
         Map<Lesson, ProgressStatus> progress = new HashMap<>();
         Map<Integer, ProgressStatus> savedStatuses = controller.loadLessonProgressStatuses();
@@ -260,7 +264,21 @@ public class DashboardFrame {
             }
         }
         return new DashboardState(solved, controller.loadRecentActivityHistory(), progress,
-                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved));
+                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered);
+    }
+
+    private boolean recoverExhaustedLivesOnOpen() {
+        if (!oracleConnected || currentUser.getId() <= 0 || currentUser.getLives() > 0) {
+            return false;
+        }
+        try {
+            return AppContext.getInstance().getGamificationService()
+                    .recoverLivesIfEligible(currentUser) > 0;
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.WARNING,
+                    "No se pudo comprobar la recuperación automática de vidas", ex);
+            return false;
+        }
     }
 
     private void applyDashboardState(DashboardState state) {
@@ -1849,7 +1867,9 @@ public class DashboardFrame {
         syncStatus.setText("Actualizando tu progreso…");
         int offlineSolved = solvedChallengesCount;
         Task<DashboardState> refresh = new Task<>() {
-            @Override protected DashboardState call() { return fetchDashboardState(offlineSolved); }
+            @Override protected DashboardState call() {
+                return fetchDashboardState(offlineSolved, false);
+            }
         };
         refresh.setOnSucceeded(e -> {
             refreshing = false;
