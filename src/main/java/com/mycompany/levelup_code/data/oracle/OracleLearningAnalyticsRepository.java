@@ -36,7 +36,7 @@ public final class OracleLearningAnalyticsRepository {
                 }
             }
             try (PreparedStatement stmt = conn.prepareStatement("SELECT NVL(SUM(exp_ganada),0), "
-                    + "COUNT(DISTINCT TRUNC(fecha)) FROM Actividad_Diaria "
+                    + "COUNT(DISTINCT CASE WHEN exp_ganada>0 THEN TRUNC(fecha) END) FROM Actividad_Diaria "
                     + "WHERE id_usuario=? AND fecha>=TRUNC(SYSDATE)-6 AND fecha<TRUNC(SYSDATE)+1")) {
                 stmt.setInt(1, userId);
                 try (ResultSet rs = stmt.executeQuery()) {
