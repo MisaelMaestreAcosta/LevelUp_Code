@@ -99,6 +99,8 @@ public class DashboardFrame {
     private Button navProgressBtn;
     private Button navNotebookBtn;
     private Button navGoalsBtn;
+    private Button navLabBtn;
+    private CodingLabPane codingLab;
     private NotebookPane notebookPane;
     private VBox practiceView;
     private VBox practiceResults;
@@ -480,6 +482,10 @@ public class DashboardFrame {
         navGoalsBtn.getStyleClass().add("nav-btn");
         navGoalsBtn.setMaxWidth(Double.MAX_VALUE);
         navGoalsBtn.setOnAction(e -> switchWorkspaceView("GOALS"));
+        navLabBtn = new Button("Laboratorio");
+        navLabBtn.getStyleClass().add("nav-btn");
+        navLabBtn.setMaxWidth(Double.MAX_VALUE);
+        navLabBtn.setOnAction(e -> switchWorkspaceView("LAB"));
 
         navComparatorBtn = new Button("Comparar lenguajes");
         navComparatorBtn.getStyleClass().add("nav-btn");
@@ -519,7 +525,7 @@ public class DashboardFrame {
 
         navColumn.getChildren().addAll(
                 lblBrand, lblSub, lblNavSection,
-                navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navComparatorBtn, navAchievementsBtn
+                navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
@@ -1984,6 +1990,9 @@ public class DashboardFrame {
             target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected);
         } else if ("GOALS".equals(cardKey)) {
             target = new LearningGoalsPane(currentUser.getId(), oracleConnected);
+        } else if ("LAB".equals(cardKey)) {
+            if (codingLab == null) codingLab = new CodingLabPane(currentUser, oracleConnected);
+            target = codingLab;
         } else if ("NOTEBOOK".equals(cardKey)) {
             if (notebookPane==null) notebookPane = new NotebookPane(currentUser, oracleConnected,
                     allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
@@ -2006,6 +2015,7 @@ public class DashboardFrame {
         navProgressBtn.getStyleClass().setAll("PROGRESS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navNotebookBtn.getStyleClass().setAll("NOTEBOOK".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navGoalsBtn.getStyleClass().setAll("GOALS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
+        navLabBtn.getStyleClass().setAll("LAB".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navCoursesBtn.setGraphic(Theme.createIcon(
                 Theme.IconKind.BOOK, 16, "COURSES".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_INDIGO));
 
