@@ -2,6 +2,7 @@ package com.mycompany.levelup_code.data.oracle;
 
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.data.dao.ChallengeRepository;
+import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.CourseModule;
@@ -177,7 +178,9 @@ public class OracleChallengeRepository implements ChallengeRepository {
             String rawOptions = rs.getString("opciones");
             List<String> options = QuizOptionCodec.decode(rawOptions);
             String correctAnswer = rs.getString("respuesta_correcta");
-            return new QuizChallenge(id, title, statement, lesson, expReward, options, correctAnswer);
+            QuizChallenge quiz = new QuizChallenge(id, title, statement, lesson, expReward, options, correctAnswer);
+            quiz.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
+            return quiz;
         }
 
         String template = rs.getString("codigo_inicial");
@@ -186,6 +189,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
         CodeChallenge codeChallenge = new CodeChallenge(
                 id, title, statement, lesson, expReward, template, limitSeconds);
+        codeChallenge.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
         return codeChallenge;
     }
 }

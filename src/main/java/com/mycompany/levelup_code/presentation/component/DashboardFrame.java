@@ -4,6 +4,7 @@ import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -144,6 +145,7 @@ public class DashboardFrame {
     private CodeChallenge adminEditingChallenge;
     private TextField txtAdminTitle;
     private TextField txtAdminReward;
+    private ComboBox<ChallengeDifficulty> cmbAdminDifficulty;
     private TextArea txtAdminStatement;
     private TextArea txtAdminTemplate;
     private TextField txtAdminCase1In;
@@ -1447,14 +1449,20 @@ public class DashboardFrame {
 
         txtAdminReward = new TextField("90");
         txtAdminReward.getStyleClass().add("input-field");
+        cmbAdminDifficulty = new ComboBox<>();
+        cmbAdminDifficulty.getItems().setAll(ChallengeDifficulty.values());
+        cmbAdminDifficulty.getSelectionModel().select(ChallengeDifficulty.MEDIO);
+        cmbAdminDifficulty.setMaxWidth(Double.MAX_VALUE);
 
         VBox colLesson = wrapLabeledField("LECCIÓN", cmbAdminLesson);
         VBox colTitle = wrapLabeledField("TÍTULO DEL RETO", txtAdminTitle);
         VBox colReward = wrapLabeledField("RECOMPENSA XP", txtAdminReward);
+        VBox colDifficulty = wrapLabeledField("DIFICULTAD", cmbAdminDifficulty);
         HBox.setHgrow(colLesson, Priority.ALWAYS);
         HBox.setHgrow(colTitle, Priority.ALWAYS);
         colReward.setPrefWidth(150);
-        row1.getChildren().addAll(colLesson, colTitle, colReward);
+        colDifficulty.setPrefWidth(130);
+        row1.getChildren().addAll(colLesson, colTitle, colReward, colDifficulty);
 
         HBox row2 = new HBox(14);
         VBox.setVgrow(row2, Priority.ALWAYS);
@@ -1529,6 +1537,7 @@ public class DashboardFrame {
         Runnable invalidate = this::invalidateAdminValidation;
         cmbAdminChallenge.valueProperty().addListener((obs, old, value) -> loadAdminChallengeSelection());
         cmbAdminLesson.valueProperty().addListener((obs, old, value) -> invalidate.run());
+        cmbAdminDifficulty.valueProperty().addListener((obs, old, value) -> invalidate.run());
         for (javafx.beans.value.ObservableValue<String> value : List.of(
                 txtAdminTitle.textProperty(), txtAdminReward.textProperty(),
                 txtAdminStatement.textProperty(), txtAdminTemplate.textProperty(),
@@ -1722,6 +1731,7 @@ public class DashboardFrame {
                 template,
                 2
         );
+        newCh.setDifficulty(cmbAdminDifficulty.getValue());
         boolean firstHidden = adminEditingChallenge != null
                 && !adminEditingChallenge.getTestCases().isEmpty()
                 && adminEditingChallenge.getTestCases().get(0).isHidden();
@@ -1737,7 +1747,7 @@ public class DashboardFrame {
                         existing.getExpectedOutput(), existing.isHidden()));
             }
         }
-        String fingerprint = targetLesson.getId() + "\n" + title + "\n" + statement + "\n"
+        String fingerprint = targetLesson.getId() + "\n" + cmbAdminDifficulty.getValue() + "\n" + title + "\n" + statement + "\n"
                 + template + "\n" + reward + "\n" + case1In + "\n" + case1Out
                 + "\n" + case2In + "\n" + case2Out;
         return new AdminChallengeDraft(targetLesson, newCh, fingerprint);
@@ -1773,6 +1783,7 @@ public class DashboardFrame {
             cmbAdminLesson.setDisable(false);
             txtAdminTitle.clear();
             txtAdminReward.setText("90");
+            cmbAdminDifficulty.getSelectionModel().select(ChallengeDifficulty.MEDIO);
             txtAdminStatement.clear();
             txtAdminTemplate.clear();
             txtAdminCase1In.clear();
@@ -1798,6 +1809,7 @@ public class DashboardFrame {
         if (lessonIndex >= 0) cmbAdminLesson.getSelectionModel().select(lessonIndex);
         txtAdminTitle.setText(challenge.getTitle());
         txtAdminReward.setText(Integer.toString(challenge.getExpReward()));
+        cmbAdminDifficulty.getSelectionModel().select(challenge.getDifficulty());
         txtAdminStatement.setText(challenge.getDescription());
         txtAdminTemplate.setText(challenge.getInitialTemplate());
         List<TestCase> cases = challenge.getTestCases();

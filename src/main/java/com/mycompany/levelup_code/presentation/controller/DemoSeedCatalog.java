@@ -53,7 +53,23 @@ public final class DemoSeedCatalog {
         buildPythonCurriculum(pythonLang);
         buildCppCurriculum(cppLang);
 
-        return Arrays.asList(javaLang, pythonLang, cppLang);
+        List<Language> languages = Arrays.asList(javaLang, pythonLang, cppLang);
+        for (Language language : languages) {
+            for (com.mycompany.levelup_code.domain.model.CourseModule module : language.getModules()) {
+                for (Lesson lesson : module.getLessons()) {
+                    for (com.mycompany.levelup_code.domain.model.Challenge challenge : lesson.getChallenges()) {
+                        int id = challenge.getId();
+                        if (id == 113 || id == 114 || id == 211 || id == 212 || id == 311 || id == 312) {
+                            challenge.setDifficulty(com.mycompany.levelup_code.domain.enums.ChallengeDifficulty.DIFICIL);
+                        } else if (id == 101 || id == 102 || id == 106 || id == 107
+                                || id == 104 || id == 202 || id == 203 || id == 204 || id == 302) {
+                            challenge.setDifficulty(com.mycompany.levelup_code.domain.enums.ChallengeDifficulty.FACIL);
+                        }
+                    }
+                }
+            }
+        }
+        return languages;
     }
 
     private static void buildJavaCurriculum(Language javaLang) {

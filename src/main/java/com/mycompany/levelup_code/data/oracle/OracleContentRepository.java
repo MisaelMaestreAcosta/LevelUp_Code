@@ -360,7 +360,7 @@ public class OracleContentRepository implements ContentRepository {
     @Override
     public Challenge saveChallenge(Challenge challenge) {
         String baseSql = "INSERT INTO Retos (id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia) "
-                + "VALUES (?, ?, ?, ?, 'MEDIO', ?, ("
+                + "VALUES (?, ?, ?, ?, ?, ?, ("
                 + "SELECT NVL(MAX(orden_secuencia), 0) + 1 FROM Retos WHERE id_leccion = ?"
                 + "))";
 
@@ -372,8 +372,9 @@ public class OracleContentRepository implements ContentRepository {
                     stmt.setString(2, challenge.getTitle());
                     stmt.setString(3, challenge.getDescription());
                     stmt.setString(4, challenge instanceof QuizChallenge ? "QUIZ" : "CODIGO");
-                    stmt.setInt(5, challenge.getExpReward());
-                    stmt.setInt(6, challenge.getLesson().getId());
+                    stmt.setString(5, challenge.getDifficulty().name());
+                    stmt.setInt(6, challenge.getExpReward());
+                    stmt.setInt(7, challenge.getLesson().getId());
                     stmt.executeUpdate();
                     try (ResultSet rs = stmt.getGeneratedKeys()) {
                         if (rs.next()) {
@@ -480,7 +481,7 @@ public class OracleContentRepository implements ContentRepository {
     @Override
     public Challenge updateChallenge(Challenge challenge) {
         String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
-                + "exp_recompensa = ? WHERE id_reto = ?";
+                + "exp_recompensa = ?, dificultad = ? WHERE id_reto = ?";
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -488,7 +489,8 @@ public class OracleContentRepository implements ContentRepository {
                     stmt.setString(1, challenge.getTitle());
                     stmt.setString(2, challenge.getDescription());
                     stmt.setInt(3, challenge.getExpReward());
-                    stmt.setInt(4, challenge.getId());
+                    stmt.setString(4, challenge.getDifficulty().name());
+                    stmt.setInt(5, challenge.getId());
                     if (stmt.executeUpdate() != 1) {
                         throw new SQLException("El reto ya no existe.");
                     }

@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.domain.model;
 
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
 
 /**
  * Clase abstracta que representa la entidad base para un reto de evaluación.
@@ -24,6 +25,7 @@ public abstract class Challenge {
 
     // Puntos de experiencia otorgados por resolver exitosamente el reto
     private int expReward;
+    private ChallengeDifficulty difficulty = ChallengeDifficulty.MEDIO;
 
     /**
      * Constructor por defecto
@@ -125,5 +127,11 @@ public abstract class Challenge {
 
     public void setExpReward(int expReward) {
         this.expReward = expReward;
+    }
+
+    public ChallengeDifficulty getDifficulty() { return difficulty; }
+
+    public void setDifficulty(ChallengeDifficulty difficulty) {
+        this.difficulty = java.util.Objects.requireNonNull(difficulty);
     }
 }
