@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.data.oracle;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.data.dao.AttemptRepository;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
+import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.User;
@@ -17,6 +18,8 @@ import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,6 +38,26 @@ public class OracleAttemptRepository implements AttemptRepository {
     @Override
     public boolean managesGamificationTransactionally() {
         return true;
+    }
+
+    @Override
+    public Map<Integer, ChallengeProgress> findProgressByUser(int userId) {
+        Map<Integer, ChallengeProgress> progress = new HashMap<>();
+        String sql = "SELECT id_reto, MAX(es_correcto) AS aprobado "
+                + "FROM Intentos WHERE id_usuario = ? GROUP BY id_reto";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    progress.put(rs.getInt("id_reto"), rs.getInt("aprobado") == 1
+                            ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED);
+                }
+            }
+            return progress;
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudo consultar el estado de los retos: " + ex.getMessage(), ex);
+        }
     }
 
     @Override

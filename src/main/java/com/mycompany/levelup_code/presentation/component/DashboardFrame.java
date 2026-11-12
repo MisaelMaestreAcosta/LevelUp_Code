@@ -5,6 +5,7 @@ import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
+import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -102,6 +103,8 @@ public class DashboardFrame {
     private ComboBox<String> practiceLanguage;
     private ComboBox<String> practiceType;
     private ComboBox<String> practiceDifficulty;
+    private ComboBox<String> practiceProgress;
+    private Map<Integer, ChallengeProgress> challengeProgress = Map.of();
     private Button navComparatorBtn;
     private Button navAchievementsBtn;
     private Button navAdminBtn;
@@ -256,7 +259,7 @@ public class DashboardFrame {
 
     private record DashboardState(int solved, Map<LocalDate, Integer> activity,
             Map<Lesson, ProgressStatus> progress, Set<Integer> achievements,
-            boolean livesRecovered) { }
+            boolean livesRecovered, Map<Integer, ChallengeProgress> challengeProgress) { }
 
     private DashboardState fetchDashboardState(int offlineSolved, boolean livesRecovered) {
         int solved = controller.syncTelemetryAndGetSolvedChallenges(offlineSolved);
@@ -274,7 +277,10 @@ public class DashboardFrame {
             }
         }
         return new DashboardState(solved, controller.loadRecentActivityHistory(), progress,
-                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered);
+                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered,
+                oracleConnected && currentUser.getId() > 0
+                        ? AppContext.getInstance().getChallengeService().getProgressByUser(currentUser.getId())
+                        : Map.of());
     }
 
     private boolean recoverExhaustedLivesOnOpen() {
@@ -297,6 +303,7 @@ public class DashboardFrame {
         activityByDate.putAll(state.activity());
         lessonStatuses = state.progress();
         unlockedAchievementIds = state.achievements();
+        challengeProgress = state.challengeProgress();
         lastKnownOfflineExp = currentUser.getTotalExp();
     }
 
@@ -801,7 +808,12 @@ public class DashboardFrame {
         practiceDifficulty = new ComboBox<>();
         practiceDifficulty.getItems().setAll("Todas las dificultades", "Fácil", "Medio", "Difícil");
         practiceDifficulty.getSelectionModel().selectFirst();
-        for (ComboBox<String> combo : List.of(practiceLanguage, practiceType, practiceDifficulty)) {
+        practiceProgress = new ComboBox<>();
+        practiceProgress.getItems().setAll("Todos los estados", "Pendiente", "Intentado",
+                "Superado", "Repasar errores");
+        practiceProgress.getSelectionModel().selectFirst();
+        for (ComboBox<String> combo : List.of(practiceLanguage, practiceType,
+                practiceDifficulty, practiceProgress)) {
             combo.getStyleClass().add("combo-box-modern");
             combo.valueProperty().addListener((obs, previous, selected) -> renderPracticeCatalog());
         }
@@ -813,9 +825,10 @@ public class DashboardFrame {
             practiceLanguage.getSelectionModel().selectFirst();
             practiceType.getSelectionModel().selectFirst();
             practiceDifficulty.getSelectionModel().selectFirst();
+            practiceProgress.getSelectionModel().selectFirst();
         });
         FlowPane filters = new FlowPane(10, 10, practiceSearch, practiceLanguage,
-                practiceType, practiceDifficulty, clear);
+                practiceType, practiceDifficulty, practiceProgress, clear);
         filters.getStyleClass().add("surface-card");
         practiceCount = new Label();
         practiceCount.getStyleClass().add("muted-text");
@@ -840,12 +853,19 @@ public class DashboardFrame {
                 total++;
                 String language = lesson.getModule().getLanguage().getName();
                 String type = challenge.getType() == ChallengeType.QUIZ ? "Quiz" : "Código";
+                ChallengeProgress progress = challengeProgress.getOrDefault(challenge.getId(),
+                        ChallengeProgress.PENDING);
                 if (!"Todos los lenguajes".equals(practiceLanguage.getValue())
                         && !language.equalsIgnoreCase(practiceLanguage.getValue())) continue;
                 if (!"Todos los tipos".equals(practiceType.getValue())
                         && !type.equals(practiceType.getValue())) continue;
                 if (!"Todas las dificultades".equals(practiceDifficulty.getValue())
                         && !challenge.getDifficulty().label().equals(practiceDifficulty.getValue())) continue;
+                String progressFilter = practiceProgress.getValue();
+                if (!"Todos los estados".equals(progressFilter)
+                        && !("Repasar errores".equals(progressFilter)
+                                ? progress == ChallengeProgress.ATTEMPTED
+                                : progress.label().equals(progressFilter))) continue;
                 String searchable = challenge.getTitle() + " " + lesson.getTitle() + " "
                         + lesson.getModule().getTitle();
                 if (!searchable.toLowerCase(Locale.ROOT).contains(query)) continue;
@@ -857,14 +877,21 @@ public class DashboardFrame {
                 title.setWrapText(true);
                 Label details = new Label(language + " · " + lesson.getTitle() + " · " + type
                         + " · " + challenge.getDifficulty().label() + " · +"
-                        + challenge.getExpReward() + " XP");
+                        + challenge.getExpReward() + " XP · " + progress.label());
                 details.setWrapText(true);
                 details.getStyleClass().add("muted-text");
                 Button open = new Button("Abrir reto");
                 open.getStyleClass().add("btn-primary");
                 open.setOnAction(e -> new ChallengeFrame(currentUser, challenge,
                         this::onChallengeOrLessonCompleted).show());
-                card.getChildren().addAll(title, details, open);
+                card.getChildren().addAll(title, details);
+                if (progress == ChallengeProgress.ATTEMPTED) {
+                    Label review = new Label("Tu último intento no aprobó este reto. Puedes volver a intentarlo.");
+                    review.getStyleClass().add("text-warning");
+                    review.setWrapText(true);
+                    card.getChildren().add(review);
+                }
+                card.getChildren().add(open);
                 practiceResults.getChildren().add(card);
             }
         }
@@ -2000,6 +2027,7 @@ public class DashboardFrame {
             populateLessonsForLanguage(activeLanguageKey);
             refreshCourseProgressBars();
             refreshAchievementsGrid();
+            renderPracticeCatalog();
             if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
             if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
         });

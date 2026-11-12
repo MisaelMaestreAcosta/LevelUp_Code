@@ -7,6 +7,7 @@ import com.mycompany.levelup_code.data.dao.ChallengeRepository;
 
 import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.enums.AttemptResult;
+import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
@@ -22,6 +23,11 @@ import java.util.UUID;
 public class ChallengeService {
 
     public static final int ATTEMPT_HISTORY_LIMIT = 50;
+
+    public Map<Integer, ChallengeProgress> getProgressByUser(int userId) {
+        if (userId <= 0) throw new IllegalArgumentException("El usuario debe ser válido.");
+        return attemptRepository.findProgressByUser(userId);
+    }
 
     private final ChallengeRepository challengeRepository;
     private final AttemptRepository attemptRepository;
