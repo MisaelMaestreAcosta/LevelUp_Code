@@ -424,7 +424,19 @@ public class DashboardFrame {
         comparatorView = buildComparatorWorkspaceView();
         achievementsView = buildAchievementsWorkspaceView();
         if (currentUser != null && currentUser.isAdministrator()) {
-            adminView = buildAdminCrudWorkspaceView();
+            adminView = oracleConnected ? new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
+                if (disposed) return;
+                Challenge challenge = saved.challenge();
+                for (Lesson lesson : allLessonsForAdmin) {
+                    lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
+                    if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
+                            && lesson.getId() == challenge.getLessonId()) {
+                        challenge.setLesson(lesson);
+                        lesson.addChallenge(challenge);
+                    }
+                }
+                refreshAllDashboardState();
+            }) : buildAdminCrudWorkspaceView();
         }
 
         workspaceContainer.getChildren().setAll(coursesView);
@@ -515,7 +527,7 @@ public class DashboardFrame {
         navAchievementsBtn.setMaxWidth(Double.MAX_VALUE);
 
         if (currentUser != null && currentUser.isAdministrator()) {
-            navAdminBtn = new Button("Crear un reto");
+            navAdminBtn = new Button("Administrar retos");
             navAdminBtn.getStyleClass().add("nav-btn");
             navAdminBtn.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 16, Theme.HEX_GREEN));
             navAdminBtn.setGraphicTextGap(10);

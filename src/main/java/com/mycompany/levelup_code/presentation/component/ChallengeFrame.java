@@ -151,6 +151,13 @@ public class ChallengeFrame extends Stage {
     }
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback) {
+        this(user, challenge, onSolvedCallback, false);
+    }
+
+    private final boolean preview;
+
+    public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview) {
+        this.preview = preview;
         this.currentUser = user;
         editorFontSize = EditorPreferences.forUser(user == null ? 0 : user.getId()).fontSize();
         draftSaveDelay.setOnFinished(event -> rememberDraft());
@@ -953,7 +960,7 @@ public class ChallengeFrame extends Stage {
     }
 
     private boolean canPersistDraft(Challenge challenge) {
-        return currentUser != null && currentUser.getEmail() != null
+        return !preview && currentUser != null && currentUser.getEmail() != null
                 && !currentUser.getEmail().isBlank() && challenge != null && challenge.getId() > 0;
     }
 
@@ -1696,7 +1703,7 @@ public class ChallengeFrame extends Stage {
 
     private boolean isPracticeOnly() {
         AppContext context = AppContext.getInstance();
-        return (currentUser != null && currentUser.getLives() <= 0)
+        return preview || (currentUser != null && currentUser.getLives() <= 0)
                 || (context.isOracleConnected() && !context.isOracleAvailable())
                 || isSimulatedCodeEvaluation();
     }
@@ -1708,6 +1715,7 @@ public class ChallengeFrame extends Stage {
     }
 
     private String practiceModeMessage() {
+        if (preview) return "Vista previa del estudiante. Prueba la plantilla y las opciones del reto.";
         if (isSimulatedCodeEvaluation()) {
             return "Práctica simulada: puedes probar tu idea, pero este resultado no modificará XP ni vidas hasta contar con ejecución real para este lenguaje.";
         }
@@ -1718,6 +1726,7 @@ public class ChallengeFrame extends Stage {
     }
 
     private String practiceSuccessMessage() {
+        if (preview) return "Vista previa completada.";
         if (isSimulatedCodeEvaluation()) {
             return "¡Práctica simulada completada! El resultado no modificó XP ni vidas.";
         }

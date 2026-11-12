@@ -359,14 +359,29 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Challenge saveChallenge(Challenge challenge) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                saveChallenge(conn, challenge);
+                conn.commit();
+                return challenge;
+            } catch (SQLException | RuntimeException ex) {
+                conn.rollback();
+                throw ex;
+            }
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudo crear el reto.", ex);
+        }
+    }
+
+    /** Caller owns the transaction, allowing publication metadata to commit together. */
+    public Challenge saveChallenge(Connection conn, Challenge challenge) throws SQLException {
         String baseSql = "INSERT INTO Retos (id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ("
                 + "SELECT NVL(MAX(orden_secuencia), 0) + 1 FROM Retos WHERE id_leccion = ?"
                 + "))";
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
+        try {
                 try (PreparedStatement stmt = conn.prepareStatement(baseSql, new String[]{"ID_RETO"})) {
                     stmt.setInt(1, challenge.getLesson().getId());
                     stmt.setString(2, challenge.getTitle());
@@ -415,16 +430,9 @@ public class OracleContentRepository implements ContentRepository {
                     }
                 }
 
-                conn.commit();
                 return challenge;
-            } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new BusinessException("Error al guardar reto especializado en Oracle: " + e.getMessage(), e);
+        } catch (SQLException ex) {
+            throw ex;
         }
     }
 
@@ -480,11 +488,25 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Challenge updateChallenge(Challenge challenge) {
-        String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
-                + "exp_recompensa = ?, dificultad = ? WHERE id_reto = ?";
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
+                updateChallenge(conn, challenge);
+                conn.commit();
+                return challenge;
+            } catch (SQLException | RuntimeException ex) {
+                conn.rollback();
+                throw ex;
+            }
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudo actualizar el reto.", ex);
+        }
+    }
+
+    public Challenge updateChallenge(Connection conn, Challenge challenge) throws SQLException {
+        String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
+                + "exp_recompensa = ?, dificultad = ? WHERE id_reto = ?";
+        try {
                 try (PreparedStatement stmt = conn.prepareStatement(baseSql)) {
                     stmt.setString(1, challenge.getTitle());
                     stmt.setString(2, challenge.getDescription());
@@ -537,16 +559,9 @@ public class OracleContentRepository implements ContentRepository {
                     }
                 }
 
-                conn.commit();
                 return challenge;
-            } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            throw new BusinessException("Error al actualizar reto en Oracle: " + e.getMessage(), e);
+        } catch (SQLException ex) {
+            throw ex;
         }
     }
 }

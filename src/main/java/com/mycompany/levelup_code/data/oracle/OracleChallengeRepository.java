@@ -46,7 +46,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
     @Override
     public Optional<Challenge> findById(int challengeId) {
-        String sql = SELECT_CHALLENGE_SQL + "WHERE r.id_reto = ?";
+        String sql = SELECT_CHALLENGE_SQL + "WHERE r.id_reto = ? AND r.estado='PUBLICADO' AND lg.activo=1";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, challengeId);
@@ -63,7 +63,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
     public List<Challenge> findByLessonId(Connection conn, Lesson lesson) throws SQLException {
         List<Challenge> challenges = new ArrayList<>();
-        String sql = SELECT_CHALLENGE_SQL + "WHERE r.id_leccion = ? ORDER BY r.orden_secuencia ASC";
+        String sql = SELECT_CHALLENGE_SQL + "WHERE r.id_leccion = ? AND r.estado='PUBLICADO' ORDER BY r.orden_secuencia ASC";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, lesson.getId());
             try (ResultSet rs = stmt.executeQuery()) {
@@ -81,7 +81,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
         if (lessonsById.isEmpty()) return;
 
         Map<Integer, CodeChallenge> codeChallengesById = new HashMap<>();
-        String sql = SELECT_CHALLENGE_SQL + "WHERE lg.activo = 1 "
+        String sql = SELECT_CHALLENGE_SQL + "WHERE lg.activo = 1 AND r.estado='PUBLICADO' "
                 + "ORDER BY lg.id_lenguaje, m.orden_secuencia, l.orden_secuencia, r.orden_secuencia";
         try (PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
@@ -103,7 +103,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
                 + "JOIN Lecciones le ON le.id_leccion = r.id_leccion "
                 + "JOIN Modulos m ON m.id_modulo = le.id_modulo "
                 + "JOIN Lenguajes lg ON lg.id_lenguaje = m.id_lenguaje "
-                + "WHERE lg.activo = 1 ORDER BY cp.id_reto, cp.id_caso";
+                + "WHERE lg.activo = 1 AND r.estado='PUBLICADO' ORDER BY cp.id_reto, cp.id_caso";
         try (PreparedStatement stmt = conn.prepareStatement(casesSql);
              ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
@@ -115,6 +115,16 @@ public class OracleChallengeRepository implements ChallengeRepository {
                         rs.getString("entrada"),
                         rs.getString("salida_esperada"),
                         rs.getInt("es_oculto") == 1));
+            }
+        }
+    }
+
+    Challenge findForAuthoring(Connection conn, int challengeId) throws SQLException {
+        try (PreparedStatement statement = conn.prepareStatement(SELECT_CHALLENGE_SQL + "WHERE r.id_reto=?")) {
+            statement.setInt(1, challengeId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) throw new IllegalArgumentException("El reto ya no existe.");
+                return mapChallenge(conn, result);
             }
         }
     }
