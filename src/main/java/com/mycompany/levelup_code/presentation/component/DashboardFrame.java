@@ -51,6 +51,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.Slider;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
@@ -148,6 +149,7 @@ public class DashboardFrame {
     private TextArea txtComparePython;
     private TextArea txtCompareCpp;
     private Label lblCompareSummary;
+    private ComparisonExercisePane comparisonExercise;
     private final List<Button> comparatorTopicButtons = new ArrayList<>();
     private int activeComparatorLessonIndex = 0;
 
@@ -1347,7 +1349,15 @@ public class DashboardFrame {
         });
 
         bottomCallout.getChildren().addAll(lblCompareSummary, btnPractice);
-        view.getChildren().addAll(topToolbar, threeColumns, bottomCallout);
+        comparisonExercise = new ComparisonExercisePane(() -> {
+            List<TextArea> editors = List.of(txtCompareJava, txtComparePython, txtCompareCpp);
+            List<String> terms = comparisonExercise.terms();
+            for (int i = 0; i < editors.size(); i++) {
+                int position = editors.get(i).getText().indexOf(terms.get(i));
+                if (position >= 0) editors.get(i).selectRange(position, position + terms.get(i).length());
+            }
+        });
+        view.getChildren().addAll(topToolbar, threeColumns, bottomCallout, comparisonExercise);
         return view;
     }
 
@@ -1374,6 +1384,17 @@ public class DashboardFrame {
         Label badge = Theme.createPillBadge(paradigmTag, badgeClass);
         badge.setWrapText(true);
         head.getChildren().addAll(lblLang, badge);
+        Button copy = new Button("Copiar código");
+        copy.setOnAction(event -> {
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(editor.getText());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        });
+        Slider font = new Slider(12, 24, 14);
+        font.setAccessibleText("Tamaño de letra de " + langName);
+        font.valueProperty().addListener((observable, old, value) ->
+                editor.setStyle("-fx-font-size: " + value.intValue() + "px;"));
+        head.getChildren().add(new FlowPane(8, 8, copy, font));
 
         col.getChildren().addAll(head, editor);
         return col;
@@ -1398,6 +1419,7 @@ public class DashboardFrame {
             lessonIdx = 5;
         }
         this.activeComparatorLessonIndex = lessonIdx;
+        if (comparisonExercise != null) comparisonExercise.setTopic(lessonIdx);
 
         Lesson sampleLesson = (!javaLessons.isEmpty() && lessonIdx < javaLessons.size())
                 ? javaLessons.get(lessonIdx)
