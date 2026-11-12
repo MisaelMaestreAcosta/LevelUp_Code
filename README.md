@@ -26,6 +26,17 @@ los valores predeterminados. El perfil permite editar nombre y apellido y cambia
 verificando la actual. El cambio de contraseña usa una actualización condicional para detectar
 modificaciones concurrentes. Las preferencias demo solo duran la sesión.
 
+Para la administración avanzada, aplica **una vez y en orden** `database/08_content_publication.sql`
+y `database/09_content_versions.sql` antes de ejecutar esta versión de la aplicación, tanto en
+bases nuevas como existentes. Los retos anteriores quedan publicados y se crea una copia inicial
+de su contenido actual. Las versiones de ediciones anteriores a esta migración no se pueden reconstruir.
+El panel permite guardar borradores, validar una solución de referencia privada, publicar, archivar,
+previsualizar, editar quizzes y administrar casos de prueba visibles u ocultos. Cada guardado crea
+una revisión y el historial de intentos conserva el enunciado de la versión evaluada. La XP se sigue
+otorgando una vez por reto, aunque haya varias versiones. Los envíos comprueban la revisión antes
+de evaluar y antes de confirmar la transacción. El trigger `TRG_INTENTO_VERSION` vincula los intentos
+creados por el paquete PL/SQL existente con la versión vigente.
+
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
 **Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  

@@ -35,6 +35,13 @@ public class Attempt {
 
     // Stable client key used to make retries idempotent in Oracle.
     private String requestId;
+    private int challengeRevision;
+    private String challengeStatement;
+
+    public int getChallengeRevision() { return challengeRevision; }
+    public void setChallengeRevision(int value) { challengeRevision = value; }
+    public String getChallengeStatement() { return challengeStatement; }
+    public void setChallengeStatement(String value) { challengeStatement = value; }
 
     // Fecha y hora exacta en la que se registró el intento (submittedAt)
     private LocalDateTime attemptDate;

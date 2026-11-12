@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Puerto de negocio para almacenar intentos y consultar el historial. */
 public interface AttemptRepository {
@@ -15,6 +16,10 @@ public interface AttemptRepository {
 
     /** Guarda el intento y devuelve la entidad registrada. */
     Attempt save(Attempt attempt);
+
+    default Optional<Attempt> findByRequestId(int userId, int challengeId, String requestId) {
+        return Optional.empty();
+    }
 
     /** Devuelve los intentos del usuario para el reto, en orden cronológico. */
     List<Attempt> findByUserAndChallenge(int userId, int challengeId);

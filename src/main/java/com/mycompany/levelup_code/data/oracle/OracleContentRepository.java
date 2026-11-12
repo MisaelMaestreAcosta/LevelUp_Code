@@ -363,6 +363,7 @@ public class OracleContentRepository implements ContentRepository {
             conn.setAutoCommit(false);
             try {
                 saveChallenge(conn, challenge);
+                OracleChallengeVersionRepository.snapshot(conn, challenge.getId(), null);
                 conn.commit();
                 return challenge;
             } catch (SQLException | RuntimeException ex) {
@@ -412,8 +413,8 @@ public class OracleContentRepository implements ContentRepository {
                     try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
                         for (TestCase tc : cc.getTestCases()) {
                             stmt.setInt(1, cc.getId());
-                            stmt.setString(2, tc.getInput());
-                            stmt.setString(3, tc.getExpectedOutput());
+                            stmt.setClob(2, new java.io.StringReader(tc.getInput() == null ? "" : tc.getInput()));
+                            stmt.setClob(3, new java.io.StringReader(tc.getExpectedOutput() == null ? "" : tc.getExpectedOutput()));
                             stmt.setInt(4, tc.isHidden() ? 1 : 0);
                             stmt.addBatch();
                         }
@@ -492,6 +493,12 @@ public class OracleContentRepository implements ContentRepository {
             conn.setAutoCommit(false);
             try {
                 updateChallenge(conn, challenge);
+                try (PreparedStatement statement = conn.prepareStatement(
+                        "UPDATE Retos SET revision=revision+1,fecha_actualizacion=SYSTIMESTAMP WHERE id_reto=?")) {
+                    statement.setInt(1, challenge.getId());
+                    statement.executeUpdate();
+                }
+                OracleChallengeVersionRepository.snapshot(conn, challenge.getId(), null);
                 conn.commit();
                 return challenge;
             } catch (SQLException | RuntimeException ex) {
@@ -539,8 +546,8 @@ public class OracleContentRepository implements ContentRepository {
                     try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
                         for (TestCase testCase : code.getTestCases()) {
                             stmt.setInt(1, code.getId());
-                            stmt.setString(2, testCase.getInput());
-                            stmt.setString(3, testCase.getExpectedOutput());
+                            stmt.setClob(2, new java.io.StringReader(testCase.getInput() == null ? "" : testCase.getInput()));
+                            stmt.setClob(3, new java.io.StringReader(testCase.getExpectedOutput() == null ? "" : testCase.getExpectedOutput()));
                             stmt.setInt(4, testCase.isHidden() ? 1 : 0);
                             stmt.addBatch();
                         }

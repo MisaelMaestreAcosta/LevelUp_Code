@@ -78,9 +78,22 @@ public class ChallengeService {
 
     public SubmissionResult submitAttemptDetailed(
             User user, int challengeId, String submission, String requestId) {
+        return submitAttemptDetailed(user, challengeId, submission, requestId, 0);
+    }
+
+    public SubmissionResult submitAttemptDetailed(
+            User user, int challengeId, String submission, String requestId, int expectedRevision) {
         validateSubmission(user, challengeId, submission);
         if (requestId == null || requestId.isBlank() || requestId.length() > 64) {
             throw new IllegalArgumentException("El identificador del envío debe ser válido.");
+        }
+        Optional<Attempt> confirmed = attemptRepository.findByRequestId(user.getId(), challengeId, requestId.trim());
+        if (confirmed.isPresent()) {
+            Attempt saved = confirmed.get();
+            if (!saved.getSubmittedContent().equals(submission.trim())) {
+                throw new IllegalArgumentException("Este identificador pertenece a otra respuesta.");
+            }
+            return new SubmissionResult(saved, new ChallengeEvaluation(saved.getResult(), saved.getExecutionTimeMs()));
         }
         if (user.getLives() <= 0) {
             throw new IllegalStateException("El usuario no dispone de vidas suficientes para enviar intentos.");
@@ -92,6 +105,9 @@ public class ChallengeService {
         }
         Challenge challenge = challengeResult.orElseThrow(() ->
                 new IllegalArgumentException("El reto no existe."));
+        if (expectedRevision > 0 && challenge.getRevision() != expectedRevision) {
+            throw new IllegalStateException("El reto cambió. Abre la versión actual antes de enviar. Tu borrador se conserva.");
+        }
 
         if (challenge.getType() == null || challenge.getExpReward() < 0) {
             throw new IllegalStateException("El reto tiene un tipo o recompensa inválidos.");
@@ -125,6 +141,8 @@ public class ChallengeService {
         attempt.setExecutionTimeMs(evaluation.getExecutionTimeMs());
         attempt.setEarnedExperience(firstCorrectAttempt ? challenge.getExpReward() : 0);
         attempt.setRequestId(requestId.trim());
+        attempt.setChallengeRevision(challenge.getRevision());
+        attempt.setChallengeStatement(challenge.getDescription());
 
         Attempt savedAttempt = attemptRepository.save(attempt);
         if (savedAttempt == null) {

@@ -219,6 +219,13 @@ public final class InMemoryTestRepositories {
         private final boolean transactionalGamification;
         private int seq = 1;
 
+        @Override
+        public Optional<Attempt> findByRequestId(int userId, int challengeId, String requestId) {
+            return attempts.stream().filter(attempt -> attempt.getUserId() == userId
+                    && attempt.getChallenge().getId() == challengeId
+                    && java.util.Objects.equals(attempt.getRequestId(), requestId)).findFirst();
+        }
+
         public FakeAttemptRepository() {
             this(false);
         }

@@ -13,6 +13,10 @@ public abstract class Challenge {
 
     // Identificador único del reto
     private int id;
+    private int revision;
+
+    public int getRevision() { return revision; }
+    public void setRevision(int revision) { this.revision = revision; }
 
     // Título descriptivo del reto
     private String title;

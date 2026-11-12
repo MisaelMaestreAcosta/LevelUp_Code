@@ -24,7 +24,7 @@ public final class AuthoringService {
         }
         if (challenge instanceof QuizChallenge quiz && (quiz.getOptions().size() < 2
                 || quiz.getOptions().stream().anyMatch(option -> option == null || option.isBlank())
-                || quiz.getOptions().stream().distinct().count() != quiz.getOptions().size()
+                || quiz.getOptions().stream().map(option -> option.strip().toLowerCase(java.util.Locale.ROOT)).distinct().count() != quiz.getOptions().size()
                 || !quiz.getOptions().contains(quiz.getCorrectAnswer()) || quiz.getCorrectAnswer().length() > 200)) {
             throw new IllegalArgumentException("Añade al menos dos opciones distintas y selecciona la respuesta correcta, de hasta 200 caracteres.");
         }

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -81,6 +82,15 @@ public class OracleAttemptRepository implements AttemptRepository {
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try (CallableStatement cstmt = conn.prepareCall(plsql)) {
+                try (PreparedStatement lock = conn.prepareStatement("SELECT estado,revision FROM Retos WHERE id_reto=? FOR UPDATE")) {
+                    lock.setInt(1, attempt.getChallenge().getId());
+                    try (ResultSet current = lock.executeQuery()) {
+                        if (!current.next() || !"PUBLICADO".equals(current.getString(1))
+                                || current.getInt(2) != attempt.getChallenge().getRevision()) {
+                            throw new IllegalStateException("El reto cambió durante la evaluación. Abre su versión actual para enviar.");
+                        }
+                    }
+                }
                 cstmt.setInt(1, attempt.getUser().getId());
                 cstmt.setInt(2, attempt.getChallenge().getId());
                 cstmt.setInt(3, attempt.isCorrect() ? 1 : 0);
@@ -128,7 +138,7 @@ public class OracleAttemptRepository implements AttemptRepository {
                     }
                 }
                 return attempt;
-            } catch (SQLException ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             } finally {
@@ -152,10 +162,10 @@ public class OracleAttemptRepository implements AttemptRepository {
     public List<Attempt> findRecentByUserAndChallenge(int userId, int challengeId, int limit) {
         if (limit <= 0) throw new IllegalArgumentException("El límite debe ser mayor que cero.");
         List<Attempt> list = new ArrayList<>();
-        String sql = "SELECT * FROM (SELECT id_intento, id_usuario, id_reto, codigo_enviado, salida_obtenida, "
-                + "es_correcto, tiempo_ejecucion_ms, exp_obtenida, fecha_intento "
-                + "FROM Intentos WHERE id_usuario = ? AND id_reto = ? "
-                + "ORDER BY fecha_intento DESC) WHERE ROWNUM <= ?";
+        String sql = "SELECT * FROM (SELECT i.*,v.revision AS version_reto,v.enunciado AS enunciado_version "
+                + "FROM Intentos i JOIN Version_Reto v ON v.id_version=i.id_version_reto "
+                + "WHERE i.id_usuario = ? AND i.id_reto = ? "
+                + "ORDER BY i.fecha_intento DESC,i.id_intento DESC) WHERE ROWNUM <= ?";
 
         User user = userDAO.findById(userId).orElse(null);
         Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
@@ -181,6 +191,8 @@ public class OracleAttemptRepository implements AttemptRepository {
                             rs.getInt("exp_obtenida"),
                             ts != null ? ts.toLocalDateTime() : LocalDateTime.now()
                     );
+                    a.setChallengeRevision(rs.getInt("version_reto"));
+                    a.setChallengeStatement(rs.getString("enunciado_version"));
                     list.add(a);
                 }
             }
@@ -188,6 +200,31 @@ public class OracleAttemptRepository implements AttemptRepository {
             throw new BusinessException("Error al listar intentos por usuario y reto en Oracle: " + e.getMessage(), e);
         }
         return list;
+    }
+
+    @Override
+    public Optional<Attempt> findByRequestId(int userId, int challengeId, String requestId) {
+        String sql = "SELECT i.*,v.revision AS version_reto,v.enunciado AS enunciado_version "
+                + "FROM Intentos i JOIN Version_Reto v ON v.id_version=i.id_version_reto "
+                + "WHERE i.id_usuario=? AND i.id_reto=? AND i.id_solicitud=?";
+        try (Connection connection = DatabaseConnection.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, userId); statement.setInt(2, challengeId); statement.setString(3, requestId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return Optional.empty();
+                User user = userDAO.findById(userId).orElseThrow();
+                com.mycompany.levelup_code.domain.model.CodeChallenge historical = new com.mycompany.levelup_code.domain.model.CodeChallenge();
+                historical.setId(challengeId);
+                historical.setRevision(result.getInt("version_reto"));
+                historical.setDescription(result.getString("enunciado_version"));
+                Attempt attempt = new Attempt(result.getInt("id_intento"), user, historical, result.getString("codigo_enviado"),
+                        result.getInt("es_correcto") == 1 ? AttemptResult.CORRECT : parseResult(result.getString("salida_obtenida")),
+                        result.getLong("tiempo_ejecucion_ms"), result.getInt("exp_obtenida"), result.getTimestamp("fecha_intento").toLocalDateTime());
+                attempt.setChallengeRevision(result.getInt("version_reto"));
+                attempt.setChallengeStatement(result.getString("enunciado_version"));
+                attempt.setRequestId(requestId);
+                return Optional.of(attempt);
+            }
+        } catch (SQLException ex) { throw new BusinessException("No se pudo comprobar el envío anterior.", ex); }
     }
 
     private AttemptResult parseResult(String raw) {

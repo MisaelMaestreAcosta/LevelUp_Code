@@ -433,7 +433,7 @@ public class ChallengeFrame extends Stage {
                         : ATTEMPT_DATE.format(attempt.getAttemptDate());
                 Label summary = new Label(date + " · " + attemptResultLabel(attempt.getResult())
                         + " · +" + attempt.getEarnedExperience() + " XP"
-                        + " · " + attempt.getExecutionTimeMs() + " ms");
+                        + " · " + attempt.getExecutionTimeMs() + " ms · versión " + attempt.getChallengeRevision());
                 summary.setWrapText(true);
                 summary.getStyleClass().add(attempt.isCorrect() ? "text-success" : "text-warning");
                 TextArea submission = new TextArea(attempt.getSubmittedContent() == null
@@ -443,6 +443,13 @@ public class ChallengeFrame extends Stage {
                 submission.setPrefRowCount(4);
                 submission.setAccessibleText("Respuesta enviada el " + date);
                 card.getChildren().addAll(summary, submission);
+                if (attempt.getChallengeStatement() != null) {
+                    Label statement = new Label(attempt.getChallengeStatement());
+                    statement.setWrapText(true);
+                    TitledPane original = new TitledPane("Enunciado de esta versión", statement);
+                    original.setExpanded(false);
+                    card.getChildren().add(original);
+                }
                 entries.getChildren().add(card);
             }
         });
@@ -1563,7 +1570,7 @@ public class ChallengeFrame extends Stage {
                         ChallengeService.SubmissionResult saved = AppContext.getInstance()
                                 .getChallengeService().submitAttemptDetailed(
                                         submission.user().toUser(), submission.challengeId(),
-                                        submission.payload(), submission.requestId());
+                                        submission.payload(), submission.requestId(), submission.revision());
                         SimulatedCodeRunner.ExecutionSummary detail = saved.evaluation().getExecutionSummary();
                         return new EvaluationOutcome(detail, saved.attempt().isCorrect(),
                                 PersistenceOutcome.saved(saved.attempt()));
@@ -1683,11 +1690,11 @@ public class ChallengeFrame extends Stage {
             // before receiving Oracle's response, the same key is reused later.
             saveUncertain = true;
         }
-        return new Submission(activeChallenge.getId(), payload, code, selectedQuizIndex,
+        return new Submission(activeChallenge.getId(), activeChallenge.getRevision(), payload, code, selectedQuizIndex,
                 correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly, requestId);
     }
 
-    private record Submission(int challengeId, String payload, CodeSnapshot code, int quizIndex,
+    private record Submission(int challengeId, int revision, String payload, CodeSnapshot code, int quizIndex,
             int correctQuizIndex, String correctAnswer, UserSnapshot user,
             boolean saveToOracle, boolean practiceOnly, String requestId) { }
 

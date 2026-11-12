@@ -126,7 +126,9 @@ public final class OracleAuthoringRepository {
                         }
                     }
                 }
+                OracleChallengeVersionRepository.snapshot(connection, challenge.getId(), administratorId);
                 connection.commit();
+                challenge.setRevision(revision);
                 return new AuthoredChallenge(challenge, draft.referenceSolution(), draft.state(), revision);
             } catch (SQLException | RuntimeException ex) {
                 connection.rollback();

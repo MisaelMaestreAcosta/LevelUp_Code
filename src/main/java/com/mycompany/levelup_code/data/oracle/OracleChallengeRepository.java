@@ -29,7 +29,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
     private static final String SELECT_CHALLENGE_SQL =
             "SELECT r.id_reto, r.id_leccion, r.titulo_reto, r.enunciado, r.tipo_reto, "
-            + "r.dificultad, r.exp_recompensa, r.orden_secuencia, "
+            + "r.dificultad, r.exp_recompensa, r.orden_secuencia, r.revision, "
             + "rc.codigo_inicial, rc.limite_tiempo_ms, "
             + "rq.opciones, rq.respuesta_correcta, "
             + "l.titulo AS leccion_titulo, l.contenido AS leccion_contenido, "
@@ -190,6 +190,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
             String correctAnswer = rs.getString("respuesta_correcta");
             QuizChallenge quiz = new QuizChallenge(id, title, statement, lesson, expReward, options, correctAnswer);
             quiz.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
+            quiz.setRevision(rs.getInt("revision"));
             return quiz;
         }
 
@@ -200,6 +201,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
         CodeChallenge codeChallenge = new CodeChallenge(
                 id, title, statement, lesson, expReward, template, limitSeconds);
         codeChallenge.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
+        codeChallenge.setRevision(rs.getInt("revision"));
         return codeChallenge;
     }
 }

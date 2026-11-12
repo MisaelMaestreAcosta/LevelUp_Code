@@ -2,6 +2,7 @@ package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.business.service.AuthoringService;
 import com.mycompany.levelup_code.data.oracle.OracleAuthoringRepository;
+import com.mycompany.levelup_code.data.oracle.OracleChallengeVersionRepository;
 import com.mycompany.levelup_code.domain.enums.*;
 import com.mycompany.levelup_code.domain.model.*;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import javafx.util.StringConverter;
 /** Editing fields are captured on the FX thread before any database or compilation work. */
 public final class ChallengeAuthoringPane extends VBox {
     private record CaseFields(TextArea input, TextArea output, CheckBox hidden, VBox row) { }
+    private record OptionFields(TextField text, RadioButton correct, HBox row) { }
     private final User administrator;
     private final List<Lesson> lessons;
     private final Consumer<AuthoredChallenge> savedCallback;
@@ -24,6 +26,12 @@ public final class ChallengeAuthoringPane extends VBox {
     private final ComboBox<OracleAuthoringRepository.Entry> entries = new ComboBox<>();
     private final ComboBox<Lesson> lesson = new ComboBox<>();
     private final ComboBox<ChallengeDifficulty> difficulty = new ComboBox<>();
+    private final ComboBox<String> kind = new ComboBox<>();
+    private final VBox codePanel = new VBox(10);
+    private final VBox quizPanel = new VBox(10);
+    private final VBox options = new VBox(8);
+    private final ToggleGroup correctOption = new ToggleGroup();
+    private final List<OptionFields> optionFields = new ArrayList<>();
     private final TextField title = new TextField();
     private final TextArea statement = area(3);
     private final TextArea template = area(7);
@@ -57,6 +65,7 @@ public final class ChallengeAuthoringPane extends VBox {
             editingId = 0;
             revision = 0;
             lesson.setDisable(false);
+            kind.setDisable(false);
             status.setText("Copia preparada. Guarda como borrador o publica cuando esté validada.");
         });
         Button refresh = button("Actualizar lista", this::refresh);
@@ -71,7 +80,15 @@ public final class ChallengeAuthoringPane extends VBox {
         lesson.getSelectionModel().selectFirst();
         difficulty.getItems().setAll(ChallengeDifficulty.values());
         difficulty.setValue(ChallengeDifficulty.MEDIO);
+        kind.getItems().setAll("Código", "Quiz");
+        kind.setValue("Código");
+        kind.setOnAction(event -> updateKind());
         Button addCase = button("Añadir caso", () -> addCase("", "", false));
+        Button addOption = button("Añadir opción", () -> addOption("", false));
+        codePanel.getChildren().addAll(field("Plantilla para el estudiante", template),
+                field("Solución de referencia para validar", reference), cases, addCase);
+        quizPanel.getChildren().addAll(new Label("Selecciona la opción correcta con el círculo."), options, addOption);
+        Button versions = button("Consultar versiones", this::showVersions);
         Button draft = button("Guardar borrador", () -> save(PublicationState.BORRADOR));
         Button publish = button("Validar y publicar", () -> save(PublicationState.PUBLICADO));
         publish.getStyleClass().add("btn-primary");
@@ -88,10 +105,9 @@ public final class ChallengeAuthoringPane extends VBox {
             } catch (RuntimeException ex) { status.setText(ex.getMessage()); }
         });
         form.getChildren().addAll(entries, new FlowPane(8, 8, load, fresh, duplicate, refresh),
-                field("Lección", lesson), field("Título", title), field("Enunciado", statement),
+                field("Lección", lesson), field("Tipo", kind), field("Título", title), field("Enunciado", statement),
                 new FlowPane(12, 8, field("Dificultad", difficulty), field("XP", reward), field("Límite en segundos", timeout)),
-                field("Plantilla para el estudiante", template), field("Solución de referencia para validar", reference),
-                cases, addCase, new FlowPane(8, 8, draft, publish, archive, preview));
+                codePanel, quizPanel, new FlowPane(8, 8, draft, publish, archive, preview, versions));
         getChildren().addAll(heading, status, form);
         reset();
         refresh();
@@ -135,13 +151,23 @@ public final class ChallengeAuthoringPane extends VBox {
     }
 
     private AuthoredChallenge capture(PublicationState state) {
-        CodeChallenge code = new CodeChallenge(editingId, title.getText().strip(), statement.getText(),
-                lesson.getValue(), reward.getValue(), template.getText(), timeout.getValue());
-        code.setDifficulty(difficulty.getValue());
-        for (CaseFields fields : caseFields) {
-            code.addTestCase(new TestCase(0, code, fields.input().getText(), fields.output().getText(), fields.hidden().isSelected()));
+        Challenge challenge;
+        if ("Quiz".equals(kind.getValue())) {
+            String answer = optionFields.stream().filter(value -> value.correct().isSelected())
+                    .map(value -> value.text().getText()).findFirst().orElse("");
+            challenge = new QuizChallenge(editingId, title.getText().strip(), statement.getText(), lesson.getValue(),
+                    reward.getValue(), optionFields.stream().map(value -> value.text().getText()).toList(), answer);
+        } else {
+            CodeChallenge code = new CodeChallenge(editingId, title.getText().strip(), statement.getText(),
+                    lesson.getValue(), reward.getValue(), template.getText(), timeout.getValue());
+            for (CaseFields fields : caseFields) {
+                code.addTestCase(new TestCase(0, code, fields.input().getText(), fields.output().getText(), fields.hidden().isSelected()));
+            }
+            challenge = code;
         }
-        AuthoredChallenge authored = new AuthoredChallenge(code, reference.getText(), state, revision);
+        challenge.setDifficulty(difficulty.getValue());
+        challenge.setRevision(revision);
+        AuthoredChallenge authored = new AuthoredChallenge(challenge, reference.getText(), state, revision);
         AuthoringService.validate(authored);
         return authored;
     }
@@ -158,24 +184,29 @@ public final class ChallengeAuthoringPane extends VBox {
     }
 
     private void show(AuthoredChallenge authored) {
-        if (!(authored.challenge() instanceof CodeChallenge code)) {
-            status.setText("Selecciona un reto de código para editarlo en este formulario.");
-            return;
-        }
-        editingId = code.getId();
+        Challenge challenge = authored.challenge();
+        editingId = challenge.getId();
         revision = authored.revision();
-        lesson.setValue(lessons.stream().filter(value -> value.getId() == code.getLessonId()).findFirst().orElse(null));
+        lesson.setValue(lessons.stream().filter(value -> value.getId() == challenge.getLessonId()).findFirst().orElse(null));
         lesson.setDisable(true);
-        title.setText(code.getTitle());
-        statement.setText(code.getDescription());
-        difficulty.setValue(code.getDifficulty());
-        reward.getValueFactory().setValue(code.getExpReward());
-        timeout.getValueFactory().setValue(code.getTimeLimitSeconds());
-        template.setText(code.getInitialTemplate());
+        kind.setValue(challenge instanceof QuizChallenge ? "Quiz" : "Código");
+        kind.setDisable(true);
+        title.setText(challenge.getTitle());
+        statement.setText(challenge.getDescription());
+        difficulty.setValue(challenge.getDifficulty());
+        reward.getValueFactory().setValue(challenge.getExpReward());
         reference.setText(authored.referenceSolution());
         cases.getChildren().clear();
         caseFields.clear();
-        for (TestCase test : code.getTestCases()) addCase(test.getInput(), test.getExpectedOutput(), test.isHidden());
+        options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
+        if (challenge instanceof CodeChallenge code) {
+            timeout.getValueFactory().setValue(code.getTimeLimitSeconds());
+            template.setText(code.getInitialTemplate());
+            for (TestCase test : code.getTestCases()) addCase(test.getInput(), test.getExpectedOutput(), test.isHidden());
+        } else if (challenge instanceof QuizChallenge quiz) {
+            for (String option : quiz.getOptions()) addOption(option, option.equals(quiz.getCorrectAnswer()));
+        }
+        updateKind();
         status.setText("Editando " + authored.state() + " · revisión " + revision);
     }
 
@@ -183,9 +214,14 @@ public final class ChallengeAuthoringPane extends VBox {
         editingId = 0;
         revision = 0;
         lesson.setDisable(false);
+        kind.setDisable(false);
+        kind.setValue("Código");
         title.clear(); statement.clear(); template.clear(); reference.clear();
         cases.getChildren().clear(); caseFields.clear();
         addCase("", "", false);
+        options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
+        addOption("", true); addOption("", false);
+        updateKind();
         status.setText("Completa la plantilla y la solución de referencia en sus campos respectivos.");
     }
 
@@ -197,6 +233,52 @@ public final class ChallengeAuthoringPane extends VBox {
     }
 
     private void refresh() { run(() -> repository.list(administrator.getId()), values -> entries.getItems().setAll(values)); }
+
+    private void updateKind() {
+        boolean code = "Código".equals(kind.getValue());
+        codePanel.setVisible(code); codePanel.setManaged(code);
+        quizPanel.setVisible(!code); quizPanel.setManaged(!code);
+    }
+
+    private void addOption(String text, boolean selected) {
+        TextField value = new TextField(text);
+        value.setAccessibleText("Texto de la opción");
+        HBox.setHgrow(value, Priority.ALWAYS);
+        RadioButton correct = new RadioButton("Correcta");
+        correct.setToggleGroup(correctOption);
+        correct.setSelected(selected);
+        HBox row = new HBox(8);
+        OptionFields fields = new OptionFields(value, correct, row);
+        Button remove = button("Quitar", () -> {
+            correctOption.getToggles().remove(correct);
+            optionFields.remove(fields);
+            options.getChildren().remove(row);
+        });
+        row.getChildren().addAll(value, correct, remove);
+        optionFields.add(fields); options.getChildren().add(row);
+    }
+
+    private void showVersions() {
+        if (editingId <= 0) { status.setText("Carga un reto guardado para consultar sus versiones."); return; }
+        int id = editingId;
+        run(() -> new OracleChallengeVersionRepository().list(administrator.getId(), id), versions -> {
+            ComboBox<OracleChallengeVersionRepository.Version> select = new ComboBox<>();
+            select.getItems().setAll(versions);
+            TextArea details = area(18);
+            details.setEditable(false);
+            select.setOnAction(event -> {
+                if (select.getValue() != null) details.setText(select.getValue().details());
+            });
+            select.getSelectionModel().selectFirst();
+            Alert dialog = new Alert(Alert.AlertType.INFORMATION);
+            dialog.initOwner(getScene().getWindow());
+            dialog.setTitle("Versiones del reto");
+            dialog.setHeaderText("Contenido guardado en cada revisión");
+            dialog.getDialogPane().setContent(new VBox(10, select, details));
+            dialog.setResizable(true);
+            dialog.show();
+        });
+    }
 
     private <T> void run(Callable<T> operation, Consumer<T> success) {
         form.setDisable(true);
