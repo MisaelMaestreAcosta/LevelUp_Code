@@ -22,6 +22,12 @@ public final class OracleAuthoringRepository {
         }
     }
 
+    public void checkAccess(int administratorId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            requireAdministrator(connection, administratorId);
+        }
+    }
+
     public List<Entry> list(int administratorId) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection()) {
             requireAdministrator(connection, administratorId);
@@ -87,7 +93,7 @@ public final class OracleAuthoringRepository {
                                 throw new IllegalStateException("El reto cambió. Actualiza la lista y vuelve a cargarlo.");
                             }
                             if (result.getInt(2) != challenge.getLessonId()
-                                    || !result.getString(3).equals(challenge instanceof CodeChallenge ? "CODIGO" : "QUIZ")) {
+                                    || !result.getString(3).equals(challenge.getType().databaseValue())) {
                                 throw new IllegalArgumentException("Conserva la lección y el tipo del reto existente.");
                             }
                         }

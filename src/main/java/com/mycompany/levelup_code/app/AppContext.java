@@ -96,6 +96,9 @@ public final class AppContext {
         Map<ChallengeType, ChallengeEvaluator> evaluators = new EnumMap<>(ChallengeType.class);
         evaluators.put(ChallengeType.CODE, new CodeChallengeEvaluator(codeRunner));
         evaluators.put(ChallengeType.QUIZ, new QuizChallengeEvaluator());
+        evaluators.put(ChallengeType.OUTPUT_PREDICTION, new QuizChallengeEvaluator());
+        evaluators.put(ChallengeType.DEBUGGING, new CodeChallengeEvaluator(codeRunner));
+        evaluators.put(ChallengeType.CODE_ORDERING, new com.mycompany.levelup_code.business.evaluator.CodeOrderingEvaluator());
 
         this.challengeService = new ChallengeService(
                 challengeRepository,

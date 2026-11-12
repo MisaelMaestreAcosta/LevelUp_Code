@@ -24,13 +24,20 @@ public final class AuthoringService {
         }
         if (challenge instanceof QuizChallenge quiz && (quiz.getOptions().size() < 2
                 || quiz.getOptions().stream().anyMatch(option -> option == null || option.isBlank())
-                || quiz.getOptions().stream().map(option -> option.strip().toLowerCase(java.util.Locale.ROOT)).distinct().count() != quiz.getOptions().size()
+                || quiz.getOptions().stream().map(option -> quiz instanceof OutputPredictionChallenge
+                        ? option.strip() : option.strip().toLowerCase(java.util.Locale.ROOT)).distinct().count() != quiz.getOptions().size()
                 || !quiz.getOptions().contains(quiz.getCorrectAnswer()) || quiz.getCorrectAnswer().length() > 200)) {
             throw new IllegalArgumentException("Añade al menos dos opciones distintas y selecciona la respuesta correcta, de hasta 200 caracteres.");
+        }
+        if (challenge instanceof OutputPredictionChallenge prediction
+                && (prediction.getCodeSnippet() == null || prediction.getCodeSnippet().isBlank())) {
+            throw new IllegalArgumentException("Añade el código cuya salida debe predecir el estudiante.");
         }
     }
 
     public AuthoredChallenge save(int administratorId, AuthoredChallenge draft) throws SQLException {
+        OracleAuthoringRepository repository = new OracleAuthoringRepository();
+        repository.checkAccess(administratorId);
         validate(draft);
         if (draft.state() == PublicationState.PUBLICADO && draft.challenge() instanceof CodeChallenge code) {
             var validation = new SimulatedCodeRunner().runAndValidate(code, draft.referenceSolution());
@@ -38,6 +45,6 @@ public final class AuthoringService {
                 throw new IllegalArgumentException("La solución de referencia no supera todos los casos de prueba.");
             }
         }
-        return new OracleAuthoringRepository().save(administratorId, draft);
+        return repository.save(administratorId, draft);
     }
 }

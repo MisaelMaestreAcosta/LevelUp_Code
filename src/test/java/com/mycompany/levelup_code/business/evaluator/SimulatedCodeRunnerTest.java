@@ -136,9 +136,12 @@ class SimulatedCodeRunnerTest {
                 assertEquals(2, mod.getLessons().size(), "Cada módulo debe tener 2 lecciones");
                 for (Lesson lesson : mod.getLessons()) {
                     totalLessons++;
-                    assertEquals(2, lesson.getChallenges().size(),
-                            "Cada lección debe tener 2 retos (Código y Quiz): " + lesson.getTitle());
-                    for (Challenge ch : lesson.getChallenges()) {
+                    List<Challenge> baseChallenges = lesson.getChallenges().stream().filter(ch ->
+                            ch.getType() == com.mycompany.levelup_code.domain.enums.ChallengeType.CODE
+                                    || ch.getType() == com.mycompany.levelup_code.domain.enums.ChallengeType.QUIZ).toList();
+                    assertEquals(2, baseChallenges.size(),
+                            "Cada lección conserva sus 2 retos base (Código y Quiz): " + lesson.getTitle());
+                    for (Challenge ch : baseChallenges) {
                         totalChallenges++;
                         if (ch instanceof CodeChallenge) {
                             CodeChallenge cc = (CodeChallenge) ch;

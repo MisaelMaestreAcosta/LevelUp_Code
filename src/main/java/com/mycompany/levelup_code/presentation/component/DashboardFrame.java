@@ -861,7 +861,7 @@ public class DashboardFrame {
         practiceLanguage.getItems().setAll("Todos los lenguajes", "Java", "Python", "C++");
         practiceLanguage.getSelectionModel().selectFirst();
         practiceType = new ComboBox<>();
-        practiceType.getItems().setAll("Todos los tipos", "Código", "Quiz");
+        practiceType.getItems().setAll("Todos los tipos", "Código", "Quiz", "Predicción de salida", "Depuración", "Ordenar fragmentos");
         practiceType.getSelectionModel().selectFirst();
         practiceDifficulty = new ComboBox<>();
         practiceDifficulty.getItems().setAll("Todas las dificultades", "Fácil", "Medio", "Difícil");
@@ -910,7 +910,7 @@ public class DashboardFrame {
             for (Challenge challenge : lesson.getChallenges()) {
                 total++;
                 String language = lesson.getModule().getLanguage().getName();
-                String type = challenge.getType() == ChallengeType.QUIZ ? "Quiz" : "Código";
+                String type = challenge.getType().label();
                 ChallengeProgress progress = challengeProgress.getOrDefault(challenge.getId(),
                         ChallengeProgress.PENDING);
                 if (!"Todos los lenguajes".equals(practiceLanguage.getValue())
@@ -940,8 +940,8 @@ public class DashboardFrame {
                 details.getStyleClass().add("muted-text");
                 Button open = new Button("Abrir reto");
                 open.getStyleClass().add("btn-primary");
-                open.setOnAction(e -> new ChallengeFrame(currentUser, challenge,
-                        this::onChallengeOrLessonCompleted).show());
+                open.setOnAction(e -> ChallengeFrame.open(currentUser, challenge,
+                        this::onChallengeOrLessonCompleted));
                 card.getChildren().addAll(title, details);
                 if (progress == ChallengeProgress.ATTEMPTED) {
                     Label review = new Label("Tu último intento no aprobó este reto. Puedes volver a intentarlo.");
@@ -1275,10 +1275,10 @@ public class DashboardFrame {
         List<Challenge> lessonChallenges = lesson.getChallenges();
         if (lessonChallenges != null && !lessonChallenges.isEmpty()) {
             for (final Challenge ch : lessonChallenges) {
-                boolean isQuiz = ch.getType() == ChallengeType.QUIZ;
-                Button btnChallenge = new Button(isQuiz ? "Reto Quiz" : "Reto Código");
+                boolean isQuiz = ch instanceof com.mycompany.levelup_code.domain.model.QuizChallenge;
+                Button btnChallenge = new Button(ch.getType().label());
                 btnChallenge.getStyleClass().add(isQuiz ? "btn-ghost" : "btn-primary");
-                btnChallenge.setOnAction(e -> new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show());
+                btnChallenge.setOnAction(e -> ChallengeFrame.open(currentUser, ch, this::onChallengeOrLessonCompleted));
                 actions.getChildren().add(btnChallenge);
             }
         }
@@ -1375,7 +1375,7 @@ public class DashboardFrame {
                     : null;
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
-            new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
+            ChallengeFrame.open(currentUser, ch, this::onChallengeOrLessonCompleted);
         });
 
         bottomCallout.getChildren().addAll(lblCompareSummary, btnPractice);
@@ -1823,7 +1823,7 @@ public class DashboardFrame {
                             ? "¡Reto publicado! Ya puedes probarlo."
                             : "Reto validado y creado para esta sesión de prueba.");
             populateLessonsForLanguage(activeLanguageKey);
-            new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
+            ChallengeFrame.open(currentUser, saved, this::onChallengeOrLessonCompleted);
         });
         save.setOnFailed(e -> {
             LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());

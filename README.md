@@ -37,6 +37,20 @@ otorgando una vez por reto, aunque haya varias versiones. Los envíos comprueban
 de evaluar y antes de confirmar la transacción. El trigger `TRG_INTENTO_VERSION` vincula los intentos
 creados por el paquete PL/SQL existente con la versión vigente.
 
+Después aplica **una vez** `database/10_challenge_types.sql` para habilitar predicción de salida,
+depuración y ordenamiento de fragmentos. La predicción amplía los quizzes con un fragmento de código,
+la depuración reutiliza plantillas y casos de `Reto_Codigo`, y el ordenamiento guarda fragmentos y
+su permutación correcta. El catálogo permite filtrar por estos tipos y el administrador puede
+crearlos, previsualizarlos y publicarlos. El modo demo incluye un ejemplo de cada tipo.
+Los ejercicios de ordenamiento usan Subir/Bajar, conservan borrador y registran resultados con
+el mismo servicio de XP e intentos. La vista previa evalúa de forma local.
+
+Antes de utilizar los envíos, recompila `database/03_plsql_gamificacion.sql` si la base aún usa
+la versión del paquete con `COMMIT` internos. Las pruebas incluyen una integración con rollback
+para las entradas/salidas vacías y otra para comprobar snapshots e impedir envíos a retos archivados.
+La segunda se omite hasta instalar las migraciones 08–10. Los scripts de este bloque se entregan
+para su instalación y no se ejecutan automáticamente al arrancar la aplicación.
+
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
 **Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  

@@ -212,8 +212,7 @@ public class OracleAttemptRepository implements AttemptRepository {
             try (ResultSet result = statement.executeQuery()) {
                 if (!result.next()) return Optional.empty();
                 User user = userDAO.findById(userId).orElseThrow();
-                com.mycompany.levelup_code.domain.model.CodeChallenge historical = new com.mycompany.levelup_code.domain.model.CodeChallenge();
-                historical.setId(challengeId);
+                Challenge historical = challengeRepository.findForAuthoring(connection, challengeId);
                 historical.setRevision(result.getInt("version_reto"));
                 historical.setDescription(result.getString("enunciado_version"));
                 Attempt attempt = new Attempt(result.getInt("id_intento"), user, historical, result.getString("codigo_enviado"),

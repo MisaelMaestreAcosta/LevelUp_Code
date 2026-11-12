@@ -69,6 +69,22 @@ public final class DemoSeedCatalog {
                 }
             }
         }
+        Lesson practiceLesson = javaLang.getModules().get(0).getLessons().get(0);
+        var prediction = new com.mycompany.levelup_code.domain.model.OutputPredictionChallenge(90101,
+                "Predice el tamaño de un conjunto", "Selecciona la salida de este fragmento ejecutado dentro de main.", practiceLesson,
+                30, List.of("1", "2", "3"), "2", "var values = new java.util.HashSet<Integer>();\nvalues.add(1);\nvalues.add(1);\nvalues.add(2);\nSystem.out.println(values.size());");
+        prediction.setDifficulty(com.mycompany.levelup_code.domain.enums.ChallengeDifficulty.FACIL);
+        practiceLesson.addChallenge(prediction);
+        var debugging = new com.mycompany.levelup_code.domain.model.DebuggingChallenge(90102,
+                "Corrige la conversión a mayúsculas", "El método debe devolver el texto en mayúsculas. Corrige el error de la plantilla.", practiceLesson,
+                30, "public class Solver { public static String solve(String input) { return input.toLowerCase(); } }", 2);
+        debugging.addTestCase(new TestCase(0, debugging, "hola", "HOLA", false));
+        debugging.addTestCase(new TestCase(0, debugging, "Java", "JAVA", true));
+        practiceLesson.addChallenge(debugging);
+        var ordering = new com.mycompany.levelup_code.domain.model.CodeOrderingChallenge(90103,
+                "Ordena el cálculo del doble", "Ordena estas instrucciones para ejecutarlas dentro de main e imprimir el doble de 3.",
+                practiceLesson, 30, List.of("System.out.println(doble);", "int numero = 3;", "int doble = numero * 2;"), List.of(2, 3, 1));
+        practiceLesson.addChallenge(ordering);
         return languages;
     }
 

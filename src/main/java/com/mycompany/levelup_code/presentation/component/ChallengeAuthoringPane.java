@@ -36,6 +36,11 @@ public final class ChallengeAuthoringPane extends VBox {
     private final TextArea statement = area(3);
     private final TextArea template = area(7);
     private final TextArea reference = area(7);
+    private final TextArea predictionSnippet = area(6);
+    private final TextArea fragments = area(7);
+    private final TextField correctOrder = new TextField();
+    private final VBox orderingPanel = new VBox(10);
+    private final VBox predictionPanel;
     private final Spinner<Integer> reward = new Spinner<>(0, 10000, 80);
     private final Spinner<Integer> timeout = new Spinner<>(1, 60, 2);
     private final VBox cases = new VBox(8);
@@ -80,14 +85,18 @@ public final class ChallengeAuthoringPane extends VBox {
         lesson.getSelectionModel().selectFirst();
         difficulty.getItems().setAll(ChallengeDifficulty.values());
         difficulty.setValue(ChallengeDifficulty.MEDIO);
-        kind.getItems().setAll("Código", "Quiz");
+        kind.getItems().setAll("Código", "Quiz", "Predicción de salida", "Depuración", "Ordenar fragmentos");
         kind.setValue("Código");
         kind.setOnAction(event -> updateKind());
         Button addCase = button("Añadir caso", () -> addCase("", "", false));
         Button addOption = button("Añadir opción", () -> addOption("", false));
         codePanel.getChildren().addAll(field("Plantilla para el estudiante", template),
                 field("Solución de referencia para validar", reference), cases, addCase);
-        quizPanel.getChildren().addAll(new Label("Selecciona la opción correcta con el círculo."), options, addOption);
+        predictionPanel = field("Código para predecir la salida", predictionSnippet);
+        quizPanel.getChildren().addAll(predictionPanel, new Label("Selecciona la opción correcta con el círculo."), options, addOption);
+        correctOrder.setPromptText("Ejemplo 2,1,3");
+        orderingPanel.getChildren().addAll(field("Fragmentos, uno por línea", fragments),
+                field("Orden correcto de los números de línea", correctOrder));
         Button versions = button("Consultar versiones", this::showVersions);
         Button draft = button("Guardar borrador", () -> save(PublicationState.BORRADOR));
         Button publish = button("Validar y publicar", () -> save(PublicationState.PUBLICADO));
@@ -101,13 +110,13 @@ public final class ChallengeAuthoringPane extends VBox {
         Button preview = button("Vista previa", () -> {
             try {
                 Challenge challenge = capture(PublicationState.BORRADOR).challenge();
-                new ChallengeFrame(administrator, challenge, null, true).show();
+                ChallengeFrame.open(administrator, challenge, null, true);
             } catch (RuntimeException ex) { status.setText(ex.getMessage()); }
         });
         form.getChildren().addAll(entries, new FlowPane(8, 8, load, fresh, duplicate, refresh),
                 field("Lección", lesson), field("Tipo", kind), field("Título", title), field("Enunciado", statement),
                 new FlowPane(12, 8, field("Dificultad", difficulty), field("XP", reward), field("Límite en segundos", timeout)),
-                codePanel, quizPanel, new FlowPane(8, 8, draft, publish, archive, preview, versions));
+                codePanel, quizPanel, orderingPanel, new FlowPane(8, 8, draft, publish, archive, preview, versions));
         getChildren().addAll(heading, status, form);
         reset();
         refresh();
@@ -152,14 +161,24 @@ public final class ChallengeAuthoringPane extends VBox {
 
     private AuthoredChallenge capture(PublicationState state) {
         Challenge challenge;
-        if ("Quiz".equals(kind.getValue())) {
+        if ("Ordenar fragmentos".equals(kind.getValue())) {
+            challenge = new CodeOrderingChallenge(editingId, title.getText().strip(), statement.getText(), lesson.getValue(),
+                    reward.getValue(), fragments.getText().lines().filter(line -> !line.isBlank()).toList(),
+                    CodeOrderingChallenge.parseOrder(correctOrder.getText()));
+        } else if ("Quiz".equals(kind.getValue()) || "Predicción de salida".equals(kind.getValue())) {
             String answer = optionFields.stream().filter(value -> value.correct().isSelected())
                     .map(value -> value.text().getText()).findFirst().orElse("");
-            challenge = new QuizChallenge(editingId, title.getText().strip(), statement.getText(), lesson.getValue(),
-                    reward.getValue(), optionFields.stream().map(value -> value.text().getText()).toList(), answer);
+            List<String> values = optionFields.stream().map(value -> value.text().getText()).toList();
+            challenge = "Predicción de salida".equals(kind.getValue())
+                    ? new OutputPredictionChallenge(editingId, title.getText().strip(), statement.getText(), lesson.getValue(),
+                            reward.getValue(), values, answer, predictionSnippet.getText())
+                    : new QuizChallenge(editingId, title.getText().strip(), statement.getText(), lesson.getValue(), reward.getValue(), values, answer);
         } else {
-            CodeChallenge code = new CodeChallenge(editingId, title.getText().strip(), statement.getText(),
-                    lesson.getValue(), reward.getValue(), template.getText(), timeout.getValue());
+            CodeChallenge code = "Depuración".equals(kind.getValue())
+                    ? new DebuggingChallenge(editingId, title.getText().strip(), statement.getText(), lesson.getValue(),
+                            reward.getValue(), template.getText(), timeout.getValue())
+                    : new CodeChallenge(editingId, title.getText().strip(), statement.getText(),
+                            lesson.getValue(), reward.getValue(), template.getText(), timeout.getValue());
             for (CaseFields fields : caseFields) {
                 code.addTestCase(new TestCase(0, code, fields.input().getText(), fields.output().getText(), fields.hidden().isSelected()));
             }
@@ -189,7 +208,7 @@ public final class ChallengeAuthoringPane extends VBox {
         revision = authored.revision();
         lesson.setValue(lessons.stream().filter(value -> value.getId() == challenge.getLessonId()).findFirst().orElse(null));
         lesson.setDisable(true);
-        kind.setValue(challenge instanceof QuizChallenge ? "Quiz" : "Código");
+        kind.setValue(challenge.getType().label());
         kind.setDisable(true);
         title.setText(challenge.getTitle());
         statement.setText(challenge.getDescription());
@@ -205,6 +224,10 @@ public final class ChallengeAuthoringPane extends VBox {
             for (TestCase test : code.getTestCases()) addCase(test.getInput(), test.getExpectedOutput(), test.isHidden());
         } else if (challenge instanceof QuizChallenge quiz) {
             for (String option : quiz.getOptions()) addOption(option, option.equals(quiz.getCorrectAnswer()));
+            if (quiz instanceof OutputPredictionChallenge prediction) predictionSnippet.setText(prediction.getCodeSnippet());
+        } else if (challenge instanceof CodeOrderingChallenge ordering) {
+            fragments.setText(String.join("\n", ordering.getFragments()));
+            correctOrder.setText(CodeOrderingChallenge.formatOrder(ordering.getCorrectOrder()));
         }
         updateKind();
         status.setText("Editando " + authored.state() + " · revisión " + revision);
@@ -217,6 +240,7 @@ public final class ChallengeAuthoringPane extends VBox {
         kind.setDisable(false);
         kind.setValue("Código");
         title.clear(); statement.clear(); template.clear(); reference.clear();
+        predictionSnippet.clear(); fragments.clear(); correctOrder.clear();
         cases.getChildren().clear(); caseFields.clear();
         addCase("", "", false);
         options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
@@ -235,9 +259,13 @@ public final class ChallengeAuthoringPane extends VBox {
     private void refresh() { run(() -> repository.list(administrator.getId()), values -> entries.getItems().setAll(values)); }
 
     private void updateKind() {
-        boolean code = "Código".equals(kind.getValue());
+        boolean code = "Código".equals(kind.getValue()) || "Depuración".equals(kind.getValue());
+        boolean ordering = "Ordenar fragmentos".equals(kind.getValue());
         codePanel.setVisible(code); codePanel.setManaged(code);
-        quizPanel.setVisible(!code); quizPanel.setManaged(!code);
+        quizPanel.setVisible(!code && !ordering); quizPanel.setManaged(!code && !ordering);
+        orderingPanel.setVisible(ordering); orderingPanel.setManaged(ordering);
+        boolean prediction = "Predicción de salida".equals(kind.getValue());
+        predictionPanel.setVisible(prediction); predictionPanel.setManaged(prediction);
     }
 
     private void addOption(String text, boolean selected) {

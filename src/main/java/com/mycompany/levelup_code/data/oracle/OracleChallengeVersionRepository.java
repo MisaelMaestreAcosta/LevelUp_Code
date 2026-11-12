@@ -22,6 +22,17 @@ public final class OracleChallengeVersionRepository {
             statement.setInt(2, challengeId);
             statement.executeUpdate();
         }
+        try (PreparedStatement statement = connection.prepareStatement("UPDATE Version_Reto v SET "
+                + "codigo_inicial=(SELECT codigo_ejemplo FROM Reto_Prediccion WHERE id_reto=v.id_reto) "
+                + "WHERE v.id_reto=? AND v.revision=(SELECT revision FROM Retos WHERE id_reto=?) AND tipo_reto='PREDICCION'")) {
+            statement.setInt(1, challengeId); statement.setInt(2, challengeId); statement.executeUpdate();
+        }
+        try (PreparedStatement statement = connection.prepareStatement("UPDATE Version_Reto v SET "
+                + "opciones=(SELECT fragmentos FROM Reto_Ordenamiento WHERE id_reto=v.id_reto),"
+                + "respuesta_correcta=(SELECT orden_correcto FROM Reto_Ordenamiento WHERE id_reto=v.id_reto) "
+                + "WHERE v.id_reto=? AND v.revision=(SELECT revision FROM Retos WHERE id_reto=?) AND tipo_reto='ORDENAR'")) {
+            statement.setInt(1, challengeId); statement.setInt(2, challengeId); statement.executeUpdate();
+        }
         try (PreparedStatement statement = connection.prepareStatement("INSERT INTO Version_Caso_Prueba "
                 + "(id_version,numero,entrada,salida_esperada,es_oculto) "
                 + "SELECT v.id_version,ROW_NUMBER() OVER(ORDER BY c.id_caso),c.entrada,c.salida_esperada,c.es_oculto "

@@ -10,6 +10,9 @@ import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
+import com.mycompany.levelup_code.domain.model.DebuggingChallenge;
+import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
+import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -31,7 +34,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
             "SELECT r.id_reto, r.id_leccion, r.titulo_reto, r.enunciado, r.tipo_reto, "
             + "r.dificultad, r.exp_recompensa, r.orden_secuencia, r.revision, "
             + "rc.codigo_inicial, rc.limite_tiempo_ms, "
-            + "rq.opciones, rq.respuesta_correcta, "
+            + "rq.opciones, rq.respuesta_correcta, rp.codigo_ejemplo, ro.fragmentos, ro.orden_correcto, "
             + "l.titulo AS leccion_titulo, l.contenido AS leccion_contenido, "
             + "l.orden_secuencia AS leccion_orden, l.exp_recompensa AS leccion_exp, "
             + "m.id_modulo, m.nombre_modulo, m.descripcion AS modulo_desc, m.orden_secuencia AS modulo_orden, "
@@ -42,7 +45,9 @@ public class OracleChallengeRepository implements ChallengeRepository {
             + "JOIN Modulos m ON m.id_modulo = l.id_modulo "
             + "JOIN Lenguajes lg ON lg.id_lenguaje = m.id_lenguaje "
             + "LEFT JOIN Reto_Codigo rc ON rc.id_reto = r.id_reto "
-            + "LEFT JOIN Reto_Quiz rq ON rq.id_reto = r.id_reto ";
+            + "LEFT JOIN Reto_Quiz rq ON rq.id_reto = r.id_reto "
+            + "LEFT JOIN Reto_Prediccion rp ON rp.id_reto = r.id_reto "
+            + "LEFT JOIN Reto_Ordenamiento ro ON ro.id_reto = r.id_reto ";
 
     @Override
     public Optional<Challenge> findById(int challengeId) {
@@ -184,11 +189,20 @@ public class OracleChallengeRepository implements ChallengeRepository {
         String type = rs.getString("tipo_reto");
         int expReward = rs.getInt("exp_recompensa");
 
-        if ("QUIZ".equalsIgnoreCase(type)) {
+        if ("ORDENAR".equals(type)) {
+            CodeOrderingChallenge ordering = new CodeOrderingChallenge(id, title, statement, lesson, expReward,
+                    QuizOptionCodec.decode(rs.getString("fragmentos")), CodeOrderingChallenge.parseOrder(rs.getString("orden_correcto")));
+            ordering.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
+            ordering.setRevision(rs.getInt("revision"));
+            return ordering;
+        }
+        if ("QUIZ".equalsIgnoreCase(type) || "PREDICCION".equals(type)) {
             String rawOptions = rs.getString("opciones");
             List<String> options = QuizOptionCodec.decode(rawOptions);
             String correctAnswer = rs.getString("respuesta_correcta");
-            QuizChallenge quiz = new QuizChallenge(id, title, statement, lesson, expReward, options, correctAnswer);
+            QuizChallenge quiz = "PREDICCION".equals(type)
+                    ? new OutputPredictionChallenge(id, title, statement, lesson, expReward, options, correctAnswer, rs.getString("codigo_ejemplo"))
+                    : new QuizChallenge(id, title, statement, lesson, expReward, options, correctAnswer);
             quiz.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
             quiz.setRevision(rs.getInt("revision"));
             return quiz;
@@ -198,8 +212,9 @@ public class OracleChallengeRepository implements ChallengeRepository {
         int limitMs = rs.getInt("limite_tiempo_ms");
         int limitSeconds = Math.max(1, limitMs / 1000);
 
-        CodeChallenge codeChallenge = new CodeChallenge(
-                id, title, statement, lesson, expReward, template, limitSeconds);
+        CodeChallenge codeChallenge = "DEPURACION".equals(type)
+                ? new DebuggingChallenge(id, title, statement, lesson, expReward, template, limitSeconds)
+                : new CodeChallenge(id, title, statement, lesson, expReward, template, limitSeconds);
         codeChallenge.setDifficulty(ChallengeDifficulty.valueOf(rs.getString("dificultad")));
         codeChallenge.setRevision(rs.getInt("revision"));
         return codeChallenge;

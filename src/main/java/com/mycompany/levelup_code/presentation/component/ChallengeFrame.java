@@ -16,6 +16,8 @@ import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.domain.model.EditorPreferences;
+import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
+import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -150,6 +152,18 @@ public class ChallengeFrame extends Stage {
         this(null, createDefaultCodeChallenge(), null);
     }
 
+    public static void open(User user, Challenge challenge, Runnable callback) {
+        open(user, challenge, callback, false);
+    }
+
+    public static void open(User user, Challenge challenge, Runnable callback, boolean preview) {
+        if (challenge instanceof CodeOrderingChallenge ordering) {
+            new CodeOrderingFrame(user, ordering, callback, preview).show();
+        } else {
+            new ChallengeFrame(user, challenge, callback, preview).show();
+        }
+    }
+
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback) {
         this(user, challenge, onSolvedCallback, false);
     }
@@ -166,7 +180,8 @@ public class ChallengeFrame extends Stage {
         if (challenge != null) {
             if (challenge.getLesson() != null && challenge.getLesson().getChallenges() != null
                     && !challenge.getLesson().getChallenges().isEmpty()) {
-                this.availableChallenges.addAll(challenge.getLesson().getChallenges());
+                this.availableChallenges.addAll(challenge.getLesson().getChallenges().stream()
+                        .filter(value -> !(value instanceof CodeOrderingChallenge)).toList());
             } else {
                 this.availableChallenges.add(challenge);
                 this.availableChallenges.add(createDefaultQuizChallenge());
@@ -362,7 +377,7 @@ public class ChallengeFrame extends Stage {
 
             for (int i = 0; i < availableChallenges.size(); i++) {
                 final Challenge ch = availableChallenges.get(i);
-                String btnLabel = (ch.getType() == ChallengeType.QUIZ ? "Quiz #" : "Código #") + (i + 1);
+                String btnLabel = ch.getType().label() + " #" + (i + 1);
                 Button btnCh = new Button(btnLabel);
                 btnCh.getStyleClass().add("btn-secondary");
                 btnCh.setOnAction(e -> loadChallengeIntoView(ch));
@@ -823,6 +838,9 @@ public class ChallengeFrame extends Stage {
 
         lblChallengeTitle.setText(challenge.getTitle());
         lblStatement.setText(challenge.getDescription());
+        if (challenge instanceof OutputPredictionChallenge prediction) {
+            lblStatement.setText(challenge.getDescription() + "\n\n" + prediction.getCodeSnippet());
+        }
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
         updateDifficultyBadge(challenge.getExpReward());
 
@@ -833,7 +851,7 @@ public class ChallengeFrame extends Stage {
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
-            badgeType.setText("RETO DE CÓDIGO · LÍMITE " + codeChallenge.getTimeLimitSeconds() + "S");
+            badgeType.setText(challenge.getType().label().toUpperCase(Locale.ROOT) + " · LÍMITE " + codeChallenge.getTimeLimitSeconds() + "S");
             badgeType.getStyleClass().setAll("badge-indigo");
 
             String langName = resolveChallengeLanguageName(codeChallenge);
@@ -866,7 +884,7 @@ public class ChallengeFrame extends Stage {
             }
         } else if (challenge instanceof QuizChallenge) {
             QuizChallenge quizChallenge = (QuizChallenge) challenge;
-            badgeType.setText("QUIZ DE SELECCIÓN");
+            badgeType.setText(challenge.getType().label().toUpperCase(Locale.ROOT));
             badgeType.getStyleClass().setAll("badge-violet");
             badgeExecutionMode.setText("VALIDACIÓN EXACTA");
             badgeExecutionMode.getStyleClass().setAll("badge-cyan");
@@ -1007,6 +1025,7 @@ public class ChallengeFrame extends Stage {
                 appendFingerprintField(content, option);
             }
             appendFingerprintField(content, quiz.getCorrectAnswer());
+            if (quiz instanceof OutputPredictionChallenge prediction) appendFingerprintField(content, prediction.getCodeSnippet());
         }
         return hashPayload(content.toString());
     }
@@ -1581,7 +1600,7 @@ public class ChallengeFrame extends Stage {
                         boolean correct = local != null ? local.isAllPassed()
                                 : submission.quizIndex() == submission.correctQuizIndex()
                                 || (submission.correctAnswer() != null
-                                && submission.correctAnswer().trim().equalsIgnoreCase(submission.payload().trim()));
+                                && submission.correctAnswer().trim().equals(submission.payload().trim()));
                         return new EvaluationOutcome(local, correct,
                                 PersistenceOutcome.failed(exceptionDetails(ex)));
                     }
@@ -1591,7 +1610,7 @@ public class ChallengeFrame extends Stage {
                 boolean correct = summary != null ? summary.isAllPassed()
                         : submission.quizIndex() == submission.correctQuizIndex()
                         || (submission.correctAnswer() != null
-                        && submission.correctAnswer().trim().equalsIgnoreCase(submission.payload().trim()));
+                        && submission.correctAnswer().trim().equals(submission.payload().trim()));
                 updateMessage("Preparando resultado…");
                 return new EvaluationOutcome(summary, correct, PersistenceOutcome.localOnly());
             }

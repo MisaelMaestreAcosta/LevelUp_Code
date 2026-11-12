@@ -83,7 +83,7 @@ public final class NotebookPane extends VBox {
     private void show(OracleNotebookRepository.Notebook data) {
         notes.getItems().setAll(data.notes()); favorites.getChildren().clear();
         for (Challenge c:challenges) if (data.favorites().contains(c.getId())) {
-            Button open=new Button(c.getTitle()); open.setOnAction(e -> new ChallengeFrame(user,c,callback).show());
+            Button open=new Button(c.getTitle()); open.setOnAction(e -> ChallengeFrame.open(user,c,callback));
             Button remove=new Button("Quitar favorito");
             remove.setOnAction(e -> run(() -> { repository.favorite(userId,c.getId(),false); return repository.load(userId); },this::show));
             FlowPane row=new FlowPane(8,8,open,remove); favorites.getChildren().add(row);
