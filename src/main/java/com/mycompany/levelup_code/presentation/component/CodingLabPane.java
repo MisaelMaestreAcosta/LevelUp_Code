@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.data.local.LabDraftStore;
 import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.domain.model.EditorPreferences;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import javafx.concurrent.Task;
@@ -31,6 +32,14 @@ public final class CodingLabPane extends VBox {
         language.getItems().setAll("Java", "Python", "C++");
         language.setValue(activeLanguage);
         code.getStyleClass().add("code-editor");
+        code.setStyle("-fx-font-size: " + EditorPreferences.forUser(user.getId()).fontSize() + "px;");
+        code.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.TAB && !event.isShiftDown()
+                    && !event.isControlDown() && !event.isAltDown()) {
+                code.replaceSelection(" ".repeat(EditorPreferences.forUser(user.getId()).indentSpaces()));
+                event.consume();
+            }
+        });
         code.setPrefRowCount(14);
         code.setAccessibleText("Código del experimento");
         input.setPrefRowCount(2);

@@ -14,6 +14,18 @@ Permite objetivos diarios o de siete días de retos superados, lecturas, XP o d�
 Su avance se consulta desde los registros existentes y no entrega recompensas adicionales;
 no requiere nuevos procedimientos PL/SQL. Instala ambos scripts con la aplicación cerrada.
 
+El laboratorio guarda manualmente un experimento por cuenta, modo y lenguaje en
+`.levelup-code/laboratory` dentro del directorio del usuario. Java utiliza el motor real
+existente y Python/C++ continúan mostrando resultados simulados. El comparador incorpora
+actividades de predicción con explicaciones, copia de código y controles de letra.
+
+Ejecuta **una sola vez** `database/07_user_preferences.sql` después del esquema base para guardar
+lenguaje inicial, tamaño del editor, indentación y reducción de animaciones. Las preferencias
+se recuperan al abrir el panel. Si la migración todavía no está instalada, el panel utiliza
+los valores predeterminados. El perfil permite editar nombre y apellido y cambiar la contraseña
+verificando la actual. El cambio de contraseña usa una actualización condicional para detectar
+modificaciones concurrentes. Las preferencias demo solo duran la sesión.
+
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
 **Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  

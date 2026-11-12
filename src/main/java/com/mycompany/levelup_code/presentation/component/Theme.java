@@ -48,6 +48,10 @@ public final class Theme {
         CHECK, LOCK, PLAY, SPARK, USER, LOGOUT, STAR, BOLT
     }
 
+    private static boolean reducedMotion;
+
+    public static void setReducedMotion(boolean value) { reducedMotion = value; }
+
     private Theme() {
     }
 
@@ -100,7 +104,7 @@ public final class Theme {
      * Ejecuta una transición suave de opacidad al cambiar de vista en el espacio de trabajo.
      */
     public static void playFadeIn(Node node) {
-        if (node == null) {
+        if (node == null || reducedMotion) {
             return;
         }
         FadeTransition ft = new FadeTransition(Duration.millis(210), node);
@@ -113,7 +117,7 @@ public final class Theme {
      * Ejecuta un pulso suave de escala y opacidad para retroalimentación interactiva al aprobar retos.
      */
     public static void playPulse(Node node) {
-        if (node == null) {
+        if (node == null || reducedMotion) {
             return;
         }
         ScaleTransition st = new ScaleTransition(Duration.millis(160), node);

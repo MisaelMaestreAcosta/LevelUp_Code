@@ -15,6 +15,7 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.domain.model.EditorPreferences;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -151,6 +152,7 @@ public class ChallengeFrame extends Stage {
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback) {
         this.currentUser = user;
+        editorFontSize = EditorPreferences.forUser(user == null ? 0 : user.getId()).fontSize();
         draftSaveDelay.setOnFinished(event -> rememberDraft());
         this.onSolvedCallback = onSolvedCallback;
         this.availableChallenges = new ArrayList<>();
@@ -541,7 +543,8 @@ public class ChallengeFrame extends Stage {
 
         txtEditor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.TAB && !event.isControlDown() && !event.isAltDown()) {
-                txtEditor.insertText(txtEditor.getCaretPosition(), "    ");
+                int spaces = EditorPreferences.forUser(currentUser == null ? 0 : currentUser.getId()).indentSpaces();
+                txtEditor.replaceSelection(" ".repeat(spaces));
                 event.consume();
             }
         });
@@ -561,7 +564,7 @@ public class ChallengeFrame extends Stage {
         editorFontSize = Math.max(11, Math.min(24, editorFontSize + delta));
         txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         txtEditor.setAccessibleHelp("Editor a " + editorFontSize
-                + " píxeles. Tab inserta cuatro espacios; Ctrl+Enter envía.");
+                + " píxeles. Tab inserta la indentación configurada; Ctrl+Enter envía.");
     }
 
     private void updateLineGutter(String text) {

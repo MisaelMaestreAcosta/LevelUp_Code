@@ -78,6 +78,14 @@ public final class InMemoryTestRepositories {
         }
 
         @Override
+        public boolean compareAndSetPassword(int userId, String expectedHash, String replacementHash) {
+            User user = byId.get(userId);
+            if (user == null || !java.util.Objects.equals(user.getPasswordHash(), expectedHash)) return false;
+            user.setPasswordHash(replacementHash);
+            return true;
+        }
+
+        @Override
         public int recoverLivesIfEligible(int userId) {
             User user = byId.get(userId);
             if (user == null) throw new IllegalArgumentException("Usuario desconocido");

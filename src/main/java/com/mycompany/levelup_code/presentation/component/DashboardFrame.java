@@ -18,6 +18,8 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.StreakAchievement;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.domain.model.EditorPreferences;
+import com.mycompany.levelup_code.data.oracle.OraclePreferenceRepository;
 import com.mycompany.levelup_code.presentation.controller.DashboardController;
 import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
 import java.time.LocalDate;
@@ -102,6 +104,8 @@ public class DashboardFrame {
     private Button navGoalsBtn;
     private Button navLabBtn;
     private CodingLabPane codingLab;
+    private Label profileName;
+    private ProfilePane profilePane;
     private NotebookPane notebookPane;
     private VBox practiceView;
     private VBox practiceResults;
@@ -234,6 +238,12 @@ public class DashboardFrame {
         stage.setScene(scene);
         Task<DashboardState> task = new Task<>() {
             @Override protected DashboardState call() {
+                EditorPreferences preferences = EditorPreferences.DEFAULT;
+                if (oracleConnected) {
+                    try { preferences = new OraclePreferenceRepository().load(currentUser.getId()); }
+                    catch (Exception ex) { LOGGER.log(Level.WARNING, "No se pudieron cargar las preferencias", ex); }
+                }
+                EditorPreferences.remember(currentUser.getId(), preferences);
                 loadDomainDataFromOracleOrSeed();
                 loadEnrollmentsFromOracle();
                 loadAchievementsFromOracleOrSeed();
@@ -243,8 +253,11 @@ public class DashboardFrame {
         task.setOnSucceeded(e -> {
             if (disposed || stage.getScene() != scene) return;
             applyDashboardState(task.getValue());
+            EditorPreferences preferences = EditorPreferences.forUser(currentUser.getId());
+            Theme.setReducedMotion(preferences.reducedMotion());
+            activeLanguageKey = preferences.language();
             initUi();
-            populateLessonsForLanguage("JAVA");
+            populateLessonsForLanguage(activeLanguageKey);
             refreshCourseProgressBars();
             loadComparisonTopic("POLYMORPHISM");
             refreshAchievementsGrid();
@@ -549,12 +562,17 @@ public class DashboardFrame {
         String roleHex = currentUser.isAdministrator() ? Theme.HEX_GREEN : Theme.HEX_INDIGO;
         VBox userTextCol = new VBox(2);
         Label lblUserName = new Label(currentUser.getUsername());
+        profileName = lblUserName;
         lblUserName.getStyleClass().add("card-title");
 
         String roleLabel = currentUser.isAdministrator() ? "Rol: Administrador" : "Rol: Estudiante";
         Label lblUserRole = new Label(roleLabel);
         lblUserRole.getStyleClass().add(currentUser.isAdministrator() ? "text-success" : "muted-text");
         userTextCol.getChildren().addAll(lblUserName, lblUserRole);
+        Button profile = new Button("Mi perfil");
+        profile.getStyleClass().add("btn-secondary");
+        profile.setOnAction(event -> switchWorkspaceView("PROFILE"));
+        userTextCol.getChildren().add(profile);
 
         profileTop.getChildren().addAll(
                 Theme.createIcon(Theme.IconKind.USER, 22, roleHex),
@@ -2015,6 +2033,10 @@ public class DashboardFrame {
         } else if ("LAB".equals(cardKey)) {
             if (codingLab == null) codingLab = new CodingLabPane(currentUser, oracleConnected);
             target = codingLab;
+        } else if ("PROFILE".equals(cardKey)) {
+            if (profilePane == null) profilePane = new ProfilePane(currentUser, oracleConnected,
+                    () -> profileName.setText(currentUser.getUsername()));
+            target = profilePane;
         } else if ("NOTEBOOK".equals(cardKey)) {
             if (notebookPane==null) notebookPane = new NotebookPane(currentUser, oracleConnected,
                     allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
