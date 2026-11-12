@@ -96,6 +96,7 @@ public class DashboardFrame {
     // Botones de navegación lateral
     private Button navCoursesBtn;
     private Button navPracticeBtn;
+    private Button navProgressBtn;
     private VBox practiceView;
     private VBox practiceResults;
     private Label practiceCount;
@@ -464,6 +465,10 @@ public class DashboardFrame {
         navPracticeBtn.setGraphicTextGap(10);
         navPracticeBtn.setMaxWidth(Double.MAX_VALUE);
         navPracticeBtn.setOnAction(e -> switchWorkspaceView("PRACTICE"));
+        navProgressBtn = new Button("Mi progreso");
+        navProgressBtn.getStyleClass().add("nav-btn");
+        navProgressBtn.setMaxWidth(Double.MAX_VALUE);
+        navProgressBtn.setOnAction(e -> switchWorkspaceView("PROGRESS"));
 
         navComparatorBtn = new Button("Comparar lenguajes");
         navComparatorBtn.getStyleClass().add("nav-btn");
@@ -503,7 +508,7 @@ public class DashboardFrame {
 
         navColumn.getChildren().addAll(
                 lblBrand, lblSub, lblNavSection,
-                navCoursesBtn, navPracticeBtn, navComparatorBtn, navAchievementsBtn
+                navCoursesBtn, navPracticeBtn, navProgressBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
@@ -1960,6 +1965,8 @@ public class DashboardFrame {
         Node target = coursesView;
         if ("COMPARATOR".equals(cardKey)) {
             target = comparatorView;
+        } else if ("PROGRESS".equals(cardKey)) {
+            target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected);
         } else if ("PRACTICE".equals(cardKey)) {
             renderPracticeCatalog();
             target = practiceView;
@@ -1974,6 +1981,7 @@ public class DashboardFrame {
 
         navCoursesBtn.getStyleClass().setAll("COURSES".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navPracticeBtn.getStyleClass().setAll("PRACTICE".equals(cardKey) ? "nav-btn-active" : "nav-btn");
+        navProgressBtn.getStyleClass().setAll("PROGRESS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navCoursesBtn.setGraphic(Theme.createIcon(
                 Theme.IconKind.BOOK, 16, "COURSES".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_INDIGO));
 
