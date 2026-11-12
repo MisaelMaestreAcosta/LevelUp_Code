@@ -1,5 +1,14 @@
 # LevelUp Code
 
+## Actualizaciones de aprendizaje
+
+La rama `feature/learning-experience` añade el centro de práctica y estadísticas reales por lenguaje.
+Para activar el cuaderno y los favoritos, ejecuta **una sola vez**, conectado como propietario
+del esquema, `database/05_student_notebook.sql` después de crear las tablas base de `01_schema.sql`.
+Es necesario tanto para instalaciones nuevas como para bases existentes; no borra datos previos.
+Las notas y favoritos son privados por usuario y se guardan en Oracle. En modo demo se muestran
+como funciones que requieren una cuenta conectada. Las estadísticas no utilizan actividad demo.
+
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
 **Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  
