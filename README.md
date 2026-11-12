@@ -9,6 +9,11 @@ Es necesario tanto para instalaciones nuevas como para bases existentes; no borr
 Las notas y favoritos son privados por usuario y se guardan en Oracle. En modo demo se muestran
 como funciones que requieren una cuenta conectada. Las estadísticas no utilizan actividad demo.
 
+Ejecuta también **una sola vez** `database/06_learning_goals.sql` para activar las metas personales.
+Permite objetivos diarios o de siete días de retos superados, lecturas, XP o días con XP.
+Su avance se consulta desde los registros existentes y no entrega recompensas adicionales;
+no requiere nuevos procedimientos PL/SQL. Instala ambos scripts con la aplicación cerrada.
+
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
 **Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  

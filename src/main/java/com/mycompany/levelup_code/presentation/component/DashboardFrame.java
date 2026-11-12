@@ -98,6 +98,7 @@ public class DashboardFrame {
     private Button navPracticeBtn;
     private Button navProgressBtn;
     private Button navNotebookBtn;
+    private Button navGoalsBtn;
     private NotebookPane notebookPane;
     private VBox practiceView;
     private VBox practiceResults;
@@ -475,6 +476,10 @@ public class DashboardFrame {
         navNotebookBtn.getStyleClass().add("nav-btn");
         navNotebookBtn.setMaxWidth(Double.MAX_VALUE);
         navNotebookBtn.setOnAction(e -> switchWorkspaceView("NOTEBOOK"));
+        navGoalsBtn = new Button("Mis metas");
+        navGoalsBtn.getStyleClass().add("nav-btn");
+        navGoalsBtn.setMaxWidth(Double.MAX_VALUE);
+        navGoalsBtn.setOnAction(e -> switchWorkspaceView("GOALS"));
 
         navComparatorBtn = new Button("Comparar lenguajes");
         navComparatorBtn.getStyleClass().add("nav-btn");
@@ -514,13 +519,17 @@ public class DashboardFrame {
 
         navColumn.getChildren().addAll(
                 lblBrand, lblSub, lblNavSection,
-                navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navComparatorBtn, navAchievementsBtn
+                navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
         }
         navColumn.getChildren().add(btnQuickLab);
-        sidebar.setTop(navColumn);
+        ScrollPane navigationScroll = new ScrollPane(navColumn);
+        navigationScroll.setFitToWidth(true);
+        navigationScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        navigationScroll.getStyleClass().add("scroll-pane-clean");
+        sidebar.setCenter(navigationScroll);
 
         // Tarjeta inferior de perfil activo y cierre de sesión
         VBox userBox = new VBox(10);
@@ -1973,6 +1982,8 @@ public class DashboardFrame {
             target = comparatorView;
         } else if ("PROGRESS".equals(cardKey)) {
             target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected);
+        } else if ("GOALS".equals(cardKey)) {
+            target = new LearningGoalsPane(currentUser.getId(), oracleConnected);
         } else if ("NOTEBOOK".equals(cardKey)) {
             if (notebookPane==null) notebookPane = new NotebookPane(currentUser, oracleConnected,
                     allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
@@ -1994,6 +2005,7 @@ public class DashboardFrame {
         navPracticeBtn.getStyleClass().setAll("PRACTICE".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navProgressBtn.getStyleClass().setAll("PROGRESS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navNotebookBtn.getStyleClass().setAll("NOTEBOOK".equals(cardKey) ? "nav-btn-active" : "nav-btn");
+        navGoalsBtn.getStyleClass().setAll("GOALS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
         navCoursesBtn.setGraphic(Theme.createIcon(
                 Theme.IconKind.BOOK, 16, "COURSES".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_INDIGO));
 
