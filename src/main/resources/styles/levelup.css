@@ -780,3 +780,167 @@
     -fx-wrap-text: true;
     -fx-max-width: 360;
 }
+
+/* Learning workspaces share the dashboard's paper surfaces and blue actions. */
+.learning-workspace {
+    -fx-spacing: 16;
+    -fx-padding: 2 2 8 2;
+}
+.learning-workspace .label {
+    -fx-text-fill: #334155;
+}
+.learning-workspace .page-title, .learning-workspace .card-title,
+.learning-workspace .metric-value {
+    -fx-text-fill: #0F172A;
+}
+.learning-workspace .muted-text, .learning-workspace .section-caption {
+    -fx-text-fill: #64748B;
+}
+.field-label {
+    -fx-text-fill: #334155;
+    -fx-font-size: 12;
+    -fx-font-weight: bold;
+}
+.workspace-status {
+    -fx-text-fill: #334155;
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 9;
+    -fx-padding: 10 14;
+    -fx-font-size: 12;
+    -fx-border-color: #BFDBFE;
+    -fx-border-radius: 9;
+}
+.learning-workspace .status-error {
+    -fx-background-color: #FEF2F2;
+    -fx-text-fill: #B91C1C;
+    -fx-border-color: #FECACA;
+}
+.learning-workspace .status-success {
+    -fx-background-color: #F0FDF4;
+    -fx-text-fill: #15803D;
+    -fx-border-color: #BBF7D0;
+}
+.workspace-empty {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-border-style: segments(5, 4);
+    -fx-padding: 24 16;
+}
+.learning-workspace .text-field, .learning-workspace .text-area,
+.learning-workspace .combo-box, .learning-workspace .spinner {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-text-fill: #0F172A;
+    -fx-prompt-text-fill: #64748B;
+    -fx-font-size: 13;
+    -fx-effect: null;
+}
+.learning-workspace .text-field {
+    -fx-padding: 10 12;
+}
+.learning-workspace .text-area {
+    -fx-padding: 4;
+}
+.learning-workspace .text-area .content {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 6;
+    -fx-padding: 10;
+}
+.learning-workspace .text-input:focused, .learning-workspace .combo-box:focused,
+.learning-workspace .spinner:focused {
+    -fx-border-color: #2563EB;
+}
+.learning-workspace .combo-box {
+    -fx-padding: 5 8;
+    -fx-min-height: 40;
+}
+.learning-workspace .combo-box > .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #0F172A;
+}
+.learning-workspace .spinner > .text-field {
+    -fx-border-width: 0;
+    -fx-background-color: transparent;
+    -fx-padding: 10 12;
+}
+.learning-workspace .spinner .increment-arrow-button,
+.learning-workspace .spinner .decrement-arrow-button {
+    -fx-background-color: #EEF2F7;
+    -fx-background-radius: 4;
+    -fx-padding: 5 10;
+}
+.learning-workspace .progress-bar {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-pref-height: 8;
+    -fx-min-height: 8;
+}
+.learning-workspace .progress-bar > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999;
+    -fx-border-width: 0;
+}
+.learning-workspace .progress-bar > .bar {
+    -fx-background-color: #2563EB;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999;
+    -fx-padding: 4;
+}
+.learning-workspace .progress-bar-green > .bar { -fx-background-color: #16A34A; }
+.learning-workspace .progress-java > .bar { -fx-background-color: #E76F00; }
+.learning-workspace .progress-python > .bar { -fx-background-color: #3776AB; }
+.learning-workspace .progress-cpp > .bar { -fx-background-color: #00599C; }
+.learning-workspace .metric-tile {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 12;
+    -fx-padding: 14 18;
+}
+.learning-workspace .btn-danger {
+    -fx-background-color: #FEF2F2;
+    -fx-text-fill: #B91C1C;
+    -fx-background-radius: 8;
+    -fx-border-color: #FECACA;
+    -fx-border-radius: 8;
+    -fx-padding: 8 12;
+}
+.learning-workspace .btn-danger:hover { -fx-background-color: #FEE2E2; }
+.learning-workspace .notes-list {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+.learning-workspace .notes-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12;
+    -fx-border-color: transparent transparent #EEF2F7 transparent;
+}
+.learning-workspace .notes-list .list-cell:filled:hover { -fx-background-color: #F1F5F9; }
+.learning-workspace .notes-list .list-cell:filled:selected { -fx-background-color: #EFF6FF; }
+.learning-workspace .notes-list .list-cell:empty { -fx-border-width: 0; }
+.learning-workspace .notes-list .list-cell:selected .card-title { -fx-text-fill: #1D4ED8; }
+.learning-workspace .badge-indigo { -fx-text-fill: #1D4ED8; }
+.learning-workspace .badge-green { -fx-text-fill: #15803D; }
+.learning-workspace .badge-neutral { -fx-text-fill: #475569; }
+.learning-workspace .separator .line {
+    -fx-border-color: #E2E8F0;
+    -fx-border-width: 1 0 0 0;
+}
+.workspace-toolbar { -fx-alignment: center-left; -fx-hgap: 10; -fx-vgap: 10; }
+.learning-workspace .editor-heading { -fx-font-size: 13; -fx-font-weight: bold; }
+.learning-workspace .code-editor, .learning-workspace .console-output {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+}
+.learning-workspace .code-editor .content { -fx-padding: 14; }
+.sidebar .nav-btn, .sidebar .nav-btn-active {
+    -fx-min-height: 42;
+    -fx-padding: 10 12;
+}

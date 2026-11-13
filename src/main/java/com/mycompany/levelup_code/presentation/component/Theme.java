@@ -45,7 +45,8 @@ public final class Theme {
 
     public enum IconKind {
         TERMINAL, CODE, BOOK, TROPHY, FLAME, HEART, SHIELD,
-        CHECK, LOCK, PLAY, SPARK, USER, LOGOUT, STAR, BOLT
+        CHECK, LOCK, PLAY, SPARK, USER, LOGOUT, STAR, BOLT,
+        CHART, NOTE, TARGET, REFRESH
     }
 
     private static boolean reducedMotion;
@@ -237,7 +238,40 @@ public final class Theme {
                 gc.strokeLine(s - 5, s / 2.0 + 3, s - 2, s / 2.0);
                 break;
 
+            case CHART:
+                gc.strokeLine(3, 2, 3, s - 3);
+                gc.strokeLine(3, s - 3, s - 2, s - 3);
+                gc.strokeLine(7, s - 6, 7, s * 0.55);
+                gc.strokeLine(s * 0.6, s - 6, s * 0.6, s * 0.35);
+                gc.strokeLine(s - 3, s - 6, s - 3, 3);
+                break;
+            case NOTE:
+                gc.strokeRoundRect(3, 2, s - 6, s - 4, 3, 3);
+                gc.strokeLine(6, 6, s - 6, 6);
+                gc.strokeLine(6, s * 0.55, s - 6, s * 0.55);
+                gc.strokeLine(6, s - 5, s * 0.6, s - 5);
+                break;
+            case TARGET:
+                gc.strokeOval(2, 2, s - 4, s - 4);
+                gc.strokeOval(s * 0.3, s * 0.3, s * 0.4, s * 0.4);
+                gc.fillOval(s / 2 - 1, s / 2 - 1, 2, 2);
+                break;
+            case REFRESH:
+                gc.strokeArc(3, 3, s - 6, s - 6, 45, 285, ArcType.OPEN);
+                gc.strokeLine(s - 3, 2, s - 3, s * 0.4);
+                gc.strokeLine(s - 3, s * 0.4, s * 0.6, s * 0.4);
+                break;
             case STAR:
+                double[] starX = new double[10];
+                double[] starY = new double[10];
+                for (int i = 0; i < 10; i++) {
+                    double angle = -Math.PI / 2 + i * Math.PI / 5;
+                    double radius = i % 2 == 0 ? s * 0.44 : s * 0.2;
+                    starX[i] = s / 2 + Math.cos(angle) * radius;
+                    starY[i] = s / 2 + Math.sin(angle) * radius;
+                }
+                gc.strokePolygon(starX, starY, 10);
+                break;
             case SPARK:
             case BOLT:
             default:

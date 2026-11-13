@@ -469,8 +469,8 @@ public class DashboardFrame {
     private BorderPane buildLeftSidebar() {
         BorderPane sidebar = new BorderPane();
         sidebar.getStyleClass().add("sidebar");
-        sidebar.setPrefWidth(212);
-        sidebar.setMinWidth(212);
+        sidebar.setPrefWidth(240);
+        sidebar.setMinWidth(240);
 
         VBox navColumn = new VBox(8);
 
@@ -499,18 +499,26 @@ public class DashboardFrame {
         navPracticeBtn.setOnAction(e -> switchWorkspaceView("PRACTICE"));
         navProgressBtn = new Button("Mi progreso");
         navProgressBtn.getStyleClass().add("nav-btn");
+        navProgressBtn.setGraphic(Theme.createIcon(Theme.IconKind.CHART, 16, Theme.HEX_INDIGO));
+        navProgressBtn.setGraphicTextGap(10);
         navProgressBtn.setMaxWidth(Double.MAX_VALUE);
         navProgressBtn.setOnAction(e -> switchWorkspaceView("PROGRESS"));
         navNotebookBtn = new Button("Mi cuaderno");
         navNotebookBtn.getStyleClass().add("nav-btn");
+        navNotebookBtn.setGraphic(Theme.createIcon(Theme.IconKind.NOTE, 16, Theme.HEX_INDIGO));
+        navNotebookBtn.setGraphicTextGap(10);
         navNotebookBtn.setMaxWidth(Double.MAX_VALUE);
         navNotebookBtn.setOnAction(e -> switchWorkspaceView("NOTEBOOK"));
         navGoalsBtn = new Button("Mis metas");
         navGoalsBtn.getStyleClass().add("nav-btn");
+        navGoalsBtn.setGraphic(Theme.createIcon(Theme.IconKind.TARGET, 16, Theme.HEX_GREEN));
+        navGoalsBtn.setGraphicTextGap(10);
         navGoalsBtn.setMaxWidth(Double.MAX_VALUE);
         navGoalsBtn.setOnAction(e -> switchWorkspaceView("GOALS"));
         navLabBtn = new Button("Laboratorio");
         navLabBtn.getStyleClass().add("nav-btn");
+        navLabBtn.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 16, Theme.HEX_INDIGO));
+        navLabBtn.setGraphicTextGap(10);
         navLabBtn.setMaxWidth(Double.MAX_VALUE);
         navLabBtn.setOnAction(e -> switchWorkspaceView("LAB"));
 
@@ -2066,28 +2074,23 @@ public class DashboardFrame {
         workspaceContainer.getChildren().setAll(target);
         Theme.playFadeIn(target);
 
-        navCoursesBtn.getStyleClass().setAll("COURSES".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navPracticeBtn.getStyleClass().setAll("PRACTICE".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navProgressBtn.getStyleClass().setAll("PROGRESS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navNotebookBtn.getStyleClass().setAll("NOTEBOOK".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navGoalsBtn.getStyleClass().setAll("GOALS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navLabBtn.getStyleClass().setAll("LAB".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navCoursesBtn.setGraphic(Theme.createIcon(
-                Theme.IconKind.BOOK, 16, "COURSES".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_INDIGO));
-
-        navComparatorBtn.getStyleClass().setAll("COMPARATOR".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navComparatorBtn.setGraphic(Theme.createIcon(
-                Theme.IconKind.CODE, 16, "COMPARATOR".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_CYAN));
-
-        navAchievementsBtn.getStyleClass().setAll("ACHIEVEMENTS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navAchievementsBtn.setGraphic(Theme.createIcon(
-                Theme.IconKind.TROPHY, 16, "ACHIEVEMENTS".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_AMBER));
-
+        updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
+        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
+        updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
+        updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
+        updateNavigation(navLabBtn, "LAB".equals(cardKey), Theme.IconKind.TERMINAL, Theme.HEX_INDIGO);
+        updateNavigation(navComparatorBtn, "COMPARATOR".equals(cardKey), Theme.IconKind.CODE, Theme.HEX_CYAN);
+        updateNavigation(navAchievementsBtn, "ACHIEVEMENTS".equals(cardKey), Theme.IconKind.TROPHY, Theme.HEX_AMBER);
         if (navAdminBtn != null) {
-            navAdminBtn.getStyleClass().setAll("ADMIN".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-            navAdminBtn.setGraphic(Theme.createIcon(
-                    Theme.IconKind.SHIELD, 16, "ADMIN".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_GREEN));
+            updateNavigation(navAdminBtn, "ADMIN".equals(cardKey), Theme.IconKind.SHIELD, Theme.HEX_GREEN);
         }
+    }
+
+    private void updateNavigation(Button button, boolean selected, Theme.IconKind icon, String color) {
+        button.getStyleClass().removeAll("nav-btn", "nav-btn-active");
+        button.getStyleClass().add(selected ? "nav-btn-active" : "nav-btn");
+        button.setGraphic(Theme.createIcon(icon, 16, selected ? Theme.HEX_WHITE : color));
     }
 
     private void onLessonStateChanged() {
