@@ -130,6 +130,7 @@ public class DashboardFrame {
     private VBox homeView;
     private VBox homeGoal;
     private Label homeNext;
+    private Label homeCoach;
     private Button homeContinue;
     private Label homeChallenge;
     private Button homePractice;
@@ -504,6 +505,8 @@ public class DashboardFrame {
 
     private VBox buildHomeWorkspace(TilePane telemetry) {
         Label greeting = WorkspaceUi.label("Hola, " + currentUser.getUsername(), "home-greeting");
+        greeting.textProperty().bind(javafx.beans.binding.Bindings.concat("Hola, ", profileName.textProperty()));
+        homeCoach = WorkspaceUi.label("", "body-text");
         homeNext = WorkspaceUi.label("", "card-title");
         homeContinue = WorkspaceUi.button("Continuar aprendiendo", "btn-primary", Theme.IconKind.PLAY);
         homeContinue.setOnAction(event -> {
@@ -511,7 +514,7 @@ public class DashboardFrame {
             if (lesson != null) new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show();
         });
         VBox welcomeText = new VBox(10, greeting,
-                WorkspaceUi.label("Un paso más en tu aprendizaje", "muted-text"), homeNext, homeContinue);
+                homeCoach, homeNext, homeContinue);
         welcomeText.setMinWidth(0);
         HBox.setHgrow(welcomeText, Priority.ALWAYS);
         HBox welcome = new HBox(22, Lupo.portrait(Lupo.Expression.WELCOME, 110), welcomeText);
@@ -545,6 +548,12 @@ public class DashboardFrame {
         homeNext.setText(lesson == null ? "Elige un curso para comenzar."
                 : (nextLesson() == null ? "Repasa " : "Continúa con ") + lesson.getTitle());
         homeContinue.setDisable(lesson == null);
+        boolean started = selectedLessons().stream().anyMatch(item ->
+                lessonStatuses.getOrDefault(item, ProgressStatus.PENDING) != ProgressStatus.PENDING);
+        homeCoach.setText(lesson == null ? "Soy Lupo. Elige un curso y empezamos juntos."
+                : nextLesson() == null ? "¡Completaste las lecturas de este curso! Sigue con sus retos para ponerlas en práctica."
+                : started ? "Retomemos donde ibas. Tu siguiente lección está lista."
+                : "Soy Lupo. Empieza por esta lección y prueba lo que aprendas con un reto.");
         recommendedChallenge = selectedLessons().stream().flatMap(item -> item.getChallenges().stream())
                 .filter(item -> challengeProgress.get(item.getId()) != ChallengeProgress.SOLVED)
                 .findFirst().orElse(null);

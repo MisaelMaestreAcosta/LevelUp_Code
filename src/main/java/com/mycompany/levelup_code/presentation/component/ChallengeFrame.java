@@ -101,6 +101,7 @@ public class ChallengeFrame extends Stage {
     // Session-only drafts: challenge identity also keeps unsaved/demo IDs separate.
     private final Map<Challenge, Draft> drafts = new IdentityHashMap<>();
     private final Map<Challenge, Integer> hintStages = new IdentityHashMap<>();
+    private final Map<Challenge, Integer> incorrectAttempts = new IdentityHashMap<>();
     private final Map<Challenge, Long> draftRevisions = new IdentityHashMap<>();
     private final Object draftWriteLock = new Object();
     private long nextDraftRevision;
@@ -899,6 +900,7 @@ public class ChallengeFrame extends Stage {
             showFeedback("El guardado anterior sigue sin confirmar. Puedes reintentar con seguridad: Oracle no duplicará el mismo envío.", "text-warning");
         }
         lblDraftStatus.setText(draft != null ? "Borrador recuperado" : "Guardado automático activo");
+        updateCoachAction();
         viewLoaded = true;
     }
 
@@ -1023,6 +1025,17 @@ public class ChallengeFrame extends Stage {
                 ? Lupo.Expression.CELEBRATING : Lupo.Expression.THINKING);
         lblResultBanner.getStyleClass().setAll(style);
         lblResultBanner.setText(message);
+    }
+
+    private void updateCoachAction() {
+        if (incorrectAttempts.getOrDefault(activeChallenge, 0) >= 2) {
+            lupoFeedback.setAction("Ver una pista", this::showPedagogicalHint);
+        } else if (activeChallenge.getLesson() != null) {
+            lupoFeedback.setAction("Repasar la lección", () ->
+                    new LessonFrame(currentUser, activeChallenge.getLesson(), onSolvedCallback).show());
+        } else {
+            lupoFeedback.setAction("", null);
+        }
     }
 
     private boolean confirmCodeReplacement(String action) {
@@ -1627,6 +1640,7 @@ public class ChallengeFrame extends Stage {
 
     private void setBusy(boolean value) {
         busy = value;
+        lupoFeedback.setActionDisabled(value);
         btnSubmit.setDisable(value);
         btnNextChallenge.setDisable(value);
         switcherButtons.forEach(button -> button.setDisable(value));
@@ -1946,12 +1960,19 @@ public class ChallengeFrame extends Stage {
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");
             Theme.playPulse(lblResultBanner);
         } else {
+            boolean incorrectAnswer = activeChallenge instanceof QuizChallenge || latestCaseOutcomes.stream()
+                    .anyMatch(outcome -> outcome.getFailureResult() == com.mycompany.levelup_code.domain.enums.AttemptResult.INCORRECT);
+            if (incorrectAnswer) incorrectAttempts.merge(activeChallenge, 1, Integer::sum);
             showFeedback((persistence.savedToOracle ? "Intento guardado. "
                     : practiceOnly ? "Práctica sin XP. " : "Evaluado en modo local. ")
                     + (activeChallenge instanceof QuizChallenge
                     ? "Revisa la pista y elige otra respuesta." : "Revisa los casos fallidos y corrige tu código."), "text-danger");
             Theme.playPulse(lblResultBanner);
+            if (incorrectAttempts.getOrDefault(activeChallenge, 0) >= 2) {
+                lblResultBanner.setText(lblResultBanner.getText() + " Podemos revisar una pista antes de volver a intentar.");
+            }
         }
+        updateCoachAction();
         if (onSolvedCallback != null) {
             try {
                 onSolvedCallback.run();
