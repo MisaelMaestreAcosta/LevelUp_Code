@@ -39,6 +39,7 @@ public final class CodeOrderingFrame extends Stage {
     private String pendingId;
     private String pendingPayload;
     private boolean uncertain;
+    private boolean celebrated;
 
     public CodeOrderingFrame(User user, CodeOrderingChallenge challenge, Runnable callback, boolean preview) {
         this.user = user;
@@ -140,6 +141,7 @@ public final class CodeOrderingFrame extends Stage {
     private void submit() {
         if (busy) return;
         String answer = payload();
+        int previousLevel = user == null ? 1 : user.getLevel();
         boolean persistent = !preview && user != null && user.getId() > 0 && user.getLives() > 0
                 && AppContext.getInstance().isOracleConnected() && AppContext.getInstance().isOracleAvailable();
         if (!answer.equals(pendingPayload) || pendingId == null) pendingId = UUID.randomUUID().toString();
@@ -175,6 +177,11 @@ public final class CodeOrderingFrame extends Stage {
             status.setText((result.correct() ? "¡Orden correcto!" : "Ese orden aún no resuelve el ejercicio. Prueba de nuevo.")
                     + (result.saved() == null ? " Práctica local sin XP." : " Intento guardado · +" + result.saved().getEarnedExperience() + " XP."));
             saveDraft();
+            if (result.correct() && !celebrated) {
+                celebrated = true;
+                CompletionDialog.show(this, challenge.getTitle(), result.saved() == null ? 0
+                        : result.saved().getEarnedExperience(), user, previousLevel, result.saved() != null, null);
+            }
             if (result.saved() != null && callback != null) callback.run();
         });
         task.setOnFailed(event -> {

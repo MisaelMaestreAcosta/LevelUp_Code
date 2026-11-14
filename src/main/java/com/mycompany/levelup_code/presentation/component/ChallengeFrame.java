@@ -21,6 +21,8 @@ import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.Collections;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -102,6 +104,7 @@ public class ChallengeFrame extends Stage {
     private final Map<Challenge, Draft> drafts = new IdentityHashMap<>();
     private final Map<Challenge, Integer> hintStages = new IdentityHashMap<>();
     private final Map<Challenge, Integer> incorrectAttempts = new IdentityHashMap<>();
+    private final Set<Challenge> celebratedChallenges = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<Challenge, Long> draftRevisions = new IdentityHashMap<>();
     private final Object draftWriteLock = new Object();
     private long nextDraftRevision;
@@ -1807,7 +1810,7 @@ public class ChallengeFrame extends Stage {
                 lblExecutionMetrics.setText("Evaluación sin detalle de casos");
                 handleEvaluationOutcome(result.correct(), false,
                         "> No se recibió el detalle de los casos de prueba.\n", result.persistence(),
-                        submission.practiceOnly());
+                        submission.practiceOnly(), submission.user() == null ? 1 : submission.user().level());
                 return;
             }
             List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
@@ -1859,7 +1862,7 @@ public class ChallengeFrame extends Stage {
                     summary.getTotalCount()));
 
             handleEvaluationOutcome(summary.isAllPassed(), summary.isSandboxedExecution(), log.toString(),
-                    result.persistence(), submission.practiceOnly());
+                    result.persistence(), submission.practiceOnly(), submission.user() == null ? 1 : submission.user().level());
 
         } else {
             boolean correct = result.persistence().savedToOracle
@@ -1882,7 +1885,8 @@ public class ChallengeFrame extends Stage {
                     ? "Has identificado correctamente el fundamento técnico evaluado en este reto."
                     : "La opción seleccionada no corresponde al contrato esperado. Revisa la pista conceptual e inténtalo de nuevo.");
 
-            handleEvaluationOutcome(correct, true, msg + "\n", result.persistence(), submission.practiceOnly());
+            handleEvaluationOutcome(correct, true, msg + "\n", result.persistence(), submission.practiceOnly(),
+                    submission.user() == null ? 1 : submission.user().level());
         }
     }
 
@@ -1897,7 +1901,7 @@ public class ChallengeFrame extends Stage {
             boolean sandboxedValidation,
             String consoleMessage,
             PersistenceOutcome persistence,
-            boolean practiceOnly) {
+            boolean practiceOnly, int previousLevel) {
 
         StringBuilder fullConsole = new StringBuilder(consoleMessage);
         if (!practiceOnly) saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
@@ -1959,6 +1963,10 @@ public class ChallengeFrame extends Stage {
                     + (sandboxedValidation ? "" : " (Simulación)") + rewardMessage
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");
             Theme.playPulse(lblResultBanner);
+            if (celebratedChallenges.add(activeChallenge)) {
+                CompletionDialog.show(this, activeChallenge.getTitle(), reward, currentUser, previousLevel,
+                        persistence.savedToOracle, availableChallenges.size() > 1 ? this::advanceToNextChallenge : null);
+            }
         } else {
             boolean incorrectAnswer = activeChallenge instanceof QuizChallenge || latestCaseOutcomes.stream()
                     .anyMatch(outcome -> outcome.getFailureResult() == com.mycompany.levelup_code.domain.enums.AttemptResult.INCORRECT);

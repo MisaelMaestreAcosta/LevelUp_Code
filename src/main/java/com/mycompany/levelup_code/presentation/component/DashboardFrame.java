@@ -127,6 +127,7 @@ public class DashboardFrame {
     // Contenedor central con transición de vistas
     private StackPane workspaceContainer;
     private ScrollPane workspaceScroll;
+    private final HBox achievementNotice = new HBox(12);
     private VBox homeView;
     private VBox homeGoal;
     private Label homeNext;
@@ -473,7 +474,11 @@ public class DashboardFrame {
         btnRetryConnection.setManaged(false);
         HBox syncBar = new HBox(10, syncStatus, btnRetryConnection);
         syncBar.setAlignment(Pos.CENTER_LEFT);
-        centerShell.getChildren().addAll(syncBar, buildCompactTelemetry(), workspaceContainer);
+        achievementNotice.setVisible(false);
+        achievementNotice.setManaged(false);
+        achievementNotice.setAlignment(Pos.CENTER_LEFT);
+        achievementNotice.getStyleClass().add("lupo-welcome");
+        centerShell.getChildren().addAll(syncBar, buildCompactTelemetry(), achievementNotice, workspaceContainer);
         centerShell.setMinWidth(0);
         ScrollPane centerScroll = new ScrollPane(centerShell);
         workspaceScroll = centerScroll;
@@ -1718,16 +1723,6 @@ public class DashboardFrame {
         card.setAlignment(Pos.CENTER_LEFT);
         card.getStyleClass().add(unlocked ? "achievement-card-unlocked" : "achievement-card-locked");
 
-        String iconHex = unlocked ? Theme.HEX_AMBER : Theme.HEX_MUTED;
-        Theme.IconKind kind = Theme.IconKind.TROPHY;
-        if (ach instanceof StreakAchievement) {
-            kind = Theme.IconKind.FLAME;
-        } else if (ach instanceof ExperienceAchievement) {
-            kind = Theme.IconKind.BOLT;
-        } else if (ach instanceof ChallengeCountAchievement) {
-            kind = Theme.IconKind.CODE;
-        }
-
         VBox body = new VBox(5);
         HBox.setHgrow(body, Priority.ALWAYS);
 
@@ -1776,8 +1771,25 @@ public class DashboardFrame {
         achievementProgress.setAccessibleText(lblProgress.getText());
 
         body.getChildren().addAll(top, lblDesc, lblRule, achievementProgress, lblProgress);
-        card.getChildren().addAll(Theme.createIcon(kind, 24, iconHex), body);
+        card.getChildren().addAll(AchievementArt.badge(ach, unlocked, 72), body);
         return card;
+    }
+
+    private void showNewAchievements(Set<Integer> ids) {
+        List<Achievement> unlocked = achievementsCatalog.stream().filter(item -> ids.contains(item.getId())).toList();
+        if (unlocked.isEmpty()) return;
+        VBox text = new VBox(4, WorkspaceUi.label("¡Nuevas insignias!", "card-title"),
+                WorkspaceUi.label(unlocked.stream().map(Achievement::getName).collect(java.util.stream.Collectors.joining(" · ")), "body-text"));
+        text.setMinWidth(0);
+        HBox.setHgrow(text, Priority.ALWAYS);
+        Button view = WorkspaceUi.button("Ver logros", "btn-secondary", null);
+        view.setOnAction(event -> { achievementNotice.setVisible(false); achievementNotice.setManaged(false); switchWorkspaceView("ACHIEVEMENTS"); });
+        Button dismiss = WorkspaceUi.button("Cerrar", "btn-ghost", null);
+        dismiss.setOnAction(event -> { achievementNotice.setVisible(false); achievementNotice.setManaged(false); });
+        achievementNotice.getChildren().setAll(AchievementArt.badge(unlocked.getFirst(), true, 56), text, view, dismiss);
+        achievementNotice.setVisible(true);
+        achievementNotice.setManaged(true);
+        Theme.playPulse(achievementNotice);
     }
 
     private VBox buildAdminCrudWorkspaceView() {
@@ -2290,7 +2302,10 @@ public class DashboardFrame {
         refresh.setOnSucceeded(e -> {
             refreshing = false;
             if (disposed) return;
+            Set<Integer> newAchievements = new HashSet<>(refresh.getValue().achievements());
+            newAchievements.removeAll(unlockedAchievementIds);
             applyDashboardState(refresh.getValue());
+            if (oracleConnected) showNewAchievements(newAchievements);
             dataStale = false;
             setConnectionState(true, "CONECTADO", "Tu progreso está actualizado.", false);
             rebuildHeatmapCells();
