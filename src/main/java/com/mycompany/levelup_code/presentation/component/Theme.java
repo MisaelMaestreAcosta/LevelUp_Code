@@ -17,6 +17,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 
 /**
@@ -68,7 +70,16 @@ public final class Theme {
             String ext = cssUrl.toExternalForm();
             if (!scene.getStylesheets().contains(ext)) {
                 scene.getStylesheets().add(ext);
+                scene.windowProperty().addListener((observable, previous, window) -> applyWindowBrand(window));
             }
+        }
+        applyWindowBrand(scene.getWindow());
+    }
+
+    private static void applyWindowBrand(Window window) {
+        if (window instanceof Stage stage) {
+            var icon = Lupo.image(Lupo.Expression.WELCOME);
+            if (!stage.getIcons().contains(icon)) stage.getIcons().setAll(icon);
         }
     }
 

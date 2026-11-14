@@ -12,6 +12,51 @@
     -fx-text-fill: #0F172A;
 }
 
+/* Lupo accompanies the student throughout the learning experience. */
+.lupo-brand-name {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+.lupo-brand-tagline {
+    -fx-font-size: 11px;
+    -fx-text-fill: #475569;
+}
+.lupo-guide {
+    -fx-padding: 12 16;
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 12;
+    -fx-border-color: #BFDBFE;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+.lupo-guide-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1D4ED8;
+}
+.lupo-guide .label {
+    -fx-text-fill: #334155;
+}
+.lupo-guide .lupo-guide-title { -fx-text-fill: #1D4ED8; }
+.lupo-guide .text-success { -fx-text-fill: #15803D; }
+.lupo-guide .text-danger { -fx-text-fill: #B91C1C; }
+.lupo-guide .text-warning { -fx-text-fill: #B45309; }
+.lupo-welcome {
+    -fx-padding: 14 18;
+    -fx-background-color: linear-gradient(to right, #EFF6FF, #FFFFFF);
+    -fx-background-radius: 14;
+    -fx-border-color: #BFDBFE;
+    -fx-border-radius: 14;
+}
+.lupo-login-hero .hero-title,
+.lupo-login-hero .hero-accent {
+    -fx-font-size: 28px;
+}
+.lupo-auth .check-box {
+    -fx-text-fill: #334155;
+}
+
 .sidebar {
     -fx-background-color: #FFFFFF;
     -fx-border-color: transparent #D8DEE9 transparent transparent;
@@ -485,6 +530,21 @@
 }
 
 /* Opciones de Quiz y Casos de Prueba */
+.quiz-option-card,
+.quiz-option-card-selected,
+.quiz-option-card-correct,
+.quiz-option-card-wrong {
+    -fx-text-fill: #0F172A;
+}
+
+.quiz-option-card:disabled,
+.quiz-option-card-selected:disabled,
+.quiz-option-card-correct:disabled,
+.quiz-option-card-wrong:disabled {
+    -fx-opacity: 1;
+    -fx-cursor: wait;
+}
+
 .quiz-option-card {
     -fx-background-color: #F8FAFC;
     -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #94A3B8;

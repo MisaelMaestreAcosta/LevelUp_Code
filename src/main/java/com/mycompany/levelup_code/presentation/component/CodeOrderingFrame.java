@@ -22,7 +22,9 @@ public final class CodeOrderingFrame extends Stage {
     }
     private record Result(boolean correct, Attempt saved) { }
     private final ListView<Fragment> fragments = new ListView<>();
-    private final Label status = new Label();
+    private final LupoGuide lupoFeedback = new LupoGuide(Lupo.Expression.THINKING, "Ordena con Lupo",
+            "Busca qué instrucción inicia el programa y qué necesita cada fragmento para continuar.");
+    private final Label status = lupoFeedback.messageLabel();
     private final Label draftStatus = new Label();
     private final VBox controls = new VBox(12);
     private final ChallengeDraftStore store = new ChallengeDraftStore();
@@ -62,7 +64,8 @@ public final class CodeOrderingFrame extends Stage {
         history.setOnAction(event -> history());
         controls.getChildren().addAll(title, statement, new Label("Selecciona un fragmento y usa Subir o Bajar para colocarlo."),
                 fragments, new FlowPane(8, 8, up, down, submit, history));
-        VBox root = new VBox(12, controls, status, draftStatus);
+        VBox root = new VBox(12, controls, lupoFeedback, draftStatus);
+        root.getStyleClass().addAll("root-shell", "learning-workspace");
         root.setPadding(new javafx.geometry.Insets(20));
         ScrollPane scroll = new ScrollPane(root); scroll.setFitToWidth(true);
         Scene scene = new Scene(scroll, 850, 650); Theme.applyCss(scene); setScene(scene);
@@ -149,6 +152,7 @@ public final class CodeOrderingFrame extends Stage {
             detached.setId(user.getId()); detached.setExperience(user.getExperience()); detached.setLives(user.getLives());
         }
         busy = true; controls.setDisable(true); status.setText("Comprobando el orden…");
+        lupoFeedback.setExpression(Lupo.Expression.THINKING);
         Task<Result> task = new Task<>() {
             protected Result call() throws Exception {
                 if (persistent) {
@@ -162,6 +166,7 @@ public final class CodeOrderingFrame extends Stage {
         task.setOnSucceeded(event -> {
             busy = false; controls.setDisable(false); uncertain = false; pendingId = null; pendingPayload = null;
             Result result = task.getValue();
+            lupoFeedback.setExpression(result.correct() ? Lupo.Expression.CELEBRATING : Lupo.Expression.THINKING);
             if (result.saved() != null) {
                 User fresh = result.saved().getUser();
                 user.setExperience(fresh.getExperience()); user.setLevel(fresh.getLevel()); user.setLives(fresh.getLives());
@@ -174,6 +179,7 @@ public final class CodeOrderingFrame extends Stage {
         });
         task.setOnFailed(event -> {
             busy = false; controls.setDisable(false);
+            lupoFeedback.setExpression(Lupo.Expression.THINKING);
             status.setText("No se confirmó el envío. Tu orden se conserva. Puedes reintentar con la misma respuesta o abrir la versión actual del reto.");
             saveDraft();
         });
