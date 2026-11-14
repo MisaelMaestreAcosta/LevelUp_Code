@@ -47,6 +47,8 @@ class SimulatedCodeRunnerTest {
         SimulatedCodeRunner.ExecutionSummary fakeSummary = runner.runAndValidate(challenge, fakeAlgorithm);
         assertTrue(fakeSummary.isSandboxedExecution());
         assertFalse(fakeSummary.isAllPassed(), "La ejecución real debe rechazar código que no implementa el algoritmo");
+        assertEquals("99", fakeSummary.getCaseOutcomes().get(0).getActualOutput());
+        assertEquals(null, fakeSummary.getCaseOutcomes().get(1).getActualOutput());
 
         // Una implementación real de búsqueda binaria en Java DEBE compilar y aprobar todos los casos
         String realAlgorithm =
@@ -66,6 +68,8 @@ class SimulatedCodeRunnerTest {
         assertTrue(okSummary.isSandboxedExecution());
         assertTrue(okSummary.isAllPassed());
         assertEquals(2, okSummary.getPassedCount());
+        assertEquals("3", okSummary.getCaseOutcomes().get(0).getActualOutput());
+        assertEquals(null, okSummary.getCaseOutcomes().get(1).getActualOutput());
         assertFalse(okSummary.getCaseOutcomes().get(1).getMessage().contains("-1"),
                 "La salida de un caso oculto no debe mostrarse al estudiante");
     }

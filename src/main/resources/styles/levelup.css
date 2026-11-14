@@ -1078,3 +1078,14 @@
 
 .completion-content { -fx-background-color: #F8FAFC; -fx-background-radius: 12; }
 .completion-content .completion-reward { -fx-text-fill: #15803D; -fx-font-size: 18; -fx-font-weight: bold; }
+
+.ordering-list { -fx-background-color: #F8FAFC; -fx-border-color: #D8DEE9; -fx-border-radius: 10; -fx-padding: 5; }
+.ordering-list .list-cell { -fx-background-color: #FFFFFF; -fx-padding: 12; -fx-border-color: transparent transparent #E2E8F0 transparent; -fx-cursor: hand; }
+.ordering-list .list-cell:empty { -fx-background-color: transparent; -fx-border-color: transparent; }
+.ordering-list .list-cell:filled:selected { -fx-background-color: #EFF6FF; }
+.ordering-list .list-cell:drop-before { -fx-border-color: #2563EB transparent transparent transparent; -fx-border-width: 3 0 0 0; }
+.ordering-list .list-cell:drop-after { -fx-border-color: transparent transparent #2563EB transparent; -fx-border-width: 0 0 3 0; }
+.ordering-list .fragment-code, .case-value { -fx-font-family: "Consolas", "Courier New", monospace; -fx-font-size: 13; -fx-text-fill: #0F172A; }
+.ordering-list .fragment-position { -fx-text-fill: #1D4ED8; -fx-font-weight: bold; -fx-background-color: #DBEAFE; -fx-padding: 5 9; -fx-background-radius: 6; }
+.case-value { -fx-background-color: #F1F5F9; -fx-background-radius: 6; -fx-padding: 8; }
+.ordering-workspace { -fx-padding: 20; }

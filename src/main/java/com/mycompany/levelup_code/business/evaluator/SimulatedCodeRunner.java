@@ -434,12 +434,12 @@ public class SimulatedCodeRunner implements CodeRunner {
                     passed++;
                     String detail = tc.isHidden() ? label + " -> Salida correcta"
                             : label + " -> Salida correcta (\"" + actual + "\")";
-                    outcomes.add(new CaseOutcome(true, detail));
+                    outcomes.add(new CaseOutcome(true, detail, null, tc.isHidden() ? null : actual));
                 } else {
                     String detail = tc.isHidden()
                             ? label + " -> Salida incorrecta en prueba oculta"
                             : label + " -> Se obtuvo \"" + actual + "\", se esperaba \"" + tc.getExpectedOutput() + "\"";
-                    outcomes.add(new CaseOutcome(false, detail, AttemptResult.INCORRECT));
+                    outcomes.add(new CaseOutcome(false, detail, AttemptResult.INCORRECT, tc.isHidden() ? null : actual));
                 }
             } catch (TimeoutException ex) {
                 outcomes.add(new CaseOutcome(false, label + " -> TIMEOUT: " + ex.getMessage(), AttemptResult.TIMEOUT));
@@ -702,15 +702,21 @@ public class SimulatedCodeRunner implements CodeRunner {
         private final boolean passed;
         private final String message;
         private final AttemptResult failureResult;
+        private final String actualOutput;
 
         public CaseOutcome(boolean passed, String message) {
             this(passed, message, passed ? null : AttemptResult.INCORRECT);
         }
 
         public CaseOutcome(boolean passed, String message, AttemptResult failureResult) {
+            this(passed, message, failureResult, null);
+        }
+
+        private CaseOutcome(boolean passed, String message, AttemptResult failureResult, String actualOutput) {
             this.passed = passed;
             this.message = message;
             this.failureResult = failureResult;
+            this.actualOutput = actualOutput;
         }
 
         public boolean isPassed() {
@@ -724,6 +730,8 @@ public class SimulatedCodeRunner implements CodeRunner {
         public AttemptResult getFailureResult() {
             return failureResult;
         }
+
+        public String getActualOutput() { return actualOutput; }
     }
 
     /** Resumen consolidado de la ejecución de un reto de código. */

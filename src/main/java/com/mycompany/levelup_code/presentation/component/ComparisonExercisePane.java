@@ -36,7 +36,7 @@ public final class ComparisonExercisePane extends VBox {
             "1", "Un conjunto conserva un solo ejemplar de cada valor.", "HashSet", "set", "unordered_set")
     );
     private final ComboBox<String> language = new ComboBox<>();
-    private final TextArea snippet = new TextArea();
+    private final CodeEditor snippet = new CodeEditor();
     private final TextField answer = new TextField();
     private final Label feedback = new Label();
     private final Label equivalent = new Label();
@@ -51,8 +51,7 @@ public final class ComparisonExercisePane extends VBox {
         language.getSelectionModel().selectFirst();
         language.setOnAction(event -> render());
         snippet.setEditable(false);
-        snippet.setPrefRowCount(6);
-        snippet.getStyleClass().add("code-editor");
+        snippet.setPrefHeight(190);
         answer.setPromptText("¿Qué imprime este fragmento?");
         answer.setAccessibleText("Predicción de la salida");
         Button check = new Button("Comprobar respuesta");
@@ -65,9 +64,13 @@ public final class ComparisonExercisePane extends VBox {
         });
         answer.setOnAction(event -> check.fire());
         Button show = new Button("Ver explicación");
-        show.setOnAction(event -> feedback.setText("Salida esperada «" + ACTIVITIES.get(index).answer()
-                + "». " + ACTIVITIES.get(index).explanation()));
+        show.getStyleClass().add("btn-secondary");
+        show.setOnAction(event -> {
+            feedback.getStyleClass().setAll("body-text");
+            feedback.setText("Salida esperada «" + ACTIVITIES.get(index).answer() + "». " + ACTIVITIES.get(index).explanation());
+        });
         Button highlightButton = new Button("Localizar equivalencias");
+        highlightButton.getStyleClass().add("btn-secondary");
         highlightButton.setOnAction(event -> highlight.run());
         feedback.setWrapText(true);
         equivalent.setWrapText(true);
@@ -84,6 +87,7 @@ public final class ComparisonExercisePane extends VBox {
 
     private void render() {
         Activity activity = ACTIVITIES.get(index);
+        snippet.setLanguage(language.getValue());
         snippet.setText(switch (language.getValue()) {
             case "Python" -> activity.pythonCode();
             case "C++" -> activity.cppCode();

@@ -138,6 +138,7 @@ public class ChallengeFrame extends Stage {
 
     // Opciones de Quiz
     private VBox quizOptionsContainer;
+    private CodeEditor predictionCode;
     private final List<RadioButton> quizOptionCards = new ArrayList<>();
 
     // Panel lateral de casos de prueba, inspector interactivo y consola
@@ -147,6 +148,10 @@ public class ChallengeFrame extends Stage {
     private final List<SimulatedCodeRunner.CaseOutcome> latestCaseOutcomes = new ArrayList<>();
     private Label lblCaseInspectorTitle;
     private Label lblCaseInspectorDetail;
+    private VBox caseComparison;
+    private Label caseInput;
+    private Label caseExpected;
+    private Label caseActual;
     private TextArea txtConsoleOutput;
     private Label lblExecutionMetrics;
     private Label lblResultBanner;
@@ -590,6 +595,12 @@ public class ChallengeFrame extends Stage {
 
     private VBox buildQuizCard() {
         VBox card = new VBox(14);
+        predictionCode = new CodeEditor();
+        predictionCode.setEditable(false);
+        predictionCode.setPrefHeight(190);
+        predictionCode.setAccessibleText("Código para predecir la salida");
+        predictionCode.setVisible(false);
+        predictionCode.setManaged(false);
         card.getStyleClass().add("surface-card");
 
         FlowPane header = new FlowPane(10, 8);
@@ -610,7 +621,7 @@ public class ChallengeFrame extends Stage {
         scrollQuiz.getStyleClass().add("scroll-pane-clean");
         VBox.setVgrow(scrollQuiz, Priority.ALWAYS);
 
-        card.getChildren().addAll(header, scrollQuiz);
+        card.getChildren().addAll(header, predictionCode, scrollQuiz);
         return card;
     }
 
@@ -639,11 +650,30 @@ public class ChallengeFrame extends Stage {
         lblCaseInspectorDetail = new Label("Haz clic en cualquier caso de prueba superior para ver su entrada, salida esperada y diagnóstico.");
         lblCaseInspectorDetail.getStyleClass().add("muted-text");
         lblCaseInspectorDetail.setWrapText(true);
-        inspectorCard.getChildren().addAll(lblCaseInspectorTitle, lblCaseInspectorDetail);
+        caseInput = WorkspaceUi.label("", "case-value");
+        caseExpected = WorkspaceUi.label("", "case-value");
+        caseActual = WorkspaceUi.label("", "case-value");
+        VBox expectedColumn = new VBox(3, WorkspaceUi.label("Salida esperada", "field-label"), caseExpected);
+        VBox actualColumn = new VBox(3, WorkspaceUi.label("Tu resultado", "field-label"), caseActual);
+        expectedColumn.setMinWidth(0);
+        actualColumn.setMinWidth(0);
+        javafx.scene.layout.GridPane outputs = new javafx.scene.layout.GridPane();
+        outputs.setHgap(8);
+        for (int column = 0; column < 2; column++) {
+            javafx.scene.layout.ColumnConstraints constraint = new javafx.scene.layout.ColumnConstraints();
+            constraint.setPercentWidth(50);
+            outputs.getColumnConstraints().add(constraint);
+        }
+        outputs.add(expectedColumn, 0, 0);
+        outputs.add(actualColumn, 1, 0);
+        caseComparison = new VBox(8, new VBox(3, WorkspaceUi.label("Entrada", "field-label"), caseInput), outputs);
+        caseComparison.setVisible(false);
+        caseComparison.setManaged(false);
+        inspectorCard.getChildren().addAll(lblCaseInspectorTitle, lblCaseInspectorDetail, caseComparison);
 
         ScrollPane inspectorScroll = new ScrollPane(inspectorCard);
         inspectorScroll.setFitToWidth(true);
-        inspectorScroll.setPrefViewportHeight(100);
+        inspectorScroll.setPrefViewportHeight(220);
         inspectorScroll.setMinHeight(70);
         inspectorScroll.getStyleClass().add("scroll-pane-clean");
         casesCard.getChildren().addAll(casesHeader, scrollCases, inspectorScroll);
@@ -812,8 +842,14 @@ public class ChallengeFrame extends Stage {
 
         lblChallengeTitle.setText(challenge.getTitle());
         lblStatement.setText(challenge.getDescription());
-        if (challenge instanceof OutputPredictionChallenge prediction) {
-            lblStatement.setText(challenge.getDescription() + "\n\n" + prediction.getCodeSnippet());
+        boolean prediction = challenge instanceof OutputPredictionChallenge;
+        predictionCode.setVisible(prediction);
+        predictionCode.setManaged(prediction);
+        if (challenge instanceof OutputPredictionChallenge output) {
+            predictionCode.setLanguage(resolveChallengeLanguageName(challenge));
+            predictionCode.setText(output.getCodeSnippet());
+            int lines = output.getCodeSnippet().split("\\R", -1).length;
+            predictionCode.setPrefHeight(Math.max(80, Math.min(190, lines * 22 + 22)));
         }
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
         updateDifficultyBadge(challenge.getExpReward());
@@ -822,6 +858,8 @@ public class ChallengeFrame extends Stage {
         testCaseRowCards.clear();
         testCaseStatusBadges.clear();
         latestCaseOutcomes.clear();
+        caseComparison.setVisible(false);
+        caseComparison.setManaged(false);
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
@@ -1140,16 +1178,23 @@ public class ChallengeFrame extends Stage {
         }
 
         lblCaseInspectorTitle.setText("Inspector · Caso #" + (index + 1) + (tc.isHidden() ? " (Oculto)" : " (Visible)"));
-        String inputDesc = tc.isHidden() ? "[Entrada reservada para validación anti-hardcoding]" : tc.getInput();
-        String expectedDesc = tc.isHidden() ? "[Salida verificada internamente]" : tc.getExpectedOutput();
+        caseComparison.setVisible(!tc.isHidden());
+        caseComparison.setManaged(!tc.isHidden());
+        caseInput.setText(tc.isHidden() ? "" : tc.getInput() == null || tc.getInput().isEmpty() ? "[Entrada vacía]" : tc.getInput());
+        caseExpected.setText(tc.isHidden() ? "" : visibleOutput(tc.getExpectedOutput()));
+        caseActual.setText("Todavía no se ha ejecutado.");
         String verdictDesc = "Pendiente de ejecución.";
         if (index < latestCaseOutcomes.size()) {
             SimulatedCodeRunner.CaseOutcome outcome = latestCaseOutcomes.get(index);
             verdictDesc = (outcome.isPassed() ? "APROBADO — " : "FALLIDO — ") + outcome.getMessage();
+            if (!tc.isHidden()) caseActual.setText(outcome.getActualOutput() == null
+                    ? "Sin salida disponible. Consulta el diagnóstico." : visibleOutput(outcome.getActualOutput()));
         }
-        lblCaseInspectorDetail.setText("• Entrada: " + inputDesc
-                + "\n• Salida esperada: " + expectedDesc
-                + "\n• Estado: " + verdictDesc);
+        lblCaseInspectorDetail.setText(tc.isHidden() ? "Datos reservados para la evaluación. " + verdictDesc : verdictDesc);
+    }
+
+    private static String visibleOutput(String value) {
+        return value == null || value.isEmpty() ? "[Salida vacía]" : value;
     }
 
     private void showPedagogicalHint() {
