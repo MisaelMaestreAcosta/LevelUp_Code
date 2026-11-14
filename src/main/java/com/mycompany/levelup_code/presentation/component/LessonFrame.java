@@ -84,6 +84,10 @@ public class LessonFrame extends Stage implements LearningPage {
     private TabPane compactTabs;
     private Tab theoryTab;
     private Tab codeTab;
+    private Tab explorationTab;
+    private TabPane examples;
+    private Tab wideCodeTab;
+    private javafx.scene.control.TitledPane lessonChallenges;
 
     private record ProgressResult(boolean completed, boolean local, boolean newlyCompleted) { }
 
@@ -278,6 +282,7 @@ public class LessonFrame extends Stage implements LearningPage {
         lblNextAction.setText(lessonCompleted
                 ? hasChallenges() ? "Siguiente paso: elige un reto para practicar." : "Siguiente paso: vuelve al módulo para continuar."
                 : "Lee la explicación, compara el ejemplo y completa la lectura. Los retos se resuelven por separado.");
+        if (lessonCompleted && lessonChallenges != null) lessonChallenges.setExpanded(true);
     }
 
     private void initComponents() {
@@ -311,7 +316,14 @@ public class LessonFrame extends Stage implements LearningPage {
 
         VBox theoryPane = buildTheoryPane();
         VBox codePane = buildComparativeCodePane();
-        SplitPane split = new SplitPane(theoryPane, codePane);
+        var exploration = new LessonExplorationPane(currentLesson);
+        ScrollPane explorationScroll = WorkspaceUi.scroll(exploration);
+        examples = new TabPane();
+        examples.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        wideCodeTab = new Tab("Comparar", codePane);
+        Tab wideExplorationTab = new Tab("Explorar", explorationScroll);
+        examples.getTabs().addAll(wideCodeTab, wideExplorationTab);
+        SplitPane split = new SplitPane(theoryPane, examples);
         split.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
         split.setDividerPositions(0.52);
         split.setAccessibleText("Explicación y ejemplo. Arrastra el divisor para ajustar el ancho.");
@@ -319,7 +331,8 @@ public class LessonFrame extends Stage implements LearningPage {
         compactTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         theoryTab = new Tab("1. Leer");
         codeTab = new Tab("2. Comparar");
-        compactTabs.getTabs().addAll(theoryTab, codeTab);
+        explorationTab = new Tab("3. Explorar");
+        compactTabs.getTabs().addAll(theoryTab, codeTab, explorationTab);
         root.setCenter(split);
 
         VBox bottomBar = buildBottomBar();
@@ -329,13 +342,19 @@ public class LessonFrame extends Stage implements LearningPage {
         root.widthProperty().addListener((observable, oldWidth, newWidth) -> {
             if (newWidth.doubleValue() < 880 && root.getCenter() != compactTabs) {
                 split.getItems().clear();
+                wideCodeTab.setContent(null);
+                wideExplorationTab.setContent(null);
                 theoryTab.setContent(theoryPane);
                 codeTab.setContent(codePane);
+                explorationTab.setContent(explorationScroll);
                 root.setCenter(compactTabs);
             } else if (newWidth.doubleValue() >= 880 && root.getCenter() != split) {
                 theoryTab.setContent(null);
                 codeTab.setContent(null);
-                split.getItems().setAll(theoryPane, codePane);
+                explorationTab.setContent(null);
+                wideCodeTab.setContent(codePane);
+                wideExplorationTab.setContent(explorationScroll);
+                split.getItems().setAll(theoryPane, examples);
                 root.setCenter(split);
                 split.setDividerPositions(0.52);
             }
@@ -344,6 +363,11 @@ public class LessonFrame extends Stage implements LearningPage {
             if (!event.isControlDown() || event.isAltDown()) return;
             if (event.getCode() == KeyCode.DIGIT1) focusPane(false);
             else if (event.getCode() == KeyCode.DIGIT2) focusPane(true);
+            else if (event.getCode() == KeyCode.DIGIT3) {
+                compactTabs.getSelectionModel().select(explorationTab);
+                examples.getSelectionModel().select(wideExplorationTab);
+                explorationScroll.requestFocus();
+            }
             else if (event.getCode() == KeyCode.ENTER) {
                 if (btnRetry.isVisible()) btnRetry.fire();
                 else btnMarkComplete.fire();
@@ -384,15 +408,23 @@ public class LessonFrame extends Stage implements LearningPage {
         for (String block : theory.split("\\R\\s*\\R")) {
             String[] lines = block.strip().split("\\R", 2);
             boolean headingLine = lines[0].matches("\\d+[.)]\\s+.+");
-            if (headingLine) {
-                reading.getChildren().add(wrappedLabel(lines[0], "card-title"));
-            }
             String body = headingLine ? lines.length > 1 ? lines[1] : "" : block.strip();
+            VBox section = new VBox(8);
             if (!body.isBlank()) {
                 Label paragraph = wrappedLabel(body, "body-text");
                 paragraph.setStyle("-fx-font-size: 15px; -fx-line-spacing: 5px;");
-                reading.getChildren().add(paragraph);
+                section.getChildren().add(paragraph);
             }
+            if (headingLine && !body.isBlank()) {
+                var panel = new javafx.scene.control.TitledPane(lines[0], section);
+                panel.setAnimated(false);
+                panel.setExpanded(true);
+                panel.setWrapText(true);
+                panel.setMinWidth(0);
+                panel.getStyleClass().add("reading-section");
+                reading.getChildren().add(panel);
+            } else if (headingLine) reading.getChildren().add(wrappedLabel(lines[0], "card-title"));
+            else reading.getChildren().add(section);
         }
         theoryScroll = new ScrollPane(reading);
         theoryScroll.setFitToWidth(true);
@@ -527,7 +559,11 @@ public class LessonFrame extends Stage implements LearningPage {
             challengesScroll.setPrefViewportHeight(Math.min(80, index * 40));
             challengesScroll.setMaxHeight(84);
             challengesScroll.setAccessibleText("Retos de esta lección");
-            bar.getChildren().add(challengesScroll);
+            lessonChallenges = new javafx.scene.control.TitledPane("Retos de esta lección", challengesScroll);
+            lessonChallenges.setExpanded(false);
+            lessonChallenges.setAnimated(false);
+            lessonChallenges.getStyleClass().add("reading-section");
+            bar.getChildren().add(lessonChallenges);
         }
         return bar;
     }
@@ -535,6 +571,7 @@ public class LessonFrame extends Stage implements LearningPage {
     private void focusPane(boolean code) {
         compactTabs.getSelectionModel().select(code ? codeTab : theoryTab);
         if (code) {
+            examples.getSelectionModel().select(wideCodeTab);
             txtComparativeCode.requestFocus();
         } else {
             theoryScroll.requestFocus();
