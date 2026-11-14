@@ -1089,3 +1089,23 @@
 .ordering-list .fragment-position { -fx-text-fill: #1D4ED8; -fx-font-weight: bold; -fx-background-color: #DBEAFE; -fx-padding: 5 9; -fx-background-radius: 6; }
 .case-value { -fx-background-color: #F1F5F9; -fx-background-radius: 6; -fx-padding: 8; }
 .ordering-workspace { -fx-padding: 20; }
+
+.achievement-card-unlocked .progress-bar, .achievement-card-locked .progress-bar {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-pref-height: 8;
+    -fx-min-height: 8;
+}
+.achievement-card-unlocked .progress-bar > .track, .achievement-card-locked .progress-bar > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+}
+.achievement-card-unlocked .progress-bar > .bar, .achievement-card-locked .progress-bar > .bar {
+    -fx-background-color: #2563EB;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+.achievement-card-unlocked .progress-bar > .bar { -fx-background-color: #16A34A; }
