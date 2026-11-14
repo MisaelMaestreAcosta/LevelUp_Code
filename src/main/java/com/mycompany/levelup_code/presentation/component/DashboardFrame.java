@@ -492,7 +492,7 @@ public class DashboardFrame {
         centerShell.setMinWidth(0);
         ScrollPane centerScroll = new ScrollPane(centerShell);
         workspaceScroll = centerScroll;
-        learningWorkspace = new LearningWorkspace(currentUser, this::onChallengeOrLessonCompleted,
+        learningWorkspace = new LearningWorkspace(currentUser, this::onLessonStateChanged, this::onChallengeOrLessonCompleted,
                 this::returnFromLearning, this::setConcentration);
         centerScroll.setFitToWidth(true);
         centerScroll.getStyleClass().add("scroll-pane-clean");

@@ -21,15 +21,17 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     private record Entry(LearningPage page, String breadcrumb) { }
     private final Deque<Entry> pages = new ArrayDeque<>();
     private final User user;
-    private final Runnable refresh;
+    private final Runnable lessonRefresh;
+    private final Runnable challengeRefresh;
     private final Runnable exit;
     private final Consumer<Boolean> focus;
     private final Label breadcrumb = WorkspaceUi.label("", "body-text");
     private final ToggleButton concentration = new ToggleButton("Concentrarme · F8");
 
-    LearningWorkspace(User user, Runnable refresh, Runnable exit, Consumer<Boolean> focus) {
+    LearningWorkspace(User user, Runnable lessonRefresh, Runnable challengeRefresh, Runnable exit, Consumer<Boolean> focus) {
         this.user = user;
-        this.refresh = refresh;
+        this.lessonRefresh = lessonRefresh;
+        this.challengeRefresh = challengeRefresh;
         this.exit = exit;
         this.focus = focus;
         setMinSize(0, 0);
@@ -58,14 +60,14 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
 
     @Override public void openLesson(Lesson lesson) {
         if (lesson == null || !canLeave()) return;
-        present(new LessonFrame(user, lesson, refresh), path(lesson));
+        present(new LessonFrame(user, lesson, lessonRefresh), path(lesson));
     }
 
     @Override public void openChallenge(Challenge challenge) {
         if (challenge == null || !canLeave()) return;
         LearningPage page = challenge instanceof CodeOrderingChallenge ordering
-                ? new CodeOrderingFrame(user, ordering, refresh, false)
-                : new ChallengeFrame(user, challenge, refresh);
+                ? new CodeOrderingFrame(user, ordering, challengeRefresh, false)
+                : new ChallengeFrame(user, challenge, challengeRefresh);
         present(page, path(challenge.getLesson()) + " › " + challenge.getTitle());
     }
 
@@ -75,6 +77,14 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
         String language = lesson.getModule() == null || lesson.getModule().getLanguage() == null
                 ? "Aprender" : lesson.getModule().getLanguage().getName();
         return language + " › " + module + " › " + lesson.getTitle();
+    }
+
+    @Override public void challengeChanged(Challenge challenge) {
+        if (pages.isEmpty()) return;
+        Entry current = pages.pop();
+        String title = path(challenge.getLesson()) + " › " + challenge.getTitle();
+        pages.push(new Entry(current.page(), title));
+        breadcrumb.setText(title);
     }
 
     private void present(LearningPage page, String title) {
@@ -90,6 +100,10 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     private void showCurrent() {
         Entry entry = pages.peek();
         setCenter(entry.page().content());
+        entry.page().content().setFocusTraversable(true);
+        javafx.application.Platform.runLater(() -> {
+            if (getCenter() == entry.page().content()) entry.page().content().requestFocus();
+        });
         breadcrumb.setText(entry.breadcrumb());
     }
 

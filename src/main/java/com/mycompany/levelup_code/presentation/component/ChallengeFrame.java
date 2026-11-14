@@ -951,6 +951,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
         }
         lblDraftStatus.setText(draft != null ? "Borrador recuperado" : "Guardado automático activo");
         updateCoachAction();
+        if (navigator != null) navigator.challengeChanged(challenge);
         viewLoaded = true;
     }
 
