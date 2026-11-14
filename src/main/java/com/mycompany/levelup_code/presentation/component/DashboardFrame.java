@@ -126,6 +126,7 @@ public class DashboardFrame {
 
     // Contenedor central con transición de vistas
     private StackPane workspaceContainer;
+    private ScrollPane workspaceScroll;
     private VBox homeView;
     private VBox homeGoal;
     private Label homeNext;
@@ -432,6 +433,7 @@ public class DashboardFrame {
         TilePane topTelemetry = buildTopTelemetryBar();
 
         workspaceContainer = new StackPane();
+        workspaceContainer.setMinWidth(0);
         VBox.setVgrow(workspaceContainer, Priority.ALWAYS);
 
         coursesView = buildCoursesWorkspaceView();
@@ -473,6 +475,7 @@ public class DashboardFrame {
         centerShell.getChildren().addAll(syncBar, buildCompactTelemetry(), workspaceContainer);
         centerShell.setMinWidth(0);
         ScrollPane centerScroll = new ScrollPane(centerShell);
+        workspaceScroll = centerScroll;
         centerScroll.setFitToWidth(true);
         centerScroll.getStyleClass().add("scroll-pane-clean");
         root.setCenter(centerScroll);
@@ -531,7 +534,9 @@ public class DashboardFrame {
                 () -> Math.max(220, Math.floor((suggestions.getWidth() - 2 - (suggestions.getWidth() >= 650 ? 16 : 0))
                         / (suggestions.getWidth() >= 650 ? 2 : 1))), suggestions.widthProperty()));
         for (VBox card : List.of(practice, homeGoal)) card.setMaxWidth(Double.MAX_VALUE);
-        return new VBox(18, welcome, suggestions, telemetry);
+        VBox view = new VBox(18, welcome, suggestions, telemetry);
+        view.setMinWidth(0);
+        return view;
     }
 
     private void refreshHome() {
@@ -744,8 +749,8 @@ public class DashboardFrame {
         TilePane telemetryBar = new TilePane(12, 12);
         telemetryBar.setPrefColumns(4);
         telemetryBar.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
-                () -> Math.max(180, (telemetryBar.getWidth() - (telemetryBar.getWidth() >= 900 ? 36 : 12))
-                        / (telemetryBar.getWidth() >= 900 ? 4 : 2)), telemetryBar.widthProperty()));
+                () -> Math.max(180, Math.floor((telemetryBar.getWidth() - 2 - (telemetryBar.getWidth() >= 900 ? 36 : 12))
+                        / (telemetryBar.getWidth() >= 900 ? 4 : 2))), telemetryBar.widthProperty()));
 
         // 1. Nivel y barra de progreso
         VBox cardLevel = new VBox(6);
@@ -887,6 +892,7 @@ public class DashboardFrame {
 
     private VBox buildCoursesWorkspaceView() {
         VBox view = new VBox(16);
+        view.setMinWidth(0);
 
         HBox secHeader = Theme.createSectionHeader(
                 "¿Qué quieres aprender hoy?",
@@ -920,6 +926,7 @@ public class DashboardFrame {
 
         VBox lessonsWrapper = new VBox(12);
         lessonsWrapper.getStyleClass().add("surface-card");
+        lessonsWrapper.setMinWidth(0);
         VBox.setVgrow(lessonsWrapper, Priority.ALWAYS);
 
         lblCourseStatus = new Label("Elige un curso y avanza a tu ritmo.");
@@ -1273,6 +1280,7 @@ public class DashboardFrame {
         visibleModules.forEach((module, lessons) -> {
             List<Lesson> allModuleLessons = selectedList.stream().filter(item -> item.getModule() == module).toList();
             VBox route = new VBox(0);
+            route.setMinWidth(0);
             route.getStyleClass().add("course-route");
             for (Lesson lesson : lessons) {
                 route.getChildren().add(createSkillNodeRow(selectedList.indexOf(lesson) + 1, lesson,
@@ -1286,11 +1294,13 @@ public class DashboardFrame {
             VBox heading = new VBox(6, WorkspaceUi.label(title, "card-title"),
                     WorkspaceUi.label(readings + "/" + allModuleLessons.size() + " lecturas · "
                             + solved + "/" + challenges.size() + " retos superados", "muted-text"));
+            heading.setMinWidth(0);
             ProgressBar progress = new ProgressBar(allModuleLessons.isEmpty() ? 0 : (double) readings / allModuleLessons.size());
             progress.setMaxWidth(Double.MAX_VALUE);
             progress.setAccessibleText(readings + " de " + allModuleLessons.size() + " lecturas completadas");
             heading.getChildren().add(progress);
             TitledPane panel = new TitledPane("", route);
+            panel.setMinWidth(0);
             panel.setGraphic(heading);
             heading.prefWidthProperty().bind(panel.widthProperty().subtract(65));
             panel.getStyleClass().add("route-module");
@@ -1368,6 +1378,7 @@ public class DashboardFrame {
         row.getStyleClass().add("route-step");
 
         FlowPane titleLine = new FlowPane(10, 8);
+        titleLine.setMinWidth(0);
         titleLine.setAlignment(Pos.CENTER_LEFT);
         Label lblTitle = new Label(lesson.getTitle());
         lblTitle.setWrapText(true);
@@ -2216,6 +2227,7 @@ public class DashboardFrame {
         }
 
         workspaceContainer.getChildren().setAll(target);
+        workspaceScroll.setVvalue(0);
         Theme.playFadeIn(target);
 
         updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
