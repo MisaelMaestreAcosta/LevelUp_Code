@@ -485,6 +485,21 @@
 }
 
 /* Opciones de Quiz y Casos de Prueba */
+.quiz-option-card,
+.quiz-option-card-selected,
+.quiz-option-card-correct,
+.quiz-option-card-wrong {
+    -fx-text-fill: #0F172A;
+}
+
+.quiz-option-card:disabled,
+.quiz-option-card-selected:disabled,
+.quiz-option-card-correct:disabled,
+.quiz-option-card-wrong:disabled {
+    -fx-opacity: 1;
+    -fx-cursor: wait;
+}
+
 .quiz-option-card {
     -fx-background-color: #F8FAFC;
     -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #94A3B8;
