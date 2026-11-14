@@ -41,9 +41,46 @@ public final class OracleLearningAnalyticsRepository {
                 stmt.setInt(1, userId);
                 try (ResultSet rs = stmt.executeQuery()) {
                     rs.next();
-                    return new LearningAnalytics(results, rs.getInt(1), rs.getInt(2));
+                    return new LearningAnalytics(results, rs.getInt(1), rs.getInt(2),
+                            loadDailyActivity(conn, userId), loadReviewChallenges(conn, userId));
                 }
             }
         }
+    }
+
+    private java.util.List<LearningAnalytics.DayActivity> loadDailyActivity(Connection connection, int userId) throws SQLException {
+        var days = new ArrayList<LearningAnalytics.DayActivity>();
+        String sql = "WITH dias AS (SELECT TRUNC(SYSDATE)-LEVEL+1 fecha FROM dual CONNECT BY LEVEL<=28) "
+                + "SELECT d.fecha,NVL(SUM(a.exp_ganada),0) FROM dias d LEFT JOIN Actividad_Diaria a "
+                + "ON a.id_usuario=? AND a.fecha>=d.fecha AND a.fecha<d.fecha+1 "
+                + "GROUP BY d.fecha ORDER BY d.fecha";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, userId);
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) days.add(new LearningAnalytics.DayActivity(rows.getDate(1).toLocalDate(), rows.getInt(2)));
+            }
+        }
+        return days;
+    }
+
+    private java.util.List<LearningAnalytics.ReviewChallenge> loadReviewChallenges(Connection connection, int userId) throws SQLException {
+        var challenges = new ArrayList<LearningAnalytics.ReviewChallenge>();
+        String sql = "SELECT r.id_reto,r.titulo,lg.nombre FROM "
+                + "(SELECT i.*,ROW_NUMBER() OVER (PARTITION BY i.id_reto ORDER BY i.fecha_intento DESC,i.id_intento DESC) posicion "
+                + "FROM Intentos i WHERE i.id_usuario=?) ultimo "
+                + "JOIN Retos r ON r.id_reto=ultimo.id_reto JOIN Lecciones le ON le.id_leccion=r.id_leccion "
+                + "JOIN Modulos m ON m.id_modulo=le.id_modulo JOIN Lenguajes lg ON lg.id_lenguaje=m.id_lenguaje "
+                + "WHERE ultimo.posicion=1 AND ultimo.es_correcto=0 AND r.estado='PUBLICADO' AND lg.activo=1 "
+                + "AND NOT EXISTS (SELECT 1 FROM Intentos aprobado WHERE aprobado.id_usuario=? "
+                + "AND aprobado.id_reto=r.id_reto AND aprobado.es_correcto=1) "
+                + "ORDER BY ultimo.fecha_intento DESC,ultimo.id_intento DESC FETCH FIRST 5 ROWS ONLY";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, userId);
+            statement.setInt(2, userId);
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) challenges.add(new LearningAnalytics.ReviewChallenge(rows.getInt(1), rows.getString(2), rows.getString(3)));
+            }
+        }
+        return challenges;
     }
 }

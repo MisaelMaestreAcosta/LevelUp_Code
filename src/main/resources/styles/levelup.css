@@ -1004,3 +1004,120 @@
     -fx-min-height: 42;
     -fx-padding: 10 12;
 }
+
+.compact-telemetry {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-padding: 10 16;
+}
+.home-greeting {
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+.route-module > .title {
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 10;
+    -fx-padding: 14;
+}
+.route-module > .content {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 16 0 0 0;
+}
+.route-module .progress-bar { -fx-pref-height: 6; }
+.route-module .progress-bar > .track { -fx-background-color: #DBEAFE; -fx-background-radius: 10; }
+.route-module .progress-bar > .bar { -fx-background-color: #2563EB; -fx-background-radius: 10; -fx-padding: 3; }
+.route-step { -fx-padding: 0 0 12 0; }
+.course-filter { -fx-text-fill: #334155; }
+.route-marker {
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: #BFDBFE;
+    -fx-text-fill: #1D4ED8;
+    -fx-font-weight: bold;
+    -fx-padding: 10;
+}
+.route-connector { -fx-background-color: #BFDBFE; -fx-min-width: 2; -fx-max-width: 2; -fx-min-height: 18; }
+.route-lesson { -fx-padding: 2; }
+.route-lesson > .title { -fx-background-color: transparent; -fx-padding: 10; }
+.route-lesson > .content { -fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 8 12 12 12; }
+.route-module:focused > .title, .route-lesson:focused > .title { -fx-border-color: #2563EB; -fx-border-radius: 8; }
+
+.syntax-editor {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-padding: 5;
+}
+.syntax-editor:editor-focused { -fx-border-color: #2563EB; }
+.source-code {
+    -fx-background-color: #F8FAFC;
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 14px;
+    -fx-highlight-fill: #BFDBFE;
+    -fx-highlight-text-fill: #0F172A;
+}
+.source-code .text { -fx-fill: #0F172A; }
+.source-code .lineno {
+    -fx-background-color: #EEF2F7;
+    -fx-text-fill: #64748B;
+    -fx-padding: 0 10;
+}
+.source-code .caret { -fx-stroke: #0F172A; }
+.source-code .syntax-keyword { -fx-fill: #6D28D9; -fx-font-weight: bold; }
+.source-code .syntax-string { -fx-fill: #15803D; }
+.source-code .syntax-comment { -fx-fill: #64748B; -fx-font-style: italic; }
+.source-code .syntax-number { -fx-fill: #B45309; }
+.source-code .syntax-bracket { -fx-fill: #1D4ED8; }
+.source-code .matching-bracket { -rtfx-background-color: #BFDBFE; -fx-font-weight: bold; }
+
+.completion-content { -fx-background-color: #F8FAFC; -fx-background-radius: 12; }
+.completion-content .completion-reward { -fx-text-fill: #15803D; -fx-font-size: 18; -fx-font-weight: bold; }
+
+.ordering-list { -fx-background-color: #F8FAFC; -fx-border-color: #D8DEE9; -fx-border-radius: 10; -fx-padding: 5; }
+.ordering-list .list-cell { -fx-background-color: #FFFFFF; -fx-padding: 12; -fx-border-color: transparent transparent #E2E8F0 transparent; -fx-cursor: hand; }
+.ordering-list .list-cell:empty { -fx-background-color: transparent; -fx-border-color: transparent; }
+.ordering-list .list-cell:filled:selected { -fx-background-color: #EFF6FF; }
+.ordering-list .list-cell:drop-before { -fx-border-color: #2563EB transparent transparent transparent; -fx-border-width: 3 0 0 0; }
+.ordering-list .list-cell:drop-after { -fx-border-color: transparent transparent #2563EB transparent; -fx-border-width: 0 0 3 0; }
+.ordering-list .fragment-code, .case-value { -fx-font-family: "Consolas", "Courier New", monospace; -fx-font-size: 13; -fx-text-fill: #0F172A; }
+.ordering-list .fragment-position { -fx-text-fill: #1D4ED8; -fx-font-weight: bold; -fx-background-color: #DBEAFE; -fx-padding: 5 9; -fx-background-radius: 6; }
+.case-value { -fx-background-color: #F1F5F9; -fx-background-radius: 6; -fx-padding: 8; }
+.ordering-workspace { -fx-padding: 20; }
+
+.achievement-card-unlocked .progress-bar, .achievement-card-locked .progress-bar {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-pref-height: 8;
+    -fx-min-height: 8;
+}
+.achievement-card-unlocked .progress-bar > .track, .achievement-card-locked .progress-bar > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+}
+.achievement-card-unlocked .progress-bar > .bar, .achievement-card-locked .progress-bar > .bar {
+    -fx-background-color: #2563EB;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+.achievement-card-unlocked .progress-bar > .bar { -fx-background-color: #16A34A; }
+.learning-navigation { -fx-background-color: #FFFFFF; -fx-background-radius: 10; -fx-padding: 10; -fx-hgap: 10; -fx-vgap: 8; }
+.xp-history .chart-plot-background { -fx-background-color: #F8FAFC; }
+.xp-history .chart-bar { -fx-bar-fill: #2563EB; -fx-background-radius: 4 4 0 0; }
+.xp-history .axis { -fx-tick-label-fill: #475569; }
+.learning-workspace .activity-day { -fx-text-fill: #0F172A; -fx-font-weight: bold; -fx-min-height: 40; }
+.trace-cell { -fx-background-color: #FFFFFF; -fx-border-color: #CBD5E1; -fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10 14; -fx-text-fill: #0F172A; -fx-font-size: 16; -fx-font-weight: bold; }
+.learning-workspace .trace-cell-active { -fx-background-color: #DBEAFE; -fx-border-color: #2563EB; -fx-text-fill: #1D4ED8; }
+.learning-workspace .trace-variables { -fx-font-family: "Consolas", "Courier New", monospace; -fx-text-fill: #1D4ED8; -fx-font-size: 13; }
+.learning-workspace .text-success { -fx-text-fill: #15803D; }
+.learning-workspace .text-warning { -fx-text-fill: #B45309; }
+.reading-section > .title { -fx-background-color: #EFF6FF; -fx-padding: 10; -fx-background-radius: 8; }
+.reading-section > .content { -fx-background-color: transparent; -fx-padding: 10; -fx-border-width: 0; }

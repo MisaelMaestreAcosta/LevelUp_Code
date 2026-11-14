@@ -21,6 +21,8 @@ import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.Collections;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -80,7 +82,14 @@ import javafx.stage.WindowEvent;
  * con numeración de líneas reactiva, casos de prueba visibles/ocultos y motor de evaluación
  * dinámica conectado a {@code Casos_Prueba} e {@code Intentos} en Oracle Database.
  */
-public class ChallengeFrame extends Stage {
+public class ChallengeFrame extends Stage implements LearningPage {
+    private BorderPane view;
+    private LearningNavigation navigator;
+
+    @Override public Region content() { return view; }
+    @Override public boolean canLeave() { return allowClose(); }
+    @Override public void disposePage() { draftSaveDelay.stop(); rememberDraft(); }
+    @Override public void setNavigator(LearningNavigation value) { navigator = value; }
 
     private static final Logger LOGGER = Logger.getLogger(ChallengeFrame.class.getName());
     private static final DateTimeFormatter ATTEMPT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -101,6 +110,8 @@ public class ChallengeFrame extends Stage {
     // Session-only drafts: challenge identity also keeps unsaved/demo IDs separate.
     private final Map<Challenge, Draft> drafts = new IdentityHashMap<>();
     private final Map<Challenge, Integer> hintStages = new IdentityHashMap<>();
+    private final Map<Challenge, Integer> incorrectAttempts = new IdentityHashMap<>();
+    private final Set<Challenge> celebratedChallenges = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<Challenge, Long> draftRevisions = new IdentityHashMap<>();
     private final Object draftWriteLock = new Object();
     private long nextDraftRevision;
@@ -130,11 +141,11 @@ public class ChallengeFrame extends Stage {
     private Button btnHint;
 
     // Editor de código y numeración de líneas
-    private TextArea txtEditor;
-    private TextArea txtLineGutter;
+    private CodeEditor txtEditor;
 
     // Opciones de Quiz
     private VBox quizOptionsContainer;
+    private CodeEditor predictionCode;
     private final List<RadioButton> quizOptionCards = new ArrayList<>();
 
     // Panel lateral de casos de prueba, inspector interactivo y consola
@@ -144,6 +155,10 @@ public class ChallengeFrame extends Stage {
     private final List<SimulatedCodeRunner.CaseOutcome> latestCaseOutcomes = new ArrayList<>();
     private Label lblCaseInspectorTitle;
     private Label lblCaseInspectorDetail;
+    private VBox caseComparison;
+    private Label caseInput;
+    private Label caseExpected;
+    private Label caseActual;
     private TextArea txtConsoleOutput;
     private Label lblExecutionMetrics;
     private Label lblResultBanner;
@@ -217,7 +232,8 @@ public class ChallengeFrame extends Stage {
     @Override
     public void close() {
         if (allowClose()) {
-            super.close();
+            if (navigator != null) navigator.back();
+            else super.close();
         }
     }
 
@@ -298,6 +314,7 @@ public class ChallengeFrame extends Stage {
         });
 
         BorderPane root = new BorderPane();
+        view = root;
         root.getStyleClass().add("root-shell");
         root.setPadding(new Insets(18, 22, 18, 22));
 
@@ -315,18 +332,18 @@ public class ChallengeFrame extends Stage {
 
         Scene scene = new Scene(root, 1140, 720);
         Runnable resizeWorkspace = () -> {
-            boolean narrow = scene.getWidth() < 900;
+            boolean narrow = root.getWidth() < 900;
             workspaceSplit.setOrientation(narrow ? Orientation.VERTICAL : Orientation.HORIZONTAL);
             workspaceSplit.setMinHeight(narrow ? 880 : 440);
             workspaceSplit.setPrefHeight(Math.max(narrow ? 880 : 440,
-                    scene.getHeight() - topHeader.getHeight() - bottomBar.getHeight() - 70));
+                    root.getHeight() - topHeader.getHeight() - bottomBar.getHeight() - 70));
         };
-        scene.widthProperty().addListener((obs, before, after) -> resizeWorkspace.run());
-        scene.heightProperty().addListener((obs, before, after) -> resizeWorkspace.run());
+        root.widthProperty().addListener((obs, before, after) -> resizeWorkspace.run());
+        root.heightProperty().addListener((obs, before, after) -> resizeWorkspace.run());
         topHeader.heightProperty().addListener((obs, before, after) -> resizeWorkspace.run());
         resizeWorkspace.run();
         KeyCombination submitShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN);
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+        root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (submitShortcut.match(event)) {
                 evaluateSubmission();
                 event.consume();
@@ -401,7 +418,7 @@ public class ChallengeFrame extends Stage {
         if (activeChallenge == null || activeChallenge.getId() <= 0) return;
         int challengeId = activeChallenge.getId();
         Alert dialog = new Alert(Alert.AlertType.INFORMATION);
-        dialog.initOwner(this);
+        dialog.initOwner(ownerWindow());
         dialog.setTitle("Historial de intentos");
         dialog.setHeaderText("Tus intentos en " + activeChallenge.getTitle());
         dialog.getButtonTypes().setAll(ButtonType.CLOSE);
@@ -554,20 +571,10 @@ public class ChallengeFrame extends Stage {
         HBox editorContainer = new HBox(0);
         VBox.setVgrow(editorContainer, Priority.ALWAYS);
 
-        txtLineGutter = new TextArea("1");
-        txtLineGutter.setEditable(false);
-        txtLineGutter.setFocusTraversable(false);
-        txtLineGutter.setPrefWidth(48);
-        txtLineGutter.setMinWidth(48);
-        txtLineGutter.setMaxWidth(48);
-        txtLineGutter.getStyleClass().add("line-gutter");
-
-        txtEditor = new TextArea();
+        txtEditor = new CodeEditor();
         txtEditor.setAccessibleText("Código de la solución");
         txtEditor.setAccessibleHelp("Ctrl+Enter para enviar. El borrador se conserva al cerrar y volver a abrir.");
         txtEditor.setMinWidth(0);
-        txtEditor.setPrefRowCount(12);
-        txtEditor.getStyleClass().add("code-editor");
         txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         HBox.setHgrow(txtEditor, Priority.ALWAYS);
 
@@ -580,12 +587,10 @@ public class ChallengeFrame extends Stage {
         });
 
         txtEditor.textProperty().addListener((obs, oldVal, newVal) -> {
-            updateLineGutter(newVal);
             scheduleDraftSave();
         });
-        txtEditor.scrollTopProperty().addListener((obs, oldVal, newVal) -> txtLineGutter.setScrollTop(newVal.doubleValue()));
 
-        editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
+        editorContainer.getChildren().add(txtEditor);
         editorCard.getChildren().addAll(toolbar, editorContainer);
         return editorCard;
     }
@@ -597,23 +602,14 @@ public class ChallengeFrame extends Stage {
                 + " píxeles. Tab inserta la indentación configurada; Ctrl+Enter envía.");
     }
 
-    private void updateLineGutter(String text) {
-        int lines = 1;
-        if (text != null && !text.isEmpty()) {
-            lines = text.split("\n", -1).length;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 1; i <= lines; i++) {
-            if (i > 1) {
-                sb.append("\n");
-            }
-            sb.append(i);
-        }
-        txtLineGutter.setText(sb.toString());
-    }
-
     private VBox buildQuizCard() {
         VBox card = new VBox(14);
+        predictionCode = new CodeEditor();
+        predictionCode.setEditable(false);
+        predictionCode.setPrefHeight(190);
+        predictionCode.setAccessibleText("Código para predecir la salida");
+        predictionCode.setVisible(false);
+        predictionCode.setManaged(false);
         card.getStyleClass().add("surface-card");
 
         FlowPane header = new FlowPane(10, 8);
@@ -634,7 +630,7 @@ public class ChallengeFrame extends Stage {
         scrollQuiz.getStyleClass().add("scroll-pane-clean");
         VBox.setVgrow(scrollQuiz, Priority.ALWAYS);
 
-        card.getChildren().addAll(header, scrollQuiz);
+        card.getChildren().addAll(header, predictionCode, scrollQuiz);
         return card;
     }
 
@@ -663,11 +659,30 @@ public class ChallengeFrame extends Stage {
         lblCaseInspectorDetail = new Label("Haz clic en cualquier caso de prueba superior para ver su entrada, salida esperada y diagnóstico.");
         lblCaseInspectorDetail.getStyleClass().add("muted-text");
         lblCaseInspectorDetail.setWrapText(true);
-        inspectorCard.getChildren().addAll(lblCaseInspectorTitle, lblCaseInspectorDetail);
+        caseInput = WorkspaceUi.label("", "case-value");
+        caseExpected = WorkspaceUi.label("", "case-value");
+        caseActual = WorkspaceUi.label("", "case-value");
+        VBox expectedColumn = new VBox(3, WorkspaceUi.label("Salida esperada", "field-label"), caseExpected);
+        VBox actualColumn = new VBox(3, WorkspaceUi.label("Tu resultado", "field-label"), caseActual);
+        expectedColumn.setMinWidth(0);
+        actualColumn.setMinWidth(0);
+        javafx.scene.layout.GridPane outputs = new javafx.scene.layout.GridPane();
+        outputs.setHgap(8);
+        for (int column = 0; column < 2; column++) {
+            javafx.scene.layout.ColumnConstraints constraint = new javafx.scene.layout.ColumnConstraints();
+            constraint.setPercentWidth(50);
+            outputs.getColumnConstraints().add(constraint);
+        }
+        outputs.add(expectedColumn, 0, 0);
+        outputs.add(actualColumn, 1, 0);
+        caseComparison = new VBox(8, new VBox(3, WorkspaceUi.label("Entrada", "field-label"), caseInput), outputs);
+        caseComparison.setVisible(false);
+        caseComparison.setManaged(false);
+        inspectorCard.getChildren().addAll(lblCaseInspectorTitle, lblCaseInspectorDetail, caseComparison);
 
         ScrollPane inspectorScroll = new ScrollPane(inspectorCard);
         inspectorScroll.setFitToWidth(true);
-        inspectorScroll.setPrefViewportHeight(100);
+        inspectorScroll.setPrefViewportHeight(220);
         inspectorScroll.setMinHeight(70);
         inspectorScroll.getStyleClass().add("scroll-pane-clean");
         casesCard.getChildren().addAll(casesHeader, scrollCases, inspectorScroll);
@@ -836,8 +851,14 @@ public class ChallengeFrame extends Stage {
 
         lblChallengeTitle.setText(challenge.getTitle());
         lblStatement.setText(challenge.getDescription());
-        if (challenge instanceof OutputPredictionChallenge prediction) {
-            lblStatement.setText(challenge.getDescription() + "\n\n" + prediction.getCodeSnippet());
+        boolean prediction = challenge instanceof OutputPredictionChallenge;
+        predictionCode.setVisible(prediction);
+        predictionCode.setManaged(prediction);
+        if (challenge instanceof OutputPredictionChallenge output) {
+            predictionCode.setLanguage(resolveChallengeLanguageName(challenge));
+            predictionCode.setText(output.getCodeSnippet());
+            int lines = output.getCodeSnippet().split("\\R", -1).length;
+            predictionCode.setPrefHeight(Math.max(80, Math.min(190, lines * 22 + 22)));
         }
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
         updateDifficultyBadge(challenge.getExpReward());
@@ -846,6 +867,8 @@ public class ChallengeFrame extends Stage {
         testCaseRowCards.clear();
         testCaseStatusBadges.clear();
         latestCaseOutcomes.clear();
+        caseComparison.setVisible(false);
+        caseComparison.setManaged(false);
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
@@ -853,6 +876,7 @@ public class ChallengeFrame extends Stage {
             badgeType.getStyleClass().setAll("badge-indigo");
 
             String langName = resolveChallengeLanguageName(codeChallenge);
+            txtEditor.setLanguage(langName);
             boolean realJvm = codeRunner.supportsRealIsolatedExecution(langName);
             badgeExecutionMode.setText(realJvm
                     ? "EJECUCIÓN LOCAL JVM"
@@ -926,6 +950,8 @@ public class ChallengeFrame extends Stage {
             showFeedback("El guardado anterior sigue sin confirmar. Puedes reintentar con seguridad: Oracle no duplicará el mismo envío.", "text-warning");
         }
         lblDraftStatus.setText(draft != null ? "Borrador recuperado" : "Guardado automático activo");
+        updateCoachAction();
+        if (navigator != null) navigator.challengeChanged(challenge);
         viewLoaded = true;
     }
 
@@ -998,7 +1024,7 @@ public class ChallengeFrame extends Stage {
                 "El contenido de este reto cambió desde que guardaste tu borrador. "
                 + "Puedes recuperar tu respuesta para copiarla o empezar con la versión actual.",
                 recover, useCurrent);
-        alert.initOwner(this);
+        alert.initOwner(ownerWindow());
         alert.setTitle("El reto fue actualizado");
         alert.setHeaderText("Tu borrador pertenece a una versión anterior");
         return alert.showAndWait().orElse(useCurrent) == recover;
@@ -1052,12 +1078,25 @@ public class ChallengeFrame extends Stage {
         lblResultBanner.setText(message);
     }
 
+    private void updateCoachAction() {
+        if (incorrectAttempts.getOrDefault(activeChallenge, 0) >= 2) {
+            lupoFeedback.setAction("Ver una pista", this::showPedagogicalHint);
+        } else if (activeChallenge.getLesson() != null) {
+            lupoFeedback.setAction("Repasar la lección", () -> {
+                if (navigator != null) navigator.openLesson(activeChallenge.getLesson());
+                else new LessonFrame(currentUser, activeChallenge.getLesson(), onSolvedCallback).show();
+            });
+        } else {
+            lupoFeedback.setAction("", null);
+        }
+    }
+
     private boolean confirmCodeReplacement(String action) {
         if (busy) {
             return false;
         }
         Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
-        confirmation.initOwner(this);
+        confirmation.initOwner(ownerWindow());
         confirmation.setTitle(action);
         confirmation.setHeaderText("Se reemplazará el código de este reto");
         confirmation.setContentText("Puedes cancelar para conservar tu borrador. Esta acción reemplazará todo el contenido del editor.");
@@ -1151,16 +1190,23 @@ public class ChallengeFrame extends Stage {
         }
 
         lblCaseInspectorTitle.setText("Inspector · Caso #" + (index + 1) + (tc.isHidden() ? " (Oculto)" : " (Visible)"));
-        String inputDesc = tc.isHidden() ? "[Entrada reservada para validación anti-hardcoding]" : tc.getInput();
-        String expectedDesc = tc.isHidden() ? "[Salida verificada internamente]" : tc.getExpectedOutput();
+        caseComparison.setVisible(!tc.isHidden());
+        caseComparison.setManaged(!tc.isHidden());
+        caseInput.setText(tc.isHidden() ? "" : tc.getInput() == null || tc.getInput().isEmpty() ? "[Entrada vacía]" : tc.getInput());
+        caseExpected.setText(tc.isHidden() ? "" : visibleOutput(tc.getExpectedOutput()));
+        caseActual.setText("Todavía no se ha ejecutado.");
         String verdictDesc = "Pendiente de ejecución.";
         if (index < latestCaseOutcomes.size()) {
             SimulatedCodeRunner.CaseOutcome outcome = latestCaseOutcomes.get(index);
             verdictDesc = (outcome.isPassed() ? "APROBADO — " : "FALLIDO — ") + outcome.getMessage();
+            if (!tc.isHidden()) caseActual.setText(outcome.getActualOutput() == null
+                    ? "Sin salida disponible. Consulta el diagnóstico." : visibleOutput(outcome.getActualOutput()));
         }
-        lblCaseInspectorDetail.setText("• Entrada: " + inputDesc
-                + "\n• Salida esperada: " + expectedDesc
-                + "\n• Estado: " + verdictDesc);
+        lblCaseInspectorDetail.setText(tc.isHidden() ? "Datos reservados para la evaluación. " + verdictDesc : verdictDesc);
+    }
+
+    private static String visibleOutput(String value) {
+        return value == null || value.isEmpty() ? "[Salida vacía]" : value;
     }
 
     private void showPedagogicalHint() {
@@ -1550,7 +1596,7 @@ public class ChallengeFrame extends Stage {
         }
         if (saveUncertain && !isPracticeOnly()) {
             Alert retry = new Alert(Alert.AlertType.CONFIRMATION);
-            retry.initOwner(this);
+            retry.initOwner(ownerWindow());
             retry.setTitle("Confirmar nuevo envío");
             retry.setHeaderText("El guardado anterior no pudo confirmarse");
             retry.setContentText("Si mantienes la misma respuesta, Oracle comprobará la clave del envío y devolverá el intento existente sin duplicarlo.");
@@ -1654,6 +1700,7 @@ public class ChallengeFrame extends Stage {
 
     private void setBusy(boolean value) {
         busy = value;
+        lupoFeedback.setActionDisabled(value);
         btnSubmit.setDisable(value);
         btnNextChallenge.setDisable(value);
         switcherButtons.forEach(button -> button.setDisable(value));
@@ -1820,7 +1867,7 @@ public class ChallengeFrame extends Stage {
                 lblExecutionMetrics.setText("Evaluación sin detalle de casos");
                 handleEvaluationOutcome(result.correct(), false,
                         "> No se recibió el detalle de los casos de prueba.\n", result.persistence(),
-                        submission.practiceOnly());
+                        submission.practiceOnly(), submission.user() == null ? 1 : submission.user().level());
                 return;
             }
             List<SimulatedCodeRunner.CaseOutcome> outcomes = summary.getCaseOutcomes();
@@ -1872,7 +1919,7 @@ public class ChallengeFrame extends Stage {
                     summary.getTotalCount()));
 
             handleEvaluationOutcome(summary.isAllPassed(), summary.isSandboxedExecution(), log.toString(),
-                    result.persistence(), submission.practiceOnly());
+                    result.persistence(), submission.practiceOnly(), submission.user() == null ? 1 : submission.user().level());
 
         } else {
             boolean correct = result.persistence().savedToOracle
@@ -1895,7 +1942,8 @@ public class ChallengeFrame extends Stage {
                     ? "Has identificado correctamente el fundamento técnico evaluado en este reto."
                     : "La opción seleccionada no corresponde al contrato esperado. Revisa la pista conceptual e inténtalo de nuevo.");
 
-            handleEvaluationOutcome(correct, true, msg + "\n", result.persistence(), submission.practiceOnly());
+            handleEvaluationOutcome(correct, true, msg + "\n", result.persistence(), submission.practiceOnly(),
+                    submission.user() == null ? 1 : submission.user().level());
         }
     }
 
@@ -1910,7 +1958,7 @@ public class ChallengeFrame extends Stage {
             boolean sandboxedValidation,
             String consoleMessage,
             PersistenceOutcome persistence,
-            boolean practiceOnly) {
+            boolean practiceOnly, int previousLevel) {
 
         StringBuilder fullConsole = new StringBuilder(consoleMessage);
         if (!practiceOnly) saveUncertain = persistence.attemptedOracleSave && !persistence.savedToOracle;
@@ -1972,13 +2020,24 @@ public class ChallengeFrame extends Stage {
                     + (sandboxedValidation ? "" : " (Simulación)") + rewardMessage
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");
             Theme.playPulse(lblResultBanner);
+            if (celebratedChallenges.add(activeChallenge)) {
+                CompletionDialog.show(ownerWindow(), activeChallenge.getTitle(), reward, currentUser, previousLevel,
+                        persistence.savedToOracle, availableChallenges.size() > 1 ? this::advanceToNextChallenge : null);
+            }
         } else {
+            boolean incorrectAnswer = activeChallenge instanceof QuizChallenge || latestCaseOutcomes.stream()
+                    .anyMatch(outcome -> outcome.getFailureResult() == com.mycompany.levelup_code.domain.enums.AttemptResult.INCORRECT);
+            if (incorrectAnswer) incorrectAttempts.merge(activeChallenge, 1, Integer::sum);
             showFeedback((persistence.savedToOracle ? "Intento guardado. "
                     : practiceOnly ? "Práctica sin XP. " : "Evaluado en modo local. ")
                     + (activeChallenge instanceof QuizChallenge
                     ? "Revisa la pista y elige otra respuesta." : "Revisa los casos fallidos y corrige tu código."), "text-danger");
             Theme.playPulse(lblResultBanner);
+            if (incorrectAttempts.getOrDefault(activeChallenge, 0) >= 2) {
+                lblResultBanner.setText(lblResultBanner.getText() + " Podemos revisar una pista antes de volver a intentar.");
+            }
         }
+        updateCoachAction();
         if (onSolvedCallback != null) {
             try {
                 onSolvedCallback.run();

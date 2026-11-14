@@ -24,7 +24,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
@@ -41,7 +40,18 @@ import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
 /** Lesson reader using the shared palette and background progress operations. */
-public class LessonFrame extends Stage {
+public class LessonFrame extends Stage implements LearningPage {
+    private BorderPane view;
+    private LearningNavigation navigator;
+
+    @Override public Region content() { return view; }
+    @Override public boolean canLeave() { return true; }
+    @Override public void disposePage() { closed = true; }
+    @Override public void setNavigator(LearningNavigation value) { navigator = value; }
+    @Override public void close() {
+        if (navigator != null) navigator.back();
+        else super.close();
+    }
 
     private static final Logger LOGGER = Logger.getLogger(LessonFrame.class.getName());
     // Serialize writes across lesson windows so a late start cannot undo a
@@ -59,7 +69,7 @@ public class LessonFrame extends Stage {
     private boolean failed;
     private Task<ProgressResult> progressTask;
 
-    private TextArea txtComparativeCode;
+    private CodeEditor txtComparativeCode;
     private Label lblComparisonCaption;
     private ToggleButton btnTabJava;
     private ToggleButton btnTabPython;
@@ -74,6 +84,10 @@ public class LessonFrame extends Stage {
     private TabPane compactTabs;
     private Tab theoryTab;
     private Tab codeTab;
+    private Tab explorationTab;
+    private TabPane examples;
+    private Tab wideCodeTab;
+    private javafx.scene.control.TitledPane lessonChallenges;
 
     private record ProgressResult(boolean completed, boolean local, boolean newlyCompleted) { }
 
@@ -268,6 +282,7 @@ public class LessonFrame extends Stage {
         lblNextAction.setText(lessonCompleted
                 ? hasChallenges() ? "Siguiente paso: elige un reto para practicar." : "Siguiente paso: vuelve al módulo para continuar."
                 : "Lee la explicación, compara el ejemplo y completa la lectura. Los retos se resuelven por separado.");
+        if (lessonCompleted && lessonChallenges != null) lessonChallenges.setExpanded(true);
     }
 
     private void initComponents() {
@@ -278,6 +293,7 @@ public class LessonFrame extends Stage {
         setMinHeight(620);
 
         BorderPane root = new BorderPane();
+        view = root;
         root.getStyleClass().add("root-shell");
         root.setPadding(new Insets(16));
 
@@ -300,7 +316,14 @@ public class LessonFrame extends Stage {
 
         VBox theoryPane = buildTheoryPane();
         VBox codePane = buildComparativeCodePane();
-        SplitPane split = new SplitPane(theoryPane, codePane);
+        var exploration = new LessonExplorationPane(currentLesson);
+        ScrollPane explorationScroll = WorkspaceUi.scroll(exploration);
+        examples = new TabPane();
+        examples.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        wideCodeTab = new Tab("Comparar", codePane);
+        Tab wideExplorationTab = new Tab("Explorar", explorationScroll);
+        examples.getTabs().addAll(wideCodeTab, wideExplorationTab);
+        SplitPane split = new SplitPane(theoryPane, examples);
         split.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
         split.setDividerPositions(0.52);
         split.setAccessibleText("Explicación y ejemplo. Arrastra el divisor para ajustar el ancho.");
@@ -308,35 +331,48 @@ public class LessonFrame extends Stage {
         compactTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         theoryTab = new Tab("1. Leer");
         codeTab = new Tab("2. Comparar");
-        compactTabs.getTabs().addAll(theoryTab, codeTab);
+        explorationTab = new Tab("3. Explorar");
+        compactTabs.getTabs().addAll(theoryTab, codeTab, explorationTab);
         root.setCenter(split);
 
         VBox bottomBar = buildBottomBar();
         root.setBottom(bottomBar);
         BorderPane.setMargin(bottomBar, new Insets(12, 0, 0, 0));
         Scene scene = new Scene(root, 1100, 800);
-        scene.widthProperty().addListener((observable, oldWidth, newWidth) -> {
+        root.widthProperty().addListener((observable, oldWidth, newWidth) -> {
             if (newWidth.doubleValue() < 880 && root.getCenter() != compactTabs) {
                 split.getItems().clear();
+                wideCodeTab.setContent(null);
+                wideExplorationTab.setContent(null);
                 theoryTab.setContent(theoryPane);
                 codeTab.setContent(codePane);
+                explorationTab.setContent(explorationScroll);
                 root.setCenter(compactTabs);
             } else if (newWidth.doubleValue() >= 880 && root.getCenter() != split) {
                 theoryTab.setContent(null);
                 codeTab.setContent(null);
-                split.getItems().setAll(theoryPane, codePane);
+                explorationTab.setContent(null);
+                wideCodeTab.setContent(codePane);
+                wideExplorationTab.setContent(explorationScroll);
+                split.getItems().setAll(theoryPane, examples);
                 root.setCenter(split);
                 split.setDividerPositions(0.52);
             }
         });
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT1, KeyCombination.CONTROL_DOWN), () -> focusPane(false));
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT2, KeyCombination.CONTROL_DOWN), () -> focusPane(true));
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN), () -> {
-            if (btnRetry.isVisible()) {
-                btnRetry.fire();
-            } else {
-                btnMarkComplete.fire();
+        root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (!event.isControlDown() || event.isAltDown()) return;
+            if (event.getCode() == KeyCode.DIGIT1) focusPane(false);
+            else if (event.getCode() == KeyCode.DIGIT2) focusPane(true);
+            else if (event.getCode() == KeyCode.DIGIT3) {
+                compactTabs.getSelectionModel().select(explorationTab);
+                examples.getSelectionModel().select(wideExplorationTab);
+                explorationScroll.requestFocus();
             }
+            else if (event.getCode() == KeyCode.ENTER) {
+                if (btnRetry.isVisible()) btnRetry.fire();
+                else btnMarkComplete.fire();
+            } else return;
+            event.consume();
         });
         Theme.applyCss(scene);
         setScene(scene);
@@ -372,15 +408,23 @@ public class LessonFrame extends Stage {
         for (String block : theory.split("\\R\\s*\\R")) {
             String[] lines = block.strip().split("\\R", 2);
             boolean headingLine = lines[0].matches("\\d+[.)]\\s+.+");
-            if (headingLine) {
-                reading.getChildren().add(wrappedLabel(lines[0], "card-title"));
-            }
             String body = headingLine ? lines.length > 1 ? lines[1] : "" : block.strip();
+            VBox section = new VBox(8);
             if (!body.isBlank()) {
                 Label paragraph = wrappedLabel(body, "body-text");
                 paragraph.setStyle("-fx-font-size: 15px; -fx-line-spacing: 5px;");
-                reading.getChildren().add(paragraph);
+                section.getChildren().add(paragraph);
             }
+            if (headingLine && !body.isBlank()) {
+                var panel = new javafx.scene.control.TitledPane(lines[0], section);
+                panel.setAnimated(false);
+                panel.setExpanded(true);
+                panel.setWrapText(true);
+                panel.setMinWidth(0);
+                panel.getStyleClass().add("reading-section");
+                reading.getChildren().add(panel);
+            } else if (headingLine) reading.getChildren().add(wrappedLabel(lines[0], "card-title"));
+            else reading.getChildren().add(section);
         }
         theoryScroll = new ScrollPane(reading);
         theoryScroll.setFitToWidth(true);
@@ -414,14 +458,13 @@ public class LessonFrame extends Stage {
             }
         });
         FlowPane languageBar = new FlowPane(8, 6, btnTabJava, btnTabPython, btnTabCpp);
-        txtComparativeCode = new TextArea();
+        txtComparativeCode = new CodeEditor();
         txtComparativeCode.setEditable(false);
         txtComparativeCode.setWrapText(true);
         txtComparativeCode.setMinSize(0, 50);
-        txtComparativeCode.getStyleClass().add("code-editor");
         txtComparativeCode.setAccessibleText("Ejemplo de código de la lección");
         txtComparativeCode.setAccessibleHelp("Puedes seleccionar y copiar el código. Control más 1 vuelve a la explicación.");
-        // A read-only TextArea otherwise consumes Tab, trapping keyboard readers.
+        // Keep keyboard readers moving between the example and lesson actions.
         txtComparativeCode.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.TAB && !event.isControlDown() && !event.isAltDown()) {
                 if (event.isShiftDown()) {
@@ -503,7 +546,10 @@ public class LessonFrame extends Stage {
                 launch.setMinHeight(Region.USE_PREF_SIZE);
                 launch.getStyleClass().add("btn-secondary");
                 launch.setAccessibleText("Abrir " + launch.getText());
-                launch.setOnAction(event -> ChallengeFrame.open(currentUser, challenge, onProgressCallback));
+                launch.setOnAction(event -> {
+                    if (navigator != null) navigator.openChallenge(challenge);
+                    else ChallengeFrame.open(currentUser, challenge, onProgressCallback);
+                });
                 challengeList.getChildren().add(launch);
             }
             ScrollPane challengesScroll = new ScrollPane(challengeList);
@@ -513,7 +559,11 @@ public class LessonFrame extends Stage {
             challengesScroll.setPrefViewportHeight(Math.min(80, index * 40));
             challengesScroll.setMaxHeight(84);
             challengesScroll.setAccessibleText("Retos de esta lección");
-            bar.getChildren().add(challengesScroll);
+            lessonChallenges = new javafx.scene.control.TitledPane("Retos de esta lección", challengesScroll);
+            lessonChallenges.setExpanded(false);
+            lessonChallenges.setAnimated(false);
+            lessonChallenges.getStyleClass().add("reading-section");
+            bar.getChildren().add(lessonChallenges);
         }
         return bar;
     }
@@ -521,6 +571,7 @@ public class LessonFrame extends Stage {
     private void focusPane(boolean code) {
         compactTabs.getSelectionModel().select(code ? codeTab : theoryTab);
         if (code) {
+            examples.getSelectionModel().select(wideCodeTab);
             txtComparativeCode.requestFocus();
         } else {
             theoryScroll.requestFocus();
@@ -533,6 +584,7 @@ public class LessonFrame extends Stage {
         updateLanguageButton(btnTabJava, "JAVA".equals(lang), "btn-java");
         updateLanguageButton(btnTabPython, "PYTHON".equals(lang), "btn-python");
         updateLanguageButton(btnTabCpp, "CPP".equals(lang), "btn-cpp");
+        txtComparativeCode.setLanguage(lang);
         txtComparativeCode.setText(snippet[0]);
         txtComparativeCode.positionCaret(0);
         txtComparativeCode.setScrollTop(0);

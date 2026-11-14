@@ -2,6 +2,18 @@ package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.data.oracle.OracleLearningAnalyticsRepository;
 import com.mycompany.levelup_code.domain.model.LearningAnalytics;
+import com.mycompany.levelup_code.domain.model.Challenge;
+import com.mycompany.levelup_code.app.AppContext;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.function.Consumer;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.GridPane;
 import javafx.concurrent.Task;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -20,8 +32,17 @@ public final class LearningAnalyticsPane extends VBox {
     private final TilePane cards = new TilePane(16, 16);
     private final FlowPane summary = new FlowPane(12, 12);
     private final Button refresh = WorkspaceUi.button("Actualizar", "btn-secondary", Theme.IconKind.REFRESH);
+    private final VBox history = new VBox(14);
+    private final VBox review = new VBox(10);
+    private final Consumer<Challenge> openChallenge;
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es-CO"));
 
     public LearningAnalyticsPane(int userId, boolean oracle) {
+        this(userId, oracle, challenge -> ChallengeFrame.open(null, challenge, null));
+    }
+
+    LearningAnalyticsPane(int userId, boolean oracle, Consumer<Challenge> openChallenge) {
+        this.openChallenge = openChallenge;
         getStyleClass().add("learning-workspace");
         refresh.setOnAction(event -> load(userId));
         cards.setPrefColumns(3);
@@ -32,7 +53,11 @@ public final class LearningAnalyticsPane extends VBox {
             cards.setPrefTileWidth(Math.max(0, Math.floor((value.doubleValue() - 16 * (columns - 1) - 2) / columns)));
         });
         VBox body = new VBox(18, summary,
-                WorkspaceUi.label("Tu avance por lenguaje", "card-title"), cards);
+                history, review, WorkspaceUi.label("Tu avance por lenguaje", "card-title"), cards);
+        history.setVisible(false);
+        history.setManaged(false);
+        review.setVisible(false);
+        review.setManaged(false);
         getChildren().addAll(WorkspaceUi.header("Mi progreso",
                 "Consulta lo que has aprendido y tu actividad de los últimos 7 días.", refresh),
                 status, WorkspaceUi.scroll(body));
@@ -57,6 +82,8 @@ public final class LearningAnalyticsPane extends VBox {
     }
 
     private void show(LearningAnalytics data) {
+        showHistory(data);
+        showReview(data);
         int solved = data.languages().stream().mapToInt(LearningAnalytics.LanguageResult::solved).sum();
         summary.getChildren().setAll(
                 metric(data.weeklyXp() + " XP", "Ganados en los últimos 7 días", Theme.IconKind.BOLT),
@@ -96,6 +123,112 @@ public final class LearningAnalyticsPane extends VBox {
                     "El progreso aparecerá cuando se publique contenido."));
         }
         WorkspaceUi.status(status, "", "");
+    }
+
+    private void showHistory(LearningAnalytics data) {
+        history.getChildren().clear();
+        history.setVisible(!data.dailyActivity().isEmpty());
+        history.setManaged(history.isVisible());
+        if (data.dailyActivity().isEmpty()) return;
+        CategoryAxis dates = new CategoryAxis();
+        NumberAxis xp = new NumberAxis();
+        xp.setLabel("XP");
+        xp.setMinorTickVisible(false);
+        BarChart<String, Number> chart = new BarChart<>(dates, xp);
+        chart.setAnimated(false);
+        chart.setLegendVisible(false);
+        chart.setMinHeight(230);
+        chart.setPrefHeight(260);
+        chart.getStyleClass().add("xp-history");
+        ComboBox<String> period = new ComboBox<>();
+        period.getItems().addAll("Últimos 7 días", "Últimos 28 días");
+        period.getSelectionModel().selectFirst();
+        period.setAccessibleText("Periodo del gráfico de experiencia");
+        Runnable render = () -> {
+            int count = period.getSelectionModel().getSelectedIndex() == 0 ? 7 : 28;
+            XYChart.Series<String, Number> series = new XYChart.Series<>();
+            var days = data.dailyActivity().subList(Math.max(0, data.dailyActivity().size() - count), data.dailyActivity().size());
+            for (var day : days) {
+                var point = new XYChart.Data<String, Number>(DATE.format(day.date()), day.xp());
+                point.nodeProperty().addListener((observable, old, node) -> {
+                    if (node != null) {
+                        Tooltip.install(node, new Tooltip(DATE.format(day.date()) + " · " + day.xp() + " XP"));
+                    }
+                });
+                series.getData().add(point);
+            }
+            chart.getData().setAll(java.util.List.of(series));
+            dates.setTickLabelRotation(count == 7 ? 0 : -45);
+        };
+        period.setOnAction(event -> render.run());
+        render.run();
+        GridPane calendar = new GridPane();
+        calendar.setHgap(6);
+        calendar.setVgap(6);
+        String[] weekdays = { "L", "M", "X", "J", "V", "S", "D" };
+        for (int column = 0; column < 7; column++) {
+            var constraint = new javafx.scene.layout.ColumnConstraints();
+            constraint.setPercentWidth(100.0 / 7);
+            calendar.getColumnConstraints().add(constraint);
+            calendar.add(WorkspaceUi.label(weekdays[column], "muted-text"), column, 0);
+        }
+        Label selectedDay = WorkspaceUi.label("Selecciona un día para consultar la XP obtenida.", "body-text");
+        int offset = data.dailyActivity().getFirst().date().getDayOfWeek().getValue() - 1;
+        int max = data.dailyActivity().stream().mapToInt(LearningAnalytics.DayActivity::xp).max().orElse(0);
+        int index = 0;
+        for (var day : data.dailyActivity()) {
+            int intensity = day.xp() == 0 ? 0 : day.xp() >= max * 0.66 ? 3 : day.xp() >= max * 0.33 ? 2 : 1;
+            Button cell = new Button(String.valueOf(day.date().getDayOfMonth()));
+            cell.getStyleClass().addAll("activity-day", "heatmap-cell-" + intensity);
+            cell.setMaxWidth(Double.MAX_VALUE);
+            cell.setAccessibleText(DATE.format(day.date()) + ", " + day.xp() + " XP");
+            cell.setTooltip(new Tooltip(cell.getAccessibleText()));
+            cell.setOnAction(event -> selectedDay.setText(DATE.format(day.date()) + " · " + day.xp() + " XP obtenidos"));
+            calendar.add(cell, (index + offset) % 7, 1 + (index + offset) / 7);
+            index++;
+        }
+        VBox chartCard = new VBox(12, WorkspaceUi.label("Tu experiencia día a día", "card-title"), period, chart);
+        chartCard.getStyleClass().add("surface-card");
+        VBox calendarCard = new VBox(12, WorkspaceUi.label("Actividad de las últimas 4 semanas", "card-title"), calendar, selectedDay);
+        calendarCard.getStyleClass().add("surface-card");
+        history.getChildren().addAll(chartCard, calendarCard);
+    }
+
+    private void showReview(LearningAnalytics data) {
+        review.getChildren().setAll(WorkspaceUi.label("Retos para repasar", "card-title"));
+        review.setVisible(true);
+        review.setManaged(true);
+        if (data.reviewChallenges().isEmpty()) {
+            review.getChildren().add(WorkspaceUi.label("Tus retos intentados y aún pendientes aparecerán aquí.", "body-text"));
+        }
+        for (var challenge : data.reviewChallenges()) {
+            Button open = WorkspaceUi.button("Volver a intentar", "btn-secondary", Theme.IconKind.PLAY);
+            open.setOnAction(event -> openReview(challenge.id(), open));
+            VBox card = new VBox(10, WorkspaceUi.label(challenge.title(), "card-title"),
+                    WorkspaceUi.label(challenge.language(), "muted-text"), open);
+            card.getStyleClass().add("surface-card");
+            review.getChildren().add(card);
+        }
+    }
+
+    private void openReview(int id, Button button) {
+        button.setDisable(true);
+        Task<Challenge> task = new Task<>() {
+            @Override protected Challenge call() {
+                return AppContext.getInstance().getChallengeRepository().findById(id).orElseThrow();
+            }
+        };
+        task.setOnSucceeded(event -> {
+            button.setDisable(false);
+            if (getScene() != null) openChallenge.accept(task.getValue());
+        });
+        task.setOnFailed(event -> {
+            button.setDisable(false);
+            WorkspaceUi.status(status, "No pudimos abrir el reto. Actualiza el progreso e inténtalo de nuevo.", "status-error");
+        });
+        Thread thread = new Thread(task, "analytics-review");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void load(int userId) {

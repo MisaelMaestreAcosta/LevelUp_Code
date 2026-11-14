@@ -36,6 +36,7 @@ public final class NotebookPane extends VBox {
     private final User user;
     private final Runnable callback;
     private final List<Challenge> challenges;
+    private final Consumer<Challenge> openChallenge;
     private Note editingNote;
     private boolean busy;
     private boolean dirty;
@@ -44,10 +45,15 @@ public final class NotebookPane extends VBox {
     private boolean wide;
 
     public NotebookPane(User user, boolean oracle, List<Challenge> challenges, Runnable callback) {
+        this(user, oracle, challenges, callback, challenge -> ChallengeFrame.open(user, challenge, callback));
+    }
+
+    NotebookPane(User user, boolean oracle, List<Challenge> challenges, Runnable callback, Consumer<Challenge> openChallenge) {
         this.user = user;
         this.userId = user.getId();
         this.challenges = challenges;
         this.callback = callback;
+        this.openChallenge = openChallenge;
         getStyleClass().add("learning-workspace");
         title.setPromptText("Por ejemplo, cómo funciona un JOIN");
         title.setTextFormatter(new TextFormatter<String>(
@@ -289,7 +295,7 @@ public final class NotebookPane extends VBox {
             Label name = WorkspaceUi.label(challenge.getTitle(), "body-text");
             Button open = WorkspaceUi.button("Practicar", "btn-ghost", Theme.IconKind.PLAY);
             open.setAccessibleText("Practicar " + challenge.getTitle());
-            open.setOnAction(event -> ChallengeFrame.open(user, challenge, callback));
+            open.setOnAction(event -> openChallenge.accept(challenge));
             Button removeFavorite = WorkspaceUi.button("Quitar", "btn-secondary", null);
             removeFavorite.setAccessibleText("Quitar " + challenge.getTitle() + " de favoritos");
             removeFavorite.setOnAction(event -> run(() -> {
