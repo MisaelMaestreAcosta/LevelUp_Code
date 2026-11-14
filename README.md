@@ -81,8 +81,16 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/02_seed.sql`](database/02_seed.sql) (catálogo limpio de despliegue: roles, lenguajes, módulos, lecciones, retos y logros)
    - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
+   - [`database/05_student_notebook.sql`](database/05_student_notebook.sql) (crea notas y retos favoritos por usuario)
+   - [`database/06_learning_goals.sql`](database/06_learning_goals.sql) (crea metas personales)
+   - [`database/07_user_preferences.sql`](database/07_user_preferences.sql) (crea preferencias del editor)
+   - [`database/08_content_publication.sql`](database/08_content_publication.sql) (añade estados de publicación y soluciones de referencia)
+   - [`database/09_content_versions.sql`](database/09_content_versions.sql) (conserva versiones del contenido y vincula intentos)
+   - [`database/10_challenge_types.sql`](database/10_challenge_types.sql) (añade predicción, depuración y ordenamiento)
 
-   Si ya tienes una base de datos creada, vuelve a ejecutar solo `database/03_plsql_gamificacion.sql` para activar la recuperación diaria de vidas, el bloqueo de intentos sin vidas y los reintentos idempotentes. No necesitas borrar ni volver a cargar los datos.
+   En una base existente, aplica una vez los scripts 05–10 que falten y recompila
+   `database/03_plsql_gamificacion.sql` para actualizar la gamificación y los reintentos idempotentes.
+   Comprueba las tablas instaladas antes de ejecutar cada script de creación.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:
@@ -116,6 +124,11 @@ El repositorio incluye **Maven Wrapper** (`mvnw` / `mvnw.cmd`), por lo que no re
 ./mvnw clean test
 ./mvnw javafx:run
 ```
+
+`OracleLearningStorageIntegrationTest` comprueba notas, favoritos, metas y preferencias
+mediante los repositorios reales. Necesita Oracle configurado y las migraciones instaladas.
+Crea cuentas temporales y elimina sus datos al finalizar cada prueba. Verifica también
+que una cuenta solo pueda consultar y modificar sus propios registros.
 
 ---
 
