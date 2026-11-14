@@ -2279,7 +2279,7 @@ public class DashboardFrame {
         } else if ("COMPARATOR".equals(cardKey)) {
             target = comparatorView;
         } else if ("PROGRESS".equals(cardKey)) {
-            target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected);
+            target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected, this::openChallenge);
         } else if ("GOALS".equals(cardKey)) {
             target = new LearningGoalsPane(currentUser.getId(), oracleConnected);
         } else if ("LAB".equals(cardKey)) {

@@ -62,6 +62,37 @@ class OracleLearningStorageIntegrationTest {
     }
 
     @Test
+    void analyticsCalendarAndReviewRemainPrivateAndExcludeSolvedChallenges() throws SQLException {
+        int challengeId = firstId("SELECT MIN(id_reto) FROM Retos WHERE estado='PUBLICADO'");
+        Assumptions.assumeTrue(challengeId > 0, "Se necesita un reto publicado.");
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            try (PreparedStatement activity = connection.prepareStatement(
+                    "INSERT INTO Actividad_Diaria(id_usuario,fecha,exp_ganada) VALUES(?,TRUNC(SYSDATE)-?,?)")) {
+                for (int[] row : new int[][] { { userId, 0, 17 }, { userId, 10, 13 }, { otherUserId, 0, 99 } }) {
+                    activity.setInt(1, row[0]); activity.setInt(2, row[1]); activity.setInt(3, row[2]);
+                    activity.executeUpdate();
+                }
+            }
+            try (PreparedStatement attempt = connection.prepareStatement(
+                    "INSERT INTO Intentos(id_usuario,id_reto,codigo_enviado,es_correcto) VALUES(?,?,'respuesta de prueba',?)")) {
+                attempt.setInt(1, userId); attempt.setInt(2, challengeId); attempt.setInt(3, 0); attempt.executeUpdate();
+                attempt.setInt(1, otherUserId); attempt.setInt(3, 1); attempt.executeUpdate();
+                var repository = new OracleLearningAnalyticsRepository();
+                var data = repository.load(userId);
+                assertEquals(28, data.dailyActivity().size());
+                assertEquals(17, data.weeklyXp());
+                assertEquals(30, data.dailyActivity().stream().mapToInt(day -> day.xp()).sum());
+                assertEquals(17, data.dailyActivity().getLast().xp());
+                assertEquals(1, data.reviewChallenges().size());
+                assertEquals(challengeId, data.reviewChallenges().getFirst().id());
+                assertEquals(99, repository.load(otherUserId).weeklyXp());
+                attempt.setInt(1, userId); attempt.setInt(3, 1); attempt.executeUpdate();
+                assertTrue(repository.load(userId).reviewChallenges().isEmpty());
+            }
+        }
+    }
+
+    @Test
     void notesAndFavoritesPersistAndStayPrivate() throws SQLException {
         int challengeId = firstId("SELECT MIN(id_reto) FROM Retos");
         OracleNotebookRepository repository = new OracleNotebookRepository();
