@@ -56,6 +56,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TitledPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
@@ -158,6 +159,8 @@ public class DashboardFrame {
     private VBox lessonsListBox;
     private final Map<String, ProgressBar> courseProgressBars = new HashMap<>();
     private final Map<String, Label> courseProgressLabels = new HashMap<>();
+    private final Map<String, Boolean> expandedModules = new HashMap<>();
+    private final Map<Lesson, Boolean> expandedLessons = new HashMap<>();
 
     // Comparador de 3 lenguajes (6 tópicos curriculares)
     private TextArea txtCompareJava;
@@ -893,8 +896,8 @@ public class DashboardFrame {
         TilePane langGrid = new TilePane(12, 12);
         langGrid.setPrefColumns(3);
         langGrid.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
-                () -> Math.max(200, (langGrid.getWidth() - (langGrid.getWidth() >= 840 ? 24 : 0))
-                        / (langGrid.getWidth() >= 840 ? 3 : 1)), langGrid.widthProperty()));
+                () -> Math.max(200, Math.floor((langGrid.getWidth() - 2 - (langGrid.getWidth() >= 840 ? 24 : 0))
+                        / (langGrid.getWidth() >= 840 ? 3 : 1))), langGrid.widthProperty()));
         Node cardJava = createLanguageCard(
                 "JAVA", "Java 21 LTS",
                 "Construye aplicaciones con clases, interfaces y colecciones.",
@@ -940,6 +943,7 @@ public class DashboardFrame {
         lessonSearch.setPrefWidth(300);
         lessonSearch.textProperty().addListener((obs, old, value) -> populateLessonsForLanguage(activeLanguageKey));
         hideCompleted = new CheckBox("Solo por completar");
+        hideCompleted.getStyleClass().add("course-filter");
         hideCompleted.setOnAction(e -> populateLessonsForLanguage(activeLanguageKey));
         Button clear = new Button("Limpiar filtros");
         clear.getStyleClass().add("btn-ghost");
@@ -965,14 +969,7 @@ public class DashboardFrame {
         resume.getStyleClass().add("lupo-welcome");
 
         lessonsListBox = new VBox(12);
-        ScrollPane scroll = new ScrollPane(lessonsListBox);
-        scroll.setFitToWidth(true);
-        scroll.setMinHeight(310);
-        scroll.setPrefHeight(430);
-        scroll.getStyleClass().add("scroll-pane-clean");
-        VBox.setVgrow(scroll, Priority.ALWAYS);
-
-        lessonsWrapper.getChildren().addAll(listHeader, lblCourseStatus, filters, scroll);
+        lessonsWrapper.getChildren().addAll(listHeader, lblCourseStatus, filters, lessonsListBox);
         view.getChildren().addAll(secHeader, resume, langGrid, lessonsWrapper);
         return view;
     }
@@ -1121,6 +1118,7 @@ public class DashboardFrame {
         topRow.getChildren().addAll(lblTitle, sp, enrollBadge);
 
         Label lblDesc = new Label(description);
+        lblDesc.setWrapText(true);
         lblDesc.getStyleClass().add("muted-text");
         lblDesc.setWrapText(true);
 
@@ -1259,7 +1257,7 @@ public class DashboardFrame {
         String query = lessonSearch.getText().strip().toLowerCase(Locale.ROOT);
         int shown = 0;
 
-        String lastModuleTitle = "";
+        Map<CourseModule, List<Lesson>> visibleModules = new java.util.LinkedHashMap<>();
         for (int i = 0; i < selectedList.size(); i++) {
             Lesson lesson = selectedList.get(i);
             CourseModule module = lesson.getModule();
@@ -1270,15 +1268,39 @@ public class DashboardFrame {
             if (hideCompleted.isSelected() && status == ProgressStatus.COMPLETED) continue;
             if (!(lesson.getTitle() + " " + modTitle).toLowerCase(Locale.ROOT).contains(query)) continue;
             shown++;
-            if (!modTitle.equals(lastModuleTitle)) {
-                lastModuleTitle = modTitle;
-                String modDesc = (module != null && module.getDescription() != null)
-                        ? module.getDescription()
-                        : "";
-                lessonsListBox.getChildren().add(createModuleHeaderRow(modTitle, modDesc));
-            }
-            lessonsListBox.getChildren().add(createSkillNodeRow(i + 1, lesson, status));
+            visibleModules.computeIfAbsent(module, key -> new ArrayList<>()).add(lesson);
         }
+        visibleModules.forEach((module, lessons) -> {
+            List<Lesson> allModuleLessons = selectedList.stream().filter(item -> item.getModule() == module).toList();
+            VBox route = new VBox(0);
+            route.getStyleClass().add("course-route");
+            for (Lesson lesson : lessons) {
+                route.getChildren().add(createSkillNodeRow(selectedList.indexOf(lesson) + 1, lesson,
+                        resolveLessonProgressStatus(lesson, 0)));
+            }
+            String title = module == null ? "Módulo curricular" : module.getTitle();
+            String key = langKey + ":" + (module == null ? "default" : module.getId());
+            long readings = allModuleLessons.stream().filter(item -> lessonStatuses.get(item) == ProgressStatus.COMPLETED).count();
+            List<Challenge> challenges = allModuleLessons.stream().flatMap(item -> item.getChallenges().stream()).toList();
+            long solved = challenges.stream().filter(item -> challengeProgress.get(item.getId()) == ChallengeProgress.SOLVED).count();
+            VBox heading = new VBox(6, WorkspaceUi.label(title, "card-title"),
+                    WorkspaceUi.label(readings + "/" + allModuleLessons.size() + " lecturas · "
+                            + solved + "/" + challenges.size() + " retos superados", "muted-text"));
+            ProgressBar progress = new ProgressBar(allModuleLessons.isEmpty() ? 0 : (double) readings / allModuleLessons.size());
+            progress.setMaxWidth(Double.MAX_VALUE);
+            progress.setAccessibleText(readings + " de " + allModuleLessons.size() + " lecturas completadas");
+            heading.getChildren().add(progress);
+            TitledPane panel = new TitledPane("", route);
+            panel.setGraphic(heading);
+            heading.prefWidthProperty().bind(panel.widthProperty().subtract(65));
+            panel.getStyleClass().add("route-module");
+            panel.setAnimated(false);
+            panel.setExpanded(!query.isEmpty() || hideCompleted.isSelected()
+                    || expandedModules.getOrDefault(key, allModuleLessons.contains(next)));
+            panel.expandedProperty().addListener((observable, old, expanded) -> expandedModules.put(key, expanded));
+            panel.setAccessibleText(title + ", " + readings + " lecturas completadas");
+            lessonsListBox.getChildren().add(panel);
+        });
         lessonResults.setText(shown + " de " + selectedList.size() + " lecciones");
         if (shown == 0) {
             Label empty = new Label(selectedList.isEmpty() ? "Pronto encontrarás lecciones aquí."
@@ -1308,28 +1330,6 @@ public class DashboardFrame {
         Lesson next = nextLesson();
         List<Lesson> lessons = selectedLessons();
         return next != null ? next : lessons.isEmpty() ? null : lessons.get(0);
-    }
-
-    private HBox createModuleHeaderRow(String moduleTitle, String moduleDescription) {
-        HBox header = new HBox(12);
-        header.getStyleClass().add("module-header-card");
-        header.setAlignment(Pos.CENTER_LEFT);
-
-        Label lblModTitle = new Label(moduleTitle);
-        lblModTitle.getStyleClass().add("card-title");
-        lblModTitle.setWrapText(true);
-        lblModTitle.setGraphic(Theme.createIcon(Theme.IconKind.SPARK, 15, Theme.HEX_INDIGO));
-        lblModTitle.setGraphicTextGap(8);
-
-        Region sp = new Region();
-        HBox.setHgrow(sp, Priority.ALWAYS);
-
-        Label lblModDesc = new Label(moduleDescription);
-        lblModDesc.getStyleClass().add("muted-text");
-        lblModDesc.setWrapText(true);
-
-        header.getChildren().addAll(lblModTitle, sp, lblModDesc);
-        return header;
     }
 
     private ProgressStatus resolveLessonProgressStatus(Lesson lesson, int indexInList) {
@@ -1365,15 +1365,11 @@ public class DashboardFrame {
             iconKind = Theme.IconKind.BOOK;
             iconHex = Theme.HEX_MUTED;
         }
-        row.getStyleClass().add(nodeStyleClass);
-
-        VBox textColumn = new VBox(4);
-        textColumn.setMinWidth(0);
-        HBox.setHgrow(textColumn, Priority.ALWAYS);
+        row.getStyleClass().add("route-step");
 
         FlowPane titleLine = new FlowPane(10, 8);
         titleLine.setAlignment(Pos.CENTER_LEFT);
-        Label lblTitle = new Label(orderNum + ". " + lesson.getTitle());
+        Label lblTitle = new Label(lesson.getTitle());
         lblTitle.setWrapText(true);
         lblTitle.getStyleClass().add("card-title");
 
@@ -1393,7 +1389,7 @@ public class DashboardFrame {
         lblPreview.getStyleClass().add("muted-text");
         lblPreview.setWrapText(true);
 
-        textColumn.getChildren().addAll(titleLine, lblPreview);
+        VBox details = new VBox(10, lblPreview);
 
         FlowPane actions = new FlowPane(8, 8);
         actions.setAlignment(Pos.CENTER_LEFT);
@@ -1414,11 +1410,28 @@ public class DashboardFrame {
             }
         }
 
-        textColumn.getChildren().add(actions);
-        row.getChildren().addAll(
-                Theme.createIcon(iconKind, 20, iconHex),
-                textColumn
-        );
+        details.getChildren().add(actions);
+        TitledPane lessonPanel = new TitledPane("", details);
+        lessonPanel.setGraphic(titleLine);
+        titleLine.prefWrapLengthProperty().bind(lessonPanel.widthProperty().subtract(65));
+        lessonPanel.getStyleClass().addAll("route-lesson", nodeStyleClass);
+        lessonPanel.setAnimated(false);
+        lessonPanel.setExpanded(expandedLessons.getOrDefault(lesson, lesson == nextLesson()));
+        lessonPanel.expandedProperty().addListener((observable, old, expanded) -> expandedLessons.put(lesson, expanded));
+        lessonPanel.setMaxWidth(Double.MAX_VALUE);
+        lessonPanel.setMinWidth(0);
+        HBox.setHgrow(lessonPanel, Priority.ALWAYS);
+        Label marker = new Label(String.valueOf(orderNum));
+        marker.setGraphic(Theme.createIcon(iconKind, 14, iconHex));
+        marker.getStyleClass().add("route-marker");
+        marker.setAccessibleText("Lección " + orderNum + ", " + statusText);
+        Region connector = new Region();
+        connector.getStyleClass().add("route-connector");
+        VBox.setVgrow(connector, Priority.ALWAYS);
+        VBox rail = new VBox(6, marker, connector);
+        rail.setAlignment(Pos.TOP_CENTER);
+        row.setAlignment(Pos.TOP_LEFT);
+        row.getChildren().addAll(rail, lessonPanel);
         return row;
     }
 
