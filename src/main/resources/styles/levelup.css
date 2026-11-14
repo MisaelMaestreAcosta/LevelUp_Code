@@ -49,6 +49,13 @@
     -fx-border-color: #BFDBFE;
     -fx-border-radius: 14;
 }
+.lupo-login-hero .hero-title,
+.lupo-login-hero .hero-accent {
+    -fx-font-size: 28px;
+}
+.lupo-auth .check-box {
+    -fx-text-fill: #334155;
+}
 
 .sidebar {
     -fx-background-color: #FFFFFF;

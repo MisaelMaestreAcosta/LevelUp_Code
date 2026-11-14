@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.fx;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.presentation.component.LoginFrame;
 import com.mycompany.levelup_code.presentation.component.Theme;
+import com.mycompany.levelup_code.presentation.component.Lupo;
 import javafx.application.Application;
 import javafx.concurrent.Task;
 import javafx.geometry.Pos;
@@ -36,8 +37,8 @@ public class LevelUpFxApp extends Application {
 
     private void showConnectingScreen(Stage stage) {
         stage.setTitle("LevelUp Code · Conectando");
-        Label title = new Label("LevelUp Code");
-        title.getStyleClass().add("card-title");
+        var brand = Lupo.brand();
+        brand.setAlignment(Pos.CENTER);
         Label message = new Label("Preparando tu espacio de aprendizaje…");
         message.getStyleClass().add("muted-text");
         ProgressIndicator indicator = new ProgressIndicator();
@@ -47,7 +48,8 @@ public class LevelUpFxApp extends Application {
         retry.setVisible(false);
         retry.setManaged(false);
         retry.setOnAction(event -> showConnectingScreen(stage));
-        VBox content = new VBox(16, title, indicator, message, retry);
+        VBox content = new VBox(16, brand, Lupo.portrait(Lupo.Expression.THINKING, 112), indicator, message, retry);
+        content.getStyleClass().add("root-shell");
         content.setAlignment(Pos.CENTER);
         Scene scene = new Scene(content, 680, 460);
         Theme.applyCss(scene);

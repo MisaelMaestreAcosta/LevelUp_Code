@@ -139,10 +139,14 @@ public class LoginFrame {
         stage.setMinHeight(420);
 
         BorderPane root = new BorderPane();
-        root.getStyleClass().add("root-shell");
+        root.getStyleClass().addAll("root-shell", "lupo-auth");
 
         VBox showcase = buildLeftShowcasePane();
         VBox form = buildRightAuthPane();
+        HBox compactBrand = Lupo.brand();
+        compactBrand.setVisible(false);
+        compactBrand.setManaged(false);
+        form.getChildren().addFirst(compactBrand);
         StackPane formContainer = new StackPane(form);
         formContainer.setMinWidth(0);
         BorderPane content = new BorderPane();
@@ -163,6 +167,8 @@ public class LoginFrame {
         loginScene = scene;
         scroll.viewportBoundsProperty().addListener((observable, oldBounds, bounds) -> {
             boolean compact = bounds.getWidth() < 900;
+            compactBrand.setVisible(compact);
+            compactBrand.setManaged(compact);
             if (compact && content.getBottom() != showcase) {
                 content.setLeft(null);
                 content.setBottom(showcase);
@@ -197,20 +203,21 @@ public class LoginFrame {
         // Encabezado de marca
         FlowPane brandRow = new FlowPane(10, 8);
         brandRow.setAlignment(Pos.CENTER_LEFT);
-        Label lblBrand = new Label("LevelUp Code");
-        lblBrand.getStyleClass().add("page-title");
-        lblBrand.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 20, Theme.HEX_INDIGO));
-        lblBrand.setGraphicTextGap(8);
         Label badgeUpc = Theme.createPillBadge("UPC · ING. SISTEMAS", "badge-indigo");
-        brandRow.getChildren().addAll(lblBrand, badgeUpc);
+        brandRow.getChildren().addAll(Lupo.brand(), badgeUpc);
 
         VBox heroBox = new VBox(2);
-        Label lblHero1 = new Label("Aprende a programar");
+        Label lblHero1 = new Label("Aprende con Lupo");
         lblHero1.getStyleClass().add("hero-title");
         lblHero1.setWrapText(true);
-        Label lblHero2 = new Label("paso a paso.");
+        Label lblHero2 = new Label("a tu ritmo.");
         lblHero2.getStyleClass().add("hero-accent");
         heroBox.getChildren().addAll(lblHero1, lblHero2);
+        heroBox.setMinWidth(0);
+        HBox.setHgrow(heroBox, Priority.ALWAYS);
+        HBox welcomeHero = new HBox(8, heroBox, Lupo.portrait(Lupo.Expression.WELCOME, 120));
+        welcomeHero.setAlignment(Pos.CENTER_LEFT);
+        welcomeHero.getStyleClass().add("lupo-login-hero");
 
         Label lblDesc = new Label(
                 "Practica con retos y compara cómo se resuelve un mismo problema en Java, Python y C++."
@@ -242,7 +249,7 @@ public class LoginFrame {
         txtCodePreview = new TextArea();
         txtCodePreview.setEditable(false);
         txtCodePreview.setPrefColumnCount(24);
-        txtCodePreview.setPrefRowCount(12);
+        txtCodePreview.setPrefRowCount(8);
         txtCodePreview.setMinWidth(0);
         txtCodePreview.setAccessibleText("Ejemplo de búsqueda binaria. Selecciona un lenguaje para comparar.");
         txtCodePreview.getStyleClass().add("code-editor");
@@ -271,7 +278,7 @@ public class LoginFrame {
 
         footer.getChildren().addAll(lblSecurity, badgeDb);
 
-        leftPane.getChildren().addAll(brandRow, heroBox, lblDesc, codeCard, footer);
+        leftPane.getChildren().addAll(brandRow, welcomeHero, lblDesc, codeCard, footer);
         return leftPane;
     }
 

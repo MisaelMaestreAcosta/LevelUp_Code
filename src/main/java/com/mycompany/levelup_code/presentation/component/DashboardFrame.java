@@ -222,7 +222,7 @@ public class DashboardFrame {
         stage.setTitle("LevelUp Code · Tu espacio de aprendizaje");
         stage.setMinWidth(900);
         stage.setMinHeight(640);
-        Label message = new Label("Preparando tus cursos y tu progreso…");
+        Label message = new Label("Lupo está preparando tus cursos y tu progreso…");
         message.getStyleClass().add("card-title");
         ProgressIndicator indicator = new ProgressIndicator();
         indicator.setMaxSize(36, 36);
@@ -231,7 +231,8 @@ public class DashboardFrame {
         retry.setVisible(false);
         retry.setManaged(false);
         retry.setOnAction(e -> showLoadingScreen());
-        VBox loading = new VBox(18, indicator, message, retry);
+        VBox loading = new VBox(18, Lupo.portrait(Lupo.Expression.THINKING, 112), indicator, message, retry);
+        loading.getStyleClass().add("root-shell");
         loading.setAlignment(Pos.CENTER);
         Scene scene = new Scene(loading, 1260, 780);
         Theme.applyCss(scene);
@@ -474,14 +475,8 @@ public class DashboardFrame {
 
         VBox navColumn = new VBox(8);
 
-        Label lblBrand = new Label("LevelUp Code");
-        lblBrand.getStyleClass().add("page-title");
-        lblBrand.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 20, Theme.HEX_INDIGO));
-        lblBrand.setGraphicTextGap(8);
-
-        Label lblSub = new Label("Aprende. Practica. Avanza.");
-        lblSub.getStyleClass().add("muted-text");
-        VBox.setMargin(lblSub, new Insets(0, 0, 14, 0));
+        HBox brand = Lupo.brand();
+        VBox.setMargin(brand, new Insets(0, 0, 14, 0));
 
         Label lblNavSection = new Label("NAVEGACIÓN PRINCIPAL");
         lblNavSection.getStyleClass().add("section-caption");
@@ -559,7 +554,7 @@ public class DashboardFrame {
         btnQuickLab.setOnAction(e -> switchWorkspaceView("PRACTICE"));
 
         navColumn.getChildren().addAll(
-                lblBrand, lblSub, lblNavSection,
+                brand, lblNavSection,
                 navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
@@ -841,8 +836,13 @@ public class DashboardFrame {
             Lesson lesson = lessonForPrimaryAction();
             if (lesson != null) new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show();
         });
-        VBox resume = new VBox(10, continueSummary, continueButton);
-        resume.getStyleClass().add("resume-card");
+        VBox resumeActions = new VBox(10, continueSummary, continueButton);
+        resumeActions.setMinWidth(0);
+        HBox.setHgrow(resumeActions, Priority.ALWAYS);
+        HBox resumeContent = new HBox(16, Lupo.portrait(Lupo.Expression.WELCOME, 88), resumeActions);
+        resumeContent.setAlignment(Pos.CENTER_LEFT);
+        VBox resume = new VBox(resumeContent);
+        resume.getStyleClass().add("lupo-welcome");
 
         lessonsListBox = new VBox(12);
         ScrollPane scroll = new ScrollPane(lessonsListBox);
@@ -860,6 +860,8 @@ public class DashboardFrame {
     private VBox buildPracticeWorkspaceView() {
         VBox view = new VBox(14);
         view.getChildren().add(Theme.createSectionHeader("Elige tu próximo reto", "Practica a tu ritmo", "badge-green"));
+        view.getChildren().add(new LupoGuide(Lupo.Expression.THINKING, "Practica con Lupo",
+                "Empieza por un reto fácil o filtra los que quieras repasar."));
         practiceSearch = new TextField();
         practiceSearch.setPromptText("Buscar reto, lección o módulo…");
         practiceSearch.setAccessibleText("Buscar retos");
@@ -1484,14 +1486,17 @@ public class DashboardFrame {
 
         Label lblTitle = new Label("Celebra tu progreso");
         lblTitle.getStyleClass().add("page-title");
-        lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.TROPHY, 20, Theme.HEX_AMBER));
+        lblTitle.setGraphic(Lupo.portrait(Lupo.Expression.CELEBRATING, 64));
         lblTitle.setGraphicTextGap(8);
+        lblTitle.setWrapText(true);
+        lblTitle.setMinWidth(0);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         lblAchievementsSummary = new Label();
         lblAchievementsSummary.getStyleClass().add("text-success");
+        lblAchievementsSummary.setWrapText(true);
 
         topHeader.getChildren().addAll(lblTitle, spacer, lblAchievementsSummary);
 
