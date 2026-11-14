@@ -1004,3 +1004,16 @@
     -fx-min-height: 42;
     -fx-padding: 10 12;
 }
+
+.compact-telemetry {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-padding: 10 16;
+}
+.home-greeting {
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}

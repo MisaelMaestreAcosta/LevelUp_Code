@@ -20,6 +20,8 @@ import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.domain.model.EditorPreferences;
 import com.mycompany.levelup_code.data.oracle.OraclePreferenceRepository;
+import com.mycompany.levelup_code.data.oracle.OracleGoalRepository;
+import com.mycompany.levelup_code.domain.model.LearningGoal;
 import com.mycompany.levelup_code.presentation.controller.DashboardController;
 import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
 import java.time.LocalDate;
@@ -97,6 +99,7 @@ public class DashboardFrame {
     private Language cppLangModel;
 
     // Botones de navegación lateral
+    private Button navHomeBtn;
     private Button navCoursesBtn;
     private Button navPracticeBtn;
     private Button navProgressBtn;
@@ -122,6 +125,14 @@ public class DashboardFrame {
 
     // Contenedor central con transición de vistas
     private StackPane workspaceContainer;
+    private VBox homeView;
+    private VBox homeGoal;
+    private Label homeNext;
+    private Button homeContinue;
+    private Label homeChallenge;
+    private Button homePractice;
+    private Challenge recommendedChallenge;
+    private boolean homeGoalLoading;
     private VBox coursesView;
     private VBox comparatorView;
     private VBox achievementsView;
@@ -440,7 +451,8 @@ public class DashboardFrame {
             }) : buildAdminCrudWorkspaceView();
         }
 
-        workspaceContainer.getChildren().setAll(coursesView);
+        homeView = buildHomeWorkspace(topTelemetry);
+        workspaceContainer.getChildren().setAll(homeView);
         syncStatus = new Label(oracleConnected ? "Tu progreso se guarda automáticamente."
                 : "Modo de prueba · Los cambios duran esta sesión.");
         syncStatus.getStyleClass().add("muted-text");
@@ -455,7 +467,7 @@ public class DashboardFrame {
         btnRetryConnection.setManaged(false);
         HBox syncBar = new HBox(10, syncStatus, btnRetryConnection);
         syncBar.setAlignment(Pos.CENTER_LEFT);
-        centerShell.getChildren().addAll(syncBar, topTelemetry, workspaceContainer);
+        centerShell.getChildren().addAll(syncBar, buildCompactTelemetry(), workspaceContainer);
         centerShell.setMinWidth(0);
         ScrollPane centerScroll = new ScrollPane(centerShell);
         centerScroll.setFitToWidth(true);
@@ -465,6 +477,111 @@ public class DashboardFrame {
         Scene scene = new Scene(root, 1260, 780);
         Theme.applyCss(scene);
         stage.setScene(scene);
+        switchWorkspaceView("HOME");
+    }
+
+    private FlowPane buildCompactTelemetry() {
+        FlowPane bar = new FlowPane(18, 8);
+        bar.getStyleClass().add("compact-telemetry");
+        for (Label source : List.of(lblLevelVal, lblExpVal, lblStreakVal, lblLivesVal)) {
+            Label value = WorkspaceUi.label("", "body-text");
+            value.textProperty().bind(source.textProperty());
+            bar.getChildren().add(value);
+        }
+        Label lives = (Label) bar.getChildren().getLast();
+        lives.textProperty().unbind();
+        lives.textProperty().bind(lblLivesVal.textProperty().concat(" vidas"));
+        bar.visibleProperty().bind(homeView.visibleProperty().not());
+        bar.managedProperty().bind(bar.visibleProperty());
+        return bar;
+    }
+
+    private VBox buildHomeWorkspace(TilePane telemetry) {
+        Label greeting = WorkspaceUi.label("Hola, " + currentUser.getUsername(), "home-greeting");
+        homeNext = WorkspaceUi.label("", "card-title");
+        homeContinue = WorkspaceUi.button("Continuar aprendiendo", "btn-primary", Theme.IconKind.PLAY);
+        homeContinue.setOnAction(event -> {
+            Lesson lesson = lessonForPrimaryAction();
+            if (lesson != null) new LessonFrame(currentUser, lesson, this::onLessonStateChanged).show();
+        });
+        VBox welcomeText = new VBox(10, greeting,
+                WorkspaceUi.label("Un paso más en tu aprendizaje", "muted-text"), homeNext, homeContinue);
+        welcomeText.setMinWidth(0);
+        HBox.setHgrow(welcomeText, Priority.ALWAYS);
+        HBox welcome = new HBox(22, Lupo.portrait(Lupo.Expression.WELCOME, 110), welcomeText);
+        welcome.setAlignment(Pos.CENTER_LEFT);
+        welcome.getStyleClass().add("lupo-welcome");
+        homeChallenge = WorkspaceUi.label("", "body-text");
+        homePractice = WorkspaceUi.button("Practicar este reto", "btn-secondary", Theme.IconKind.CODE);
+        homePractice.setOnAction(event -> {
+            if (recommendedChallenge != null) {
+                ChallengeFrame.open(currentUser, recommendedChallenge, this::onChallengeOrLessonCompleted);
+            }
+        });
+        VBox practice = new VBox(12, WorkspaceUi.label("Tu próximo reto", "card-title"), homeChallenge, homePractice);
+        practice.getStyleClass().add("surface-card");
+        homeGoal = new VBox(10);
+        homeGoal.getStyleClass().add("surface-card");
+        TilePane suggestions = new TilePane(16, 16, practice, homeGoal);
+        suggestions.setPrefColumns(2);
+        suggestions.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(220, Math.floor((suggestions.getWidth() - 2 - (suggestions.getWidth() >= 650 ? 16 : 0))
+                        / (suggestions.getWidth() >= 650 ? 2 : 1))), suggestions.widthProperty()));
+        for (VBox card : List.of(practice, homeGoal)) card.setMaxWidth(Double.MAX_VALUE);
+        return new VBox(18, welcome, suggestions, telemetry);
+    }
+
+    private void refreshHome() {
+        if (homeNext == null) return;
+        Lesson lesson = lessonForPrimaryAction();
+        homeNext.setText(lesson == null ? "Elige un curso para comenzar."
+                : (nextLesson() == null ? "Repasa " : "Continúa con ") + lesson.getTitle());
+        homeContinue.setDisable(lesson == null);
+        recommendedChallenge = selectedLessons().stream().flatMap(item -> item.getChallenges().stream())
+                .filter(item -> challengeProgress.get(item.getId()) != ChallengeProgress.SOLVED)
+                .findFirst().orElse(null);
+        homeChallenge.setText(recommendedChallenge == null
+                ? "Has recorrido los retos de este curso. Puedes elegir otro curso o repasar."
+                : recommendedChallenge.getTitle() + " · " + recommendedChallenge.getDifficulty().label());
+        homePractice.setDisable(recommendedChallenge == null);
+    }
+
+    private void loadHomeGoal() {
+        if (homeGoalLoading) return;
+        Button open = WorkspaceUi.button("Ver mis metas", "btn-secondary", Theme.IconKind.TARGET);
+        open.setOnAction(event -> switchWorkspaceView("GOALS"));
+        homeGoal.getChildren().setAll(WorkspaceUi.label("Tu meta", "card-title"),
+                WorkspaceUi.label(oracleConnected ? "Consultando tu meta…" : "Crea una meta al entrar con tu cuenta.", "body-text"), open);
+        if (!oracleConnected) return;
+        homeGoalLoading = true;
+        Task<List<LearningGoal>> task = new Task<>() {
+            @Override protected List<LearningGoal> call() throws Exception {
+                return new OracleGoalRepository().load(currentUser.getId());
+            }
+        };
+        task.setOnSucceeded(event -> {
+            homeGoalLoading = false;
+            if (disposed) return;
+            LearningGoal goal = task.getValue().stream()
+                    .filter(item -> !item.completed() && !item.start().isAfter(LocalDate.now())
+                            && !item.end().isBefore(LocalDate.now()))
+                    .min(java.util.Comparator.comparing(LearningGoal::end)).orElse(null);
+            if (goal == null) {
+                ((Label) homeGoal.getChildren().get(1)).setText("Elige una meta pequeña para tu próxima sesión.");
+            } else {
+                ProgressBar progress = new ProgressBar(goal.fraction());
+                progress.setMaxWidth(Double.MAX_VALUE);
+                String text = goal.type() + " · " + Math.min(goal.current(), goal.target()) + " de " + goal.target();
+                progress.setAccessibleText(text);
+                homeGoal.getChildren().setAll(WorkspaceUi.label("Tu meta", "card-title"),
+                        WorkspaceUi.label(text, "body-text"), progress, open);
+            }
+        });
+        task.setOnFailed(event -> {
+            homeGoalLoading = false;
+            if (!disposed) ((Label) homeGoal.getChildren().get(1)).setText("Tu meta no está disponible. Abre Mis metas para reintentar.");
+        });
+        startTask(task, "home-goal");
     }
 
     private BorderPane buildLeftSidebar() {
@@ -481,6 +598,9 @@ public class DashboardFrame {
         Label lblNavSection = new Label("NAVEGACIÓN PRINCIPAL");
         lblNavSection.getStyleClass().add("section-caption");
 
+        navHomeBtn = WorkspaceUi.button("Inicio", "nav-btn", Theme.IconKind.SPARK);
+        navHomeBtn.setMaxWidth(Double.MAX_VALUE);
+        navHomeBtn.setOnAction(event -> switchWorkspaceView("HOME"));
         navCoursesBtn = new Button("Mis cursos");
         navCoursesBtn.getStyleClass().add("nav-btn-active");
         navCoursesBtn.setGraphic(Theme.createIcon(Theme.IconKind.BOOK, 16, Theme.HEX_WHITE));
@@ -555,7 +675,7 @@ public class DashboardFrame {
 
         navColumn.getChildren().addAll(
                 brand, lblNavSection,
-                navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
+                navHomeBtn, navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
@@ -1168,6 +1288,7 @@ public class DashboardFrame {
             lessonsListBox.getChildren().add(empty);
         }
         Theme.playFadeIn(lessonsListBox);
+        refreshHome();
     }
 
     private List<Lesson> selectedLessons() {
@@ -2049,7 +2170,12 @@ public class DashboardFrame {
         }
 
         Node target = coursesView;
-        if ("COMPARATOR".equals(cardKey)) {
+        homeView.setVisible("HOME".equals(cardKey));
+        if ("HOME".equals(cardKey)) {
+            refreshHome();
+            loadHomeGoal();
+            target = homeView;
+        } else if ("COMPARATOR".equals(cardKey)) {
             target = comparatorView;
         } else if ("PROGRESS".equals(cardKey)) {
             target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected);
@@ -2079,6 +2205,7 @@ public class DashboardFrame {
         workspaceContainer.getChildren().setAll(target);
         Theme.playFadeIn(target);
 
+        updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
         updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
         updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
         updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
@@ -2134,6 +2261,7 @@ public class DashboardFrame {
             refreshCourseProgressBars();
             refreshAchievementsGrid();
             renderPracticeCatalog();
+            if (homeView.isVisible()) loadHomeGoal();
             if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
             if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
         });
