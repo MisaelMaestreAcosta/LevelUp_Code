@@ -4,6 +4,8 @@ import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
+import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
 import com.mycompany.levelup_code.domain.enums.ProgressStatus;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.Challenge;
@@ -16,6 +18,8 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.StreakAchievement;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.domain.model.EditorPreferences;
+import com.mycompany.levelup_code.data.oracle.OraclePreferenceRepository;
 import com.mycompany.levelup_code.presentation.controller.DashboardController;
 import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
 import java.time.LocalDate;
@@ -49,6 +53,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.Slider;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
@@ -93,6 +98,24 @@ public class DashboardFrame {
 
     // Botones de navegación lateral
     private Button navCoursesBtn;
+    private Button navPracticeBtn;
+    private Button navProgressBtn;
+    private Button navNotebookBtn;
+    private Button navGoalsBtn;
+    private Button navLabBtn;
+    private CodingLabPane codingLab;
+    private Label profileName;
+    private ProfilePane profilePane;
+    private NotebookPane notebookPane;
+    private VBox practiceView;
+    private VBox practiceResults;
+    private Label practiceCount;
+    private TextField practiceSearch;
+    private ComboBox<String> practiceLanguage;
+    private ComboBox<String> practiceType;
+    private ComboBox<String> practiceDifficulty;
+    private ComboBox<String> practiceProgress;
+    private Map<Integer, ChallengeProgress> challengeProgress = Map.of();
     private Button navComparatorBtn;
     private Button navAchievementsBtn;
     private Button navAdminBtn;
@@ -130,6 +153,7 @@ public class DashboardFrame {
     private TextArea txtComparePython;
     private TextArea txtCompareCpp;
     private Label lblCompareSummary;
+    private ComparisonExercisePane comparisonExercise;
     private final List<Button> comparatorTopicButtons = new ArrayList<>();
     private int activeComparatorLessonIndex = 0;
 
@@ -144,6 +168,7 @@ public class DashboardFrame {
     private CodeChallenge adminEditingChallenge;
     private TextField txtAdminTitle;
     private TextField txtAdminReward;
+    private ComboBox<ChallengeDifficulty> cmbAdminDifficulty;
     private TextArea txtAdminStatement;
     private TextArea txtAdminTemplate;
     private TextField txtAdminCase1In;
@@ -213,6 +238,12 @@ public class DashboardFrame {
         stage.setScene(scene);
         Task<DashboardState> task = new Task<>() {
             @Override protected DashboardState call() {
+                EditorPreferences preferences = EditorPreferences.DEFAULT;
+                if (oracleConnected) {
+                    try { preferences = new OraclePreferenceRepository().load(currentUser.getId()); }
+                    catch (Exception ex) { LOGGER.log(Level.WARNING, "No se pudieron cargar las preferencias", ex); }
+                }
+                EditorPreferences.remember(currentUser.getId(), preferences);
                 loadDomainDataFromOracleOrSeed();
                 loadEnrollmentsFromOracle();
                 loadAchievementsFromOracleOrSeed();
@@ -222,8 +253,11 @@ public class DashboardFrame {
         task.setOnSucceeded(e -> {
             if (disposed || stage.getScene() != scene) return;
             applyDashboardState(task.getValue());
+            EditorPreferences preferences = EditorPreferences.forUser(currentUser.getId());
+            Theme.setReducedMotion(preferences.reducedMotion());
+            activeLanguageKey = preferences.language();
             initUi();
-            populateLessonsForLanguage("JAVA");
+            populateLessonsForLanguage(activeLanguageKey);
             refreshCourseProgressBars();
             loadComparisonTopic("POLYMORPHISM");
             refreshAchievementsGrid();
@@ -246,7 +280,7 @@ public class DashboardFrame {
 
     private record DashboardState(int solved, Map<LocalDate, Integer> activity,
             Map<Lesson, ProgressStatus> progress, Set<Integer> achievements,
-            boolean livesRecovered) { }
+            boolean livesRecovered, Map<Integer, ChallengeProgress> challengeProgress) { }
 
     private DashboardState fetchDashboardState(int offlineSolved, boolean livesRecovered) {
         int solved = controller.syncTelemetryAndGetSolvedChallenges(offlineSolved);
@@ -264,7 +298,10 @@ public class DashboardFrame {
             }
         }
         return new DashboardState(solved, controller.loadRecentActivityHistory(), progress,
-                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered);
+                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered,
+                oracleConnected && currentUser.getId() > 0
+                        ? AppContext.getInstance().getChallengeService().getProgressByUser(currentUser.getId())
+                        : Map.of());
     }
 
     private boolean recoverExhaustedLivesOnOpen() {
@@ -287,6 +324,7 @@ public class DashboardFrame {
         activityByDate.putAll(state.activity());
         lessonStatuses = state.progress();
         unlockedAchievementIds = state.achievements();
+        challengeProgress = state.challengeProgress();
         lastKnownOfflineExp = currentUser.getTotalExp();
     }
 
@@ -382,10 +420,23 @@ public class DashboardFrame {
         VBox.setVgrow(workspaceContainer, Priority.ALWAYS);
 
         coursesView = buildCoursesWorkspaceView();
+        practiceView = buildPracticeWorkspaceView();
         comparatorView = buildComparatorWorkspaceView();
         achievementsView = buildAchievementsWorkspaceView();
         if (currentUser != null && currentUser.isAdministrator()) {
-            adminView = buildAdminCrudWorkspaceView();
+            adminView = oracleConnected ? new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
+                if (disposed) return;
+                Challenge challenge = saved.challenge();
+                for (Lesson lesson : allLessonsForAdmin) {
+                    lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
+                    if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
+                            && lesson.getId() == challenge.getLessonId()) {
+                        challenge.setLesson(lesson);
+                        lesson.addChallenge(challenge);
+                    }
+                }
+                refreshAllDashboardState();
+            }) : buildAdminCrudWorkspaceView();
         }
 
         workspaceContainer.getChildren().setAll(coursesView);
@@ -418,8 +469,8 @@ public class DashboardFrame {
     private BorderPane buildLeftSidebar() {
         BorderPane sidebar = new BorderPane();
         sidebar.getStyleClass().add("sidebar");
-        sidebar.setPrefWidth(212);
-        sidebar.setMinWidth(212);
+        sidebar.setPrefWidth(240);
+        sidebar.setMinWidth(240);
 
         VBox navColumn = new VBox(8);
 
@@ -440,6 +491,36 @@ public class DashboardFrame {
         navCoursesBtn.setGraphic(Theme.createIcon(Theme.IconKind.BOOK, 16, Theme.HEX_WHITE));
         navCoursesBtn.setGraphicTextGap(10);
         navCoursesBtn.setMaxWidth(Double.MAX_VALUE);
+        navPracticeBtn = new Button("Practicar");
+        navPracticeBtn.getStyleClass().add("nav-btn");
+        navPracticeBtn.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 16, Theme.HEX_GREEN));
+        navPracticeBtn.setGraphicTextGap(10);
+        navPracticeBtn.setMaxWidth(Double.MAX_VALUE);
+        navPracticeBtn.setOnAction(e -> switchWorkspaceView("PRACTICE"));
+        navProgressBtn = new Button("Mi progreso");
+        navProgressBtn.getStyleClass().add("nav-btn");
+        navProgressBtn.setGraphic(Theme.createIcon(Theme.IconKind.CHART, 16, Theme.HEX_INDIGO));
+        navProgressBtn.setGraphicTextGap(10);
+        navProgressBtn.setMaxWidth(Double.MAX_VALUE);
+        navProgressBtn.setOnAction(e -> switchWorkspaceView("PROGRESS"));
+        navNotebookBtn = new Button("Mi cuaderno");
+        navNotebookBtn.getStyleClass().add("nav-btn");
+        navNotebookBtn.setGraphic(Theme.createIcon(Theme.IconKind.NOTE, 16, Theme.HEX_INDIGO));
+        navNotebookBtn.setGraphicTextGap(10);
+        navNotebookBtn.setMaxWidth(Double.MAX_VALUE);
+        navNotebookBtn.setOnAction(e -> switchWorkspaceView("NOTEBOOK"));
+        navGoalsBtn = new Button("Mis metas");
+        navGoalsBtn.getStyleClass().add("nav-btn");
+        navGoalsBtn.setGraphic(Theme.createIcon(Theme.IconKind.TARGET, 16, Theme.HEX_GREEN));
+        navGoalsBtn.setGraphicTextGap(10);
+        navGoalsBtn.setMaxWidth(Double.MAX_VALUE);
+        navGoalsBtn.setOnAction(e -> switchWorkspaceView("GOALS"));
+        navLabBtn = new Button("Laboratorio");
+        navLabBtn.getStyleClass().add("nav-btn");
+        navLabBtn.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 16, Theme.HEX_INDIGO));
+        navLabBtn.setGraphicTextGap(10);
+        navLabBtn.setMaxWidth(Double.MAX_VALUE);
+        navLabBtn.setOnAction(e -> switchWorkspaceView("LAB"));
 
         navComparatorBtn = new Button("Comparar lenguajes");
         navComparatorBtn.getStyleClass().add("nav-btn");
@@ -454,7 +535,7 @@ public class DashboardFrame {
         navAchievementsBtn.setMaxWidth(Double.MAX_VALUE);
 
         if (currentUser != null && currentUser.isAdministrator()) {
-            navAdminBtn = new Button("Crear un reto");
+            navAdminBtn = new Button("Administrar retos");
             navAdminBtn.getStyleClass().add("nav-btn");
             navAdminBtn.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 16, Theme.HEX_GREEN));
             navAdminBtn.setGraphicTextGap(10);
@@ -475,22 +556,21 @@ public class DashboardFrame {
             refreshAchievementsGrid();
             switchWorkspaceView("ACHIEVEMENTS");
         });
-        btnQuickLab.setOnAction(e -> {
-            Lesson l = lessonForPrimaryAction();
-            Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
-                    ? l.getChallenges().get(0) : null;
-            new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
-        });
+        btnQuickLab.setOnAction(e -> switchWorkspaceView("PRACTICE"));
 
         navColumn.getChildren().addAll(
                 lblBrand, lblSub, lblNavSection,
-                navCoursesBtn, navComparatorBtn, navAchievementsBtn
+                navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
         }
         navColumn.getChildren().add(btnQuickLab);
-        sidebar.setTop(navColumn);
+        ScrollPane navigationScroll = new ScrollPane(navColumn);
+        navigationScroll.setFitToWidth(true);
+        navigationScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        navigationScroll.getStyleClass().add("scroll-pane-clean");
+        sidebar.setCenter(navigationScroll);
 
         // Tarjeta inferior de perfil activo y cierre de sesión
         VBox userBox = new VBox(10);
@@ -502,12 +582,17 @@ public class DashboardFrame {
         String roleHex = currentUser.isAdministrator() ? Theme.HEX_GREEN : Theme.HEX_INDIGO;
         VBox userTextCol = new VBox(2);
         Label lblUserName = new Label(currentUser.getUsername());
+        profileName = lblUserName;
         lblUserName.getStyleClass().add("card-title");
 
         String roleLabel = currentUser.isAdministrator() ? "Rol: Administrador" : "Rol: Estudiante";
         Label lblUserRole = new Label(roleLabel);
         lblUserRole.getStyleClass().add(currentUser.isAdministrator() ? "text-success" : "muted-text");
         userTextCol.getChildren().addAll(lblUserName, lblUserRole);
+        Button profile = new Button("Mi perfil");
+        profile.getStyleClass().add("btn-secondary");
+        profile.setOnAction(event -> switchWorkspaceView("PROFILE"));
+        userTextCol.getChildren().add(profile);
 
         profileTop.getChildren().addAll(
                 Theme.createIcon(Theme.IconKind.USER, 22, roleHex),
@@ -770,6 +855,118 @@ public class DashboardFrame {
         lessonsWrapper.getChildren().addAll(listHeader, lblCourseStatus, filters, scroll);
         view.getChildren().addAll(secHeader, resume, langGrid, lessonsWrapper);
         return view;
+    }
+
+    private VBox buildPracticeWorkspaceView() {
+        VBox view = new VBox(14);
+        view.getChildren().add(Theme.createSectionHeader("Elige tu próximo reto", "Practica a tu ritmo", "badge-green"));
+        practiceSearch = new TextField();
+        practiceSearch.setPromptText("Buscar reto, lección o módulo…");
+        practiceSearch.setAccessibleText("Buscar retos");
+        practiceSearch.getStyleClass().add("input-field");
+        practiceSearch.setPrefWidth(260);
+        practiceLanguage = new ComboBox<>();
+        practiceLanguage.getItems().setAll("Todos los lenguajes", "Java", "Python", "C++");
+        practiceLanguage.getSelectionModel().selectFirst();
+        practiceType = new ComboBox<>();
+        practiceType.getItems().setAll("Todos los tipos", "Código", "Quiz", "Predicción de salida", "Depuración", "Ordenar fragmentos");
+        practiceType.getSelectionModel().selectFirst();
+        practiceDifficulty = new ComboBox<>();
+        practiceDifficulty.getItems().setAll("Todas las dificultades", "Fácil", "Medio", "Difícil");
+        practiceDifficulty.getSelectionModel().selectFirst();
+        practiceProgress = new ComboBox<>();
+        practiceProgress.getItems().setAll("Todos los estados", "Pendiente", "Intentado",
+                "Superado", "Repasar errores");
+        practiceProgress.getSelectionModel().selectFirst();
+        for (ComboBox<String> combo : List.of(practiceLanguage, practiceType,
+                practiceDifficulty, practiceProgress)) {
+            combo.getStyleClass().add("combo-box-modern");
+            combo.valueProperty().addListener((obs, previous, selected) -> renderPracticeCatalog());
+        }
+        practiceSearch.textProperty().addListener((obs, previous, value) -> renderPracticeCatalog());
+        Button clear = new Button("Limpiar filtros");
+        clear.getStyleClass().add("btn-secondary");
+        clear.setOnAction(e -> {
+            practiceSearch.clear();
+            practiceLanguage.getSelectionModel().selectFirst();
+            practiceType.getSelectionModel().selectFirst();
+            practiceDifficulty.getSelectionModel().selectFirst();
+            practiceProgress.getSelectionModel().selectFirst();
+        });
+        FlowPane filters = new FlowPane(10, 10, practiceSearch, practiceLanguage,
+                practiceType, practiceDifficulty, practiceProgress, clear);
+        filters.getStyleClass().add("surface-card");
+        practiceCount = new Label();
+        practiceCount.getStyleClass().add("muted-text");
+        practiceResults = new VBox(10);
+        ScrollPane scroll = new ScrollPane(practiceResults);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("scroll-pane-clean");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+        view.getChildren().addAll(filters, practiceCount, scroll);
+        renderPracticeCatalog();
+        return view;
+    }
+
+    private void renderPracticeCatalog() {
+        if (practiceResults == null) return;
+        practiceResults.getChildren().clear();
+        String query = practiceSearch.getText().strip().toLowerCase(Locale.ROOT);
+        int total = 0;
+        int shown = 0;
+        for (Lesson lesson : allLessonsForAdmin) {
+            for (Challenge challenge : lesson.getChallenges()) {
+                total++;
+                String language = lesson.getModule().getLanguage().getName();
+                String type = challenge.getType().label();
+                ChallengeProgress progress = challengeProgress.getOrDefault(challenge.getId(),
+                        ChallengeProgress.PENDING);
+                if (!"Todos los lenguajes".equals(practiceLanguage.getValue())
+                        && !language.equalsIgnoreCase(practiceLanguage.getValue())) continue;
+                if (!"Todos los tipos".equals(practiceType.getValue())
+                        && !type.equals(practiceType.getValue())) continue;
+                if (!"Todas las dificultades".equals(practiceDifficulty.getValue())
+                        && !challenge.getDifficulty().label().equals(practiceDifficulty.getValue())) continue;
+                String progressFilter = practiceProgress.getValue();
+                if (!"Todos los estados".equals(progressFilter)
+                        && !("Repasar errores".equals(progressFilter)
+                                ? progress == ChallengeProgress.ATTEMPTED
+                                : progress.label().equals(progressFilter))) continue;
+                String searchable = challenge.getTitle() + " " + lesson.getTitle() + " "
+                        + lesson.getModule().getTitle();
+                if (!searchable.toLowerCase(Locale.ROOT).contains(query)) continue;
+                shown++;
+                VBox card = new VBox(8);
+                card.getStyleClass().add("surface-card");
+                Label title = new Label(challenge.getTitle());
+                title.getStyleClass().add("card-title");
+                title.setWrapText(true);
+                Label details = new Label(language + " · " + lesson.getTitle() + " · " + type
+                        + " · " + challenge.getDifficulty().label() + " · +"
+                        + challenge.getExpReward() + " XP · " + progress.label());
+                details.setWrapText(true);
+                details.getStyleClass().add("muted-text");
+                Button open = new Button("Abrir reto");
+                open.getStyleClass().add("btn-primary");
+                open.setOnAction(e -> ChallengeFrame.open(currentUser, challenge,
+                        this::onChallengeOrLessonCompleted));
+                card.getChildren().addAll(title, details);
+                if (progress == ChallengeProgress.ATTEMPTED) {
+                    Label review = new Label("Tu último intento no aprobó este reto. Puedes volver a intentarlo.");
+                    review.getStyleClass().add("text-warning");
+                    review.setWrapText(true);
+                    card.getChildren().add(review);
+                }
+                card.getChildren().add(open);
+                practiceResults.getChildren().add(card);
+            }
+        }
+        practiceCount.setText(shown + " de " + total + " retos");
+        if (shown == 0) {
+            Label empty = new Label("No hay retos con estos filtros. Prueba otra búsqueda.");
+            empty.getStyleClass().add("empty-state");
+            practiceResults.getChildren().add(empty);
+        }
     }
 
     private VBox createLanguageCard(
@@ -1086,10 +1283,10 @@ public class DashboardFrame {
         List<Challenge> lessonChallenges = lesson.getChallenges();
         if (lessonChallenges != null && !lessonChallenges.isEmpty()) {
             for (final Challenge ch : lessonChallenges) {
-                boolean isQuiz = ch.getType() == ChallengeType.QUIZ;
-                Button btnChallenge = new Button(isQuiz ? "Reto Quiz" : "Reto Código");
+                boolean isQuiz = ch instanceof com.mycompany.levelup_code.domain.model.QuizChallenge;
+                Button btnChallenge = new Button(ch.getType().label());
                 btnChallenge.getStyleClass().add(isQuiz ? "btn-ghost" : "btn-primary");
-                btnChallenge.setOnAction(e -> new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show());
+                btnChallenge.setOnAction(e -> ChallengeFrame.open(currentUser, ch, this::onChallengeOrLessonCompleted));
                 actions.getChildren().add(btnChallenge);
             }
         }
@@ -1186,11 +1383,19 @@ public class DashboardFrame {
                     : null;
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
-            new ChallengeFrame(currentUser, ch, this::onChallengeOrLessonCompleted).show();
+            ChallengeFrame.open(currentUser, ch, this::onChallengeOrLessonCompleted);
         });
 
         bottomCallout.getChildren().addAll(lblCompareSummary, btnPractice);
-        view.getChildren().addAll(topToolbar, threeColumns, bottomCallout);
+        comparisonExercise = new ComparisonExercisePane(() -> {
+            List<TextArea> editors = List.of(txtCompareJava, txtComparePython, txtCompareCpp);
+            List<String> terms = comparisonExercise.terms();
+            for (int i = 0; i < editors.size(); i++) {
+                int position = editors.get(i).getText().indexOf(terms.get(i));
+                if (position >= 0) editors.get(i).selectRange(position, position + terms.get(i).length());
+            }
+        });
+        view.getChildren().addAll(topToolbar, threeColumns, bottomCallout, comparisonExercise);
         return view;
     }
 
@@ -1217,6 +1422,17 @@ public class DashboardFrame {
         Label badge = Theme.createPillBadge(paradigmTag, badgeClass);
         badge.setWrapText(true);
         head.getChildren().addAll(lblLang, badge);
+        Button copy = new Button("Copiar código");
+        copy.setOnAction(event -> {
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(editor.getText());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        });
+        Slider font = new Slider(12, 24, 14);
+        font.setAccessibleText("Tamaño de letra de " + langName);
+        font.valueProperty().addListener((observable, old, value) ->
+                editor.setStyle("-fx-font-size: " + value.intValue() + "px;"));
+        head.getChildren().add(new FlowPane(8, 8, copy, font));
 
         col.getChildren().addAll(head, editor);
         return col;
@@ -1241,6 +1457,7 @@ public class DashboardFrame {
             lessonIdx = 5;
         }
         this.activeComparatorLessonIndex = lessonIdx;
+        if (comparisonExercise != null) comparisonExercise.setTopic(lessonIdx);
 
         Lesson sampleLesson = (!javaLessons.isEmpty() && lessonIdx < javaLessons.size())
                 ? javaLessons.get(lessonIdx)
@@ -1447,14 +1664,20 @@ public class DashboardFrame {
 
         txtAdminReward = new TextField("90");
         txtAdminReward.getStyleClass().add("input-field");
+        cmbAdminDifficulty = new ComboBox<>();
+        cmbAdminDifficulty.getItems().setAll(ChallengeDifficulty.values());
+        cmbAdminDifficulty.getSelectionModel().select(ChallengeDifficulty.MEDIO);
+        cmbAdminDifficulty.setMaxWidth(Double.MAX_VALUE);
 
         VBox colLesson = wrapLabeledField("LECCIÓN", cmbAdminLesson);
         VBox colTitle = wrapLabeledField("TÍTULO DEL RETO", txtAdminTitle);
         VBox colReward = wrapLabeledField("RECOMPENSA XP", txtAdminReward);
+        VBox colDifficulty = wrapLabeledField("DIFICULTAD", cmbAdminDifficulty);
         HBox.setHgrow(colLesson, Priority.ALWAYS);
         HBox.setHgrow(colTitle, Priority.ALWAYS);
         colReward.setPrefWidth(150);
-        row1.getChildren().addAll(colLesson, colTitle, colReward);
+        colDifficulty.setPrefWidth(130);
+        row1.getChildren().addAll(colLesson, colTitle, colReward, colDifficulty);
 
         HBox row2 = new HBox(14);
         VBox.setVgrow(row2, Priority.ALWAYS);
@@ -1529,6 +1752,7 @@ public class DashboardFrame {
         Runnable invalidate = this::invalidateAdminValidation;
         cmbAdminChallenge.valueProperty().addListener((obs, old, value) -> loadAdminChallengeSelection());
         cmbAdminLesson.valueProperty().addListener((obs, old, value) -> invalidate.run());
+        cmbAdminDifficulty.valueProperty().addListener((obs, old, value) -> invalidate.run());
         for (javafx.beans.value.ObservableValue<String> value : List.of(
                 txtAdminTitle.textProperty(), txtAdminReward.textProperty(),
                 txtAdminStatement.textProperty(), txtAdminTemplate.textProperty(),
@@ -1607,7 +1831,7 @@ public class DashboardFrame {
                             ? "¡Reto publicado! Ya puedes probarlo."
                             : "Reto validado y creado para esta sesión de prueba.");
             populateLessonsForLanguage(activeLanguageKey);
-            new ChallengeFrame(currentUser, saved, this::onChallengeOrLessonCompleted).show();
+            ChallengeFrame.open(currentUser, saved, this::onChallengeOrLessonCompleted);
         });
         save.setOnFailed(e -> {
             LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());
@@ -1722,6 +1946,7 @@ public class DashboardFrame {
                 template,
                 2
         );
+        newCh.setDifficulty(cmbAdminDifficulty.getValue());
         boolean firstHidden = adminEditingChallenge != null
                 && !adminEditingChallenge.getTestCases().isEmpty()
                 && adminEditingChallenge.getTestCases().get(0).isHidden();
@@ -1737,7 +1962,7 @@ public class DashboardFrame {
                         existing.getExpectedOutput(), existing.isHidden()));
             }
         }
-        String fingerprint = targetLesson.getId() + "\n" + title + "\n" + statement + "\n"
+        String fingerprint = targetLesson.getId() + "\n" + cmbAdminDifficulty.getValue() + "\n" + title + "\n" + statement + "\n"
                 + template + "\n" + reward + "\n" + case1In + "\n" + case1Out
                 + "\n" + case2In + "\n" + case2Out;
         return new AdminChallengeDraft(targetLesson, newCh, fingerprint);
@@ -1773,6 +1998,7 @@ public class DashboardFrame {
             cmbAdminLesson.setDisable(false);
             txtAdminTitle.clear();
             txtAdminReward.setText("90");
+            cmbAdminDifficulty.getSelectionModel().select(ChallengeDifficulty.MEDIO);
             txtAdminStatement.clear();
             txtAdminTemplate.clear();
             txtAdminCase1In.clear();
@@ -1798,6 +2024,7 @@ public class DashboardFrame {
         if (lessonIndex >= 0) cmbAdminLesson.getSelectionModel().select(lessonIndex);
         txtAdminTitle.setText(challenge.getTitle());
         txtAdminReward.setText(Integer.toString(challenge.getExpReward()));
+        cmbAdminDifficulty.getSelectionModel().select(challenge.getDifficulty());
         txtAdminStatement.setText(challenge.getDescription());
         txtAdminTemplate.setText(challenge.getInitialTemplate());
         List<TestCase> cases = challenge.getTestCases();
@@ -1819,6 +2046,25 @@ public class DashboardFrame {
         Node target = coursesView;
         if ("COMPARATOR".equals(cardKey)) {
             target = comparatorView;
+        } else if ("PROGRESS".equals(cardKey)) {
+            target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected);
+        } else if ("GOALS".equals(cardKey)) {
+            target = new LearningGoalsPane(currentUser.getId(), oracleConnected);
+        } else if ("LAB".equals(cardKey)) {
+            if (codingLab == null) codingLab = new CodingLabPane(currentUser, oracleConnected);
+            target = codingLab;
+        } else if ("PROFILE".equals(cardKey)) {
+            if (profilePane == null) profilePane = new ProfilePane(currentUser, oracleConnected,
+                    () -> profileName.setText(currentUser.getUsername()));
+            target = profilePane;
+        } else if ("NOTEBOOK".equals(cardKey)) {
+            if (notebookPane==null) notebookPane = new NotebookPane(currentUser, oracleConnected,
+                    allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
+                    this::onChallengeOrLessonCompleted);
+            target = notebookPane;
+        } else if ("PRACTICE".equals(cardKey)) {
+            renderPracticeCatalog();
+            target = practiceView;
         } else if ("ACHIEVEMENTS".equals(cardKey)) {
             target = achievementsView;
         } else if ("ADMIN".equals(cardKey) && adminView != null) {
@@ -1828,23 +2074,23 @@ public class DashboardFrame {
         workspaceContainer.getChildren().setAll(target);
         Theme.playFadeIn(target);
 
-        navCoursesBtn.getStyleClass().setAll("COURSES".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navCoursesBtn.setGraphic(Theme.createIcon(
-                Theme.IconKind.BOOK, 16, "COURSES".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_INDIGO));
-
-        navComparatorBtn.getStyleClass().setAll("COMPARATOR".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navComparatorBtn.setGraphic(Theme.createIcon(
-                Theme.IconKind.CODE, 16, "COMPARATOR".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_CYAN));
-
-        navAchievementsBtn.getStyleClass().setAll("ACHIEVEMENTS".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-        navAchievementsBtn.setGraphic(Theme.createIcon(
-                Theme.IconKind.TROPHY, 16, "ACHIEVEMENTS".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_AMBER));
-
+        updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
+        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
+        updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
+        updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
+        updateNavigation(navLabBtn, "LAB".equals(cardKey), Theme.IconKind.TERMINAL, Theme.HEX_INDIGO);
+        updateNavigation(navComparatorBtn, "COMPARATOR".equals(cardKey), Theme.IconKind.CODE, Theme.HEX_CYAN);
+        updateNavigation(navAchievementsBtn, "ACHIEVEMENTS".equals(cardKey), Theme.IconKind.TROPHY, Theme.HEX_AMBER);
         if (navAdminBtn != null) {
-            navAdminBtn.getStyleClass().setAll("ADMIN".equals(cardKey) ? "nav-btn-active" : "nav-btn");
-            navAdminBtn.setGraphic(Theme.createIcon(
-                    Theme.IconKind.SHIELD, 16, "ADMIN".equals(cardKey) ? Theme.HEX_WHITE : Theme.HEX_GREEN));
+            updateNavigation(navAdminBtn, "ADMIN".equals(cardKey), Theme.IconKind.SHIELD, Theme.HEX_GREEN);
         }
+    }
+
+    private void updateNavigation(Button button, boolean selected, Theme.IconKind icon, String color) {
+        button.getStyleClass().removeAll("nav-btn", "nav-btn-active");
+        button.getStyleClass().add(selected ? "nav-btn-active" : "nav-btn");
+        button.setGraphic(Theme.createIcon(icon, 16, selected ? Theme.HEX_WHITE : color));
     }
 
     private void onLessonStateChanged() {
@@ -1882,6 +2128,7 @@ public class DashboardFrame {
             populateLessonsForLanguage(activeLanguageKey);
             refreshCourseProgressBars();
             refreshAchievementsGrid();
+            renderPracticeCatalog();
             if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
             if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
         });

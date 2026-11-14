@@ -9,6 +9,8 @@ import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
+import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
+import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -359,72 +361,79 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Challenge saveChallenge(Challenge challenge) {
-        String baseSql = "INSERT INTO Retos (id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia) "
-                + "VALUES (?, ?, ?, ?, 'MEDIO', ?, ("
-                + "SELECT NVL(MAX(orden_secuencia), 0) + 1 FROM Retos WHERE id_leccion = ?"
-                + "))";
-
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                try (PreparedStatement stmt = conn.prepareStatement(baseSql, new String[]{"ID_RETO"})) {
-                    stmt.setInt(1, challenge.getLesson().getId());
-                    stmt.setString(2, challenge.getTitle());
-                    stmt.setString(3, challenge.getDescription());
-                    stmt.setString(4, challenge instanceof QuizChallenge ? "QUIZ" : "CODIGO");
-                    stmt.setInt(5, challenge.getExpReward());
-                    stmt.setInt(6, challenge.getLesson().getId());
-                    stmt.executeUpdate();
-                    try (ResultSet rs = stmt.getGeneratedKeys()) {
-                        if (rs.next()) {
-                            challenge.setId(rs.getInt(1));
-                        }
-                    }
-                }
-
-                if (challenge instanceof CodeChallenge) {
-                    CodeChallenge cc = (CodeChallenge) challenge;
-                    String codeSql = "INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms) VALUES (?, ?, ?)";
-                    try (PreparedStatement stmt = conn.prepareStatement(codeSql)) {
-                        stmt.setInt(1, cc.getId());
-                        stmt.setString(2, cc.getInitialTemplate());
-                        stmt.setInt(3, Math.max(1000, cc.getTimeLimitSeconds() * 1000));
-                        stmt.executeUpdate();
-                    }
-
-                    String caseSql = "INSERT INTO Casos_Prueba (id_reto, entrada, salida_esperada, es_oculto) VALUES (?, ?, ?, ?)";
-                    try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
-                        for (TestCase tc : cc.getTestCases()) {
-                            stmt.setInt(1, cc.getId());
-                            stmt.setString(2, tc.getInput());
-                            stmt.setString(3, tc.getExpectedOutput());
-                            stmt.setInt(4, tc.isHidden() ? 1 : 0);
-                            stmt.addBatch();
-                        }
-                        stmt.executeBatch();
-                    }
-                } else if (challenge instanceof QuizChallenge) {
-                    QuizChallenge qc = (QuizChallenge) challenge;
-                    String quizSql = "INSERT INTO Reto_Quiz (id_reto, opciones, respuesta_correcta) VALUES (?, ?, ?)";
-                    try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
-                        stmt.setInt(1, qc.getId());
-                        stmt.setString(2, QuizOptionCodec.encode(qc.getOptions()));
-                        stmt.setString(3, qc.getCorrectAnswer());
-                        stmt.executeUpdate();
-                    }
-                }
-
+                saveChallenge(conn, challenge);
+                OracleChallengeVersionRepository.snapshot(conn, challenge.getId(), null);
                 conn.commit();
                 return challenge;
-            } catch (SQLException ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
-            } finally {
-                conn.setAutoCommit(true);
             }
-        } catch (SQLException e) {
-            throw new BusinessException("Error al guardar reto especializado en Oracle: " + e.getMessage(), e);
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudo crear el reto.", ex);
         }
+    }
+
+    /** Caller owns the transaction, allowing publication metadata to commit together. */
+    public Challenge saveChallenge(Connection conn, Challenge challenge) throws SQLException {
+        String baseSql = "INSERT INTO Retos (id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ("
+                + "SELECT NVL(MAX(orden_secuencia), 0) + 1 FROM Retos WHERE id_leccion = ?"
+                + "))";
+
+        try (PreparedStatement stmt = conn.prepareStatement(baseSql, new String[]{"ID_RETO"})) {
+            stmt.setInt(1, challenge.getLesson().getId());
+            stmt.setString(2, challenge.getTitle());
+            stmt.setString(3, challenge.getDescription());
+            stmt.setString(4, challenge.getType().databaseValue());
+            stmt.setString(5, challenge.getDifficulty().name());
+            stmt.setInt(6, challenge.getExpReward());
+            stmt.setInt(7, challenge.getLesson().getId());
+            stmt.executeUpdate();
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    challenge.setId(rs.getInt(1));
+                }
+            }
+        }
+
+        if (challenge instanceof CodeChallenge) {
+            CodeChallenge cc = (CodeChallenge) challenge;
+            String codeSql = "INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms) VALUES (?, ?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(codeSql)) {
+                stmt.setInt(1, cc.getId());
+                stmt.setString(2, cc.getInitialTemplate());
+                stmt.setInt(3, Math.max(1000, cc.getTimeLimitSeconds() * 1000));
+                stmt.executeUpdate();
+            }
+
+            String caseSql = "INSERT INTO Casos_Prueba (id_reto, entrada, salida_esperada, es_oculto) VALUES (?, NVL(?,EMPTY_CLOB()), NVL(?,EMPTY_CLOB()), ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
+                for (TestCase tc : cc.getTestCases()) {
+                    stmt.setInt(1, cc.getId());
+                    stmt.setClob(2, new java.io.StringReader(tc.getInput() == null ? "" : tc.getInput()));
+                    stmt.setClob(3, new java.io.StringReader(tc.getExpectedOutput() == null ? "" : tc.getExpectedOutput()));
+                    stmt.setInt(4, tc.isHidden() ? 1 : 0);
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        } else if (challenge instanceof QuizChallenge) {
+            QuizChallenge qc = (QuizChallenge) challenge;
+            String quizSql = "INSERT INTO Reto_Quiz (id_reto, opciones, respuesta_correcta) VALUES (?, ?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
+                stmt.setInt(1, qc.getId());
+                stmt.setString(2, QuizOptionCodec.encode(qc.getOptions()));
+                stmt.setString(3, qc.getCorrectAnswer());
+                stmt.executeUpdate();
+            }
+        }
+        saveActivityDetails(conn, challenge, false);
+
+        return challenge;
     }
 
     @Override
@@ -479,72 +488,104 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Challenge updateChallenge(Challenge challenge) {
-        String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
-                + "exp_recompensa = ? WHERE id_reto = ?";
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                try (PreparedStatement stmt = conn.prepareStatement(baseSql)) {
-                    stmt.setString(1, challenge.getTitle());
-                    stmt.setString(2, challenge.getDescription());
-                    stmt.setInt(3, challenge.getExpReward());
-                    stmt.setInt(4, challenge.getId());
-                    if (stmt.executeUpdate() != 1) {
-                        throw new SQLException("El reto ya no existe.");
-                    }
+                updateChallenge(conn, challenge);
+                try (PreparedStatement statement = conn.prepareStatement(
+                        "UPDATE Retos SET revision=revision+1,fecha_actualizacion=SYSTIMESTAMP WHERE id_reto=?")) {
+                    statement.setInt(1, challenge.getId());
+                    statement.executeUpdate();
                 }
-
-                if (challenge instanceof CodeChallenge code) {
-                    String codeSql = "UPDATE Reto_Codigo SET codigo_inicial = ?, limite_tiempo_ms = ? "
-                            + "WHERE id_reto = ?";
-                    try (PreparedStatement stmt = conn.prepareStatement(codeSql)) {
-                        stmt.setString(1, code.getInitialTemplate());
-                        stmt.setInt(2, Math.max(1000, code.getTimeLimitSeconds() * 1000));
-                        stmt.setInt(3, code.getId());
-                        if (stmt.executeUpdate() != 1) {
-                            throw new SQLException("No se encontró la configuración de código del reto.");
-                        }
-                    }
-                    try (PreparedStatement stmt = conn.prepareStatement(
-                            "DELETE FROM Casos_Prueba WHERE id_reto = ?")) {
-                        stmt.setInt(1, code.getId());
-                        stmt.executeUpdate();
-                    }
-                    String caseSql = "INSERT INTO Casos_Prueba "
-                            + "(id_reto, entrada, salida_esperada, es_oculto) VALUES (?, ?, ?, ?)";
-                    try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
-                        for (TestCase testCase : code.getTestCases()) {
-                            stmt.setInt(1, code.getId());
-                            stmt.setString(2, testCase.getInput());
-                            stmt.setString(3, testCase.getExpectedOutput());
-                            stmt.setInt(4, testCase.isHidden() ? 1 : 0);
-                            stmt.addBatch();
-                        }
-                        stmt.executeBatch();
-                    }
-                } else if (challenge instanceof QuizChallenge quiz) {
-                    String quizSql = "UPDATE Reto_Quiz SET opciones = ?, respuesta_correcta = ? "
-                            + "WHERE id_reto = ?";
-                    try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
-                        stmt.setString(1, QuizOptionCodec.encode(quiz.getOptions()));
-                        stmt.setString(2, quiz.getCorrectAnswer());
-                        stmt.setInt(3, quiz.getId());
-                        if (stmt.executeUpdate() != 1) {
-                            throw new SQLException("No se encontró la configuración del quiz.");
-                        }
-                    }
-                }
-
+                OracleChallengeVersionRepository.snapshot(conn, challenge.getId(), null);
                 conn.commit();
                 return challenge;
-            } catch (SQLException ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
-            } finally {
-                conn.setAutoCommit(true);
             }
-        } catch (SQLException e) {
-            throw new BusinessException("Error al actualizar reto en Oracle: " + e.getMessage(), e);
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudo actualizar el reto.", ex);
+        }
+    }
+
+    public Challenge updateChallenge(Connection conn, Challenge challenge) throws SQLException {
+        String baseSql = "UPDATE Retos SET titulo_reto = ?, enunciado = ?, "
+                + "exp_recompensa = ?, dificultad = ? WHERE id_reto = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(baseSql)) {
+            stmt.setString(1, challenge.getTitle());
+            stmt.setString(2, challenge.getDescription());
+            stmt.setInt(3, challenge.getExpReward());
+            stmt.setString(4, challenge.getDifficulty().name());
+            stmt.setInt(5, challenge.getId());
+            if (stmt.executeUpdate() != 1) {
+                throw new SQLException("El reto ya no existe.");
+            }
+        }
+
+        if (challenge instanceof CodeChallenge code) {
+            String codeSql = "UPDATE Reto_Codigo SET codigo_inicial = ?, limite_tiempo_ms = ? "
+                    + "WHERE id_reto = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(codeSql)) {
+                stmt.setString(1, code.getInitialTemplate());
+                stmt.setInt(2, Math.max(1000, code.getTimeLimitSeconds() * 1000));
+                stmt.setInt(3, code.getId());
+                if (stmt.executeUpdate() != 1) {
+                    throw new SQLException("No se encontró la configuración de código del reto.");
+                }
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "DELETE FROM Casos_Prueba WHERE id_reto = ?")) {
+                stmt.setInt(1, code.getId());
+                stmt.executeUpdate();
+            }
+            String caseSql = "INSERT INTO Casos_Prueba "
+                    + "(id_reto, entrada, salida_esperada, es_oculto) VALUES (?, NVL(?,EMPTY_CLOB()), NVL(?,EMPTY_CLOB()), ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
+                for (TestCase testCase : code.getTestCases()) {
+                    stmt.setInt(1, code.getId());
+                    stmt.setClob(2, new java.io.StringReader(testCase.getInput() == null ? "" : testCase.getInput()));
+                    stmt.setClob(3, new java.io.StringReader(testCase.getExpectedOutput() == null ? "" : testCase.getExpectedOutput()));
+                    stmt.setInt(4, testCase.isHidden() ? 1 : 0);
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+        } else if (challenge instanceof QuizChallenge quiz) {
+            String quizSql = "UPDATE Reto_Quiz SET opciones = ?, respuesta_correcta = ? "
+                    + "WHERE id_reto = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(quizSql)) {
+                stmt.setString(1, QuizOptionCodec.encode(quiz.getOptions()));
+                stmt.setString(2, quiz.getCorrectAnswer());
+                stmt.setInt(3, quiz.getId());
+                if (stmt.executeUpdate() != 1) {
+                    throw new SQLException("No se encontró la configuración del quiz.");
+                }
+            }
+        }
+
+        saveActivityDetails(conn, challenge, true);
+        return challenge;
+    }
+
+    private void saveActivityDetails(Connection connection, Challenge challenge, boolean updating) throws SQLException {
+        if (challenge instanceof OutputPredictionChallenge prediction) {
+            String sql = updating ? "UPDATE Reto_Prediccion SET codigo_ejemplo=? WHERE id_reto=?"
+                    : "INSERT INTO Reto_Prediccion(codigo_ejemplo,id_reto) VALUES(?,?)";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, prediction.getCodeSnippet());
+                statement.setInt(2, prediction.getId());
+                statement.executeUpdate();
+            }
+        } else if (challenge instanceof CodeOrderingChallenge ordering) {
+            String sql = updating ? "UPDATE Reto_Ordenamiento SET fragmentos=?,orden_correcto=? WHERE id_reto=?"
+                    : "INSERT INTO Reto_Ordenamiento(fragmentos,orden_correcto,id_reto) VALUES(?,?,?)";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, QuizOptionCodec.encode(ordering.getFragments()));
+                statement.setString(2, CodeOrderingChallenge.formatOrder(ordering.getCorrectOrder()));
+                statement.setInt(3, ordering.getId());
+                statement.executeUpdate();
+            }
         }
     }
 }

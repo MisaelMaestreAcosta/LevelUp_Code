@@ -123,6 +123,29 @@ public class UserService {
         }
     }
 
+    public void updateProfile(int userId, String firstName, String lastName) {
+        if (userId <= 0 || firstName == null || lastName == null || firstName.isBlank()
+                || lastName.isBlank() || firstName.strip().length() > 50 || lastName.strip().length() > 50) {
+            throw new IllegalArgumentException("Escribe nombre y apellido de hasta 50 caracteres cada uno.");
+        }
+        userRepository.updateProfile(userId, firstName.strip(), lastName.strip());
+    }
+
+    public void changePassword(int userId, String currentPassword, String newPassword) {
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres.");
+        }
+        User fresh = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("La cuenta ya no está disponible."));
+        String previousHash = fresh.getPasswordHash();
+        if (!PasswordHasher.verify(currentPassword, previousHash)) {
+            throw new IllegalArgumentException("La contraseña actual no coincide.");
+        }
+        if (!userRepository.compareAndSetPassword(userId, previousHash, PasswordHasher.hash(newPassword))) {
+            throw new IllegalStateException("La contraseña cambió durante la operación. Vuelve a verificarla.");
+        }
+    }
+
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }

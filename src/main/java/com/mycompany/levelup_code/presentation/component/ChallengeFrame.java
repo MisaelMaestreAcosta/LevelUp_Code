@@ -15,6 +15,9 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.domain.model.EditorPreferences;
+import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
+import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -149,15 +152,36 @@ public class ChallengeFrame extends Stage {
         this(null, createDefaultCodeChallenge(), null);
     }
 
+    public static void open(User user, Challenge challenge, Runnable callback) {
+        open(user, challenge, callback, false);
+    }
+
+    public static void open(User user, Challenge challenge, Runnable callback, boolean preview) {
+        if (challenge instanceof CodeOrderingChallenge ordering) {
+            new CodeOrderingFrame(user, ordering, callback, preview).show();
+        } else {
+            new ChallengeFrame(user, challenge, callback, preview).show();
+        }
+    }
+
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback) {
+        this(user, challenge, onSolvedCallback, false);
+    }
+
+    private final boolean preview;
+
+    public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview) {
+        this.preview = preview;
         this.currentUser = user;
+        editorFontSize = EditorPreferences.forUser(user == null ? 0 : user.getId()).fontSize();
         draftSaveDelay.setOnFinished(event -> rememberDraft());
         this.onSolvedCallback = onSolvedCallback;
         this.availableChallenges = new ArrayList<>();
         if (challenge != null) {
             if (challenge.getLesson() != null && challenge.getLesson().getChallenges() != null
                     && !challenge.getLesson().getChallenges().isEmpty()) {
-                this.availableChallenges.addAll(challenge.getLesson().getChallenges());
+                this.availableChallenges.addAll(challenge.getLesson().getChallenges().stream()
+                        .filter(value -> !(value instanceof CodeOrderingChallenge)).toList());
             } else {
                 this.availableChallenges.add(challenge);
                 this.availableChallenges.add(createDefaultQuizChallenge());
@@ -353,7 +377,7 @@ public class ChallengeFrame extends Stage {
 
             for (int i = 0; i < availableChallenges.size(); i++) {
                 final Challenge ch = availableChallenges.get(i);
-                String btnLabel = (ch.getType() == ChallengeType.QUIZ ? "Quiz #" : "Código #") + (i + 1);
+                String btnLabel = ch.getType().label() + " #" + (i + 1);
                 Button btnCh = new Button(btnLabel);
                 btnCh.getStyleClass().add("btn-secondary");
                 btnCh.setOnAction(e -> loadChallengeIntoView(ch));
@@ -424,7 +448,7 @@ public class ChallengeFrame extends Stage {
                         : ATTEMPT_DATE.format(attempt.getAttemptDate());
                 Label summary = new Label(date + " · " + attemptResultLabel(attempt.getResult())
                         + " · +" + attempt.getEarnedExperience() + " XP"
-                        + " · " + attempt.getExecutionTimeMs() + " ms");
+                        + " · " + attempt.getExecutionTimeMs() + " ms · versión " + attempt.getChallengeRevision());
                 summary.setWrapText(true);
                 summary.getStyleClass().add(attempt.isCorrect() ? "text-success" : "text-warning");
                 TextArea submission = new TextArea(attempt.getSubmittedContent() == null
@@ -434,6 +458,13 @@ public class ChallengeFrame extends Stage {
                 submission.setPrefRowCount(4);
                 submission.setAccessibleText("Respuesta enviada el " + date);
                 card.getChildren().addAll(summary, submission);
+                if (attempt.getChallengeStatement() != null) {
+                    Label statement = new Label(attempt.getChallengeStatement());
+                    statement.setWrapText(true);
+                    TitledPane original = new TitledPane("Enunciado de esta versión", statement);
+                    original.setExpanded(false);
+                    card.getChildren().add(original);
+                }
                 entries.getChildren().add(card);
             }
         });
@@ -541,7 +572,8 @@ public class ChallengeFrame extends Stage {
 
         txtEditor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.TAB && !event.isControlDown() && !event.isAltDown()) {
-                txtEditor.insertText(txtEditor.getCaretPosition(), "    ");
+                int spaces = EditorPreferences.forUser(currentUser == null ? 0 : currentUser.getId()).indentSpaces();
+                txtEditor.replaceSelection(" ".repeat(spaces));
                 event.consume();
             }
         });
@@ -561,7 +593,7 @@ public class ChallengeFrame extends Stage {
         editorFontSize = Math.max(11, Math.min(24, editorFontSize + delta));
         txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         txtEditor.setAccessibleHelp("Editor a " + editorFontSize
-                + " píxeles. Tab inserta cuatro espacios; Ctrl+Enter envía.");
+                + " píxeles. Tab inserta la indentación configurada; Ctrl+Enter envía.");
     }
 
     private void updateLineGutter(String text) {
@@ -806,6 +838,9 @@ public class ChallengeFrame extends Stage {
 
         lblChallengeTitle.setText(challenge.getTitle());
         lblStatement.setText(challenge.getDescription());
+        if (challenge instanceof OutputPredictionChallenge prediction) {
+            lblStatement.setText(challenge.getDescription() + "\n\n" + prediction.getCodeSnippet());
+        }
         badgeReward.setText("+" + challenge.getExpReward() + " XP");
         updateDifficultyBadge(challenge.getExpReward());
 
@@ -816,7 +851,7 @@ public class ChallengeFrame extends Stage {
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge codeChallenge = (CodeChallenge) challenge;
-            badgeType.setText("RETO DE CÓDIGO · LÍMITE " + codeChallenge.getTimeLimitSeconds() + "S");
+            badgeType.setText(challenge.getType().label().toUpperCase(Locale.ROOT) + " · LÍMITE " + codeChallenge.getTimeLimitSeconds() + "S");
             badgeType.getStyleClass().setAll("badge-indigo");
 
             String langName = resolveChallengeLanguageName(codeChallenge);
@@ -849,7 +884,7 @@ public class ChallengeFrame extends Stage {
             }
         } else if (challenge instanceof QuizChallenge) {
             QuizChallenge quizChallenge = (QuizChallenge) challenge;
-            badgeType.setText("QUIZ DE SELECCIÓN");
+            badgeType.setText(challenge.getType().label().toUpperCase(Locale.ROOT));
             badgeType.getStyleClass().setAll("badge-violet");
             badgeExecutionMode.setText("VALIDACIÓN EXACTA");
             badgeExecutionMode.getStyleClass().setAll("badge-cyan");
@@ -950,7 +985,7 @@ public class ChallengeFrame extends Stage {
     }
 
     private boolean canPersistDraft(Challenge challenge) {
-        return currentUser != null && currentUser.getEmail() != null
+        return !preview && currentUser != null && currentUser.getEmail() != null
                 && !currentUser.getEmail().isBlank() && challenge != null && challenge.getId() > 0;
     }
 
@@ -990,6 +1025,7 @@ public class ChallengeFrame extends Stage {
                 appendFingerprintField(content, option);
             }
             appendFingerprintField(content, quiz.getCorrectAnswer());
+            if (quiz instanceof OutputPredictionChallenge prediction) appendFingerprintField(content, prediction.getCodeSnippet());
         }
         return hashPayload(content.toString());
     }
@@ -1553,7 +1589,7 @@ public class ChallengeFrame extends Stage {
                         ChallengeService.SubmissionResult saved = AppContext.getInstance()
                                 .getChallengeService().submitAttemptDetailed(
                                         submission.user().toUser(), submission.challengeId(),
-                                        submission.payload(), submission.requestId());
+                                        submission.payload(), submission.requestId(), submission.revision());
                         SimulatedCodeRunner.ExecutionSummary detail = saved.evaluation().getExecutionSummary();
                         return new EvaluationOutcome(detail, saved.attempt().isCorrect(),
                                 PersistenceOutcome.saved(saved.attempt()));
@@ -1564,7 +1600,7 @@ public class ChallengeFrame extends Stage {
                         boolean correct = local != null ? local.isAllPassed()
                                 : submission.quizIndex() == submission.correctQuizIndex()
                                 || (submission.correctAnswer() != null
-                                && submission.correctAnswer().trim().equalsIgnoreCase(submission.payload().trim()));
+                                && submission.correctAnswer().trim().equals(submission.payload().trim()));
                         return new EvaluationOutcome(local, correct,
                                 PersistenceOutcome.failed(exceptionDetails(ex)));
                     }
@@ -1574,7 +1610,7 @@ public class ChallengeFrame extends Stage {
                 boolean correct = summary != null ? summary.isAllPassed()
                         : submission.quizIndex() == submission.correctQuizIndex()
                         || (submission.correctAnswer() != null
-                        && submission.correctAnswer().trim().equalsIgnoreCase(submission.payload().trim()));
+                        && submission.correctAnswer().trim().equals(submission.payload().trim()));
                 updateMessage("Preparando resultado…");
                 return new EvaluationOutcome(summary, correct, PersistenceOutcome.localOnly());
             }
@@ -1673,11 +1709,11 @@ public class ChallengeFrame extends Stage {
             // before receiving Oracle's response, the same key is reused later.
             saveUncertain = true;
         }
-        return new Submission(activeChallenge.getId(), payload, code, selectedQuizIndex,
+        return new Submission(activeChallenge.getId(), activeChallenge.getRevision(), payload, code, selectedQuizIndex,
                 correctQuizIndex, correctAnswer, user, saveToOracle, practiceOnly, requestId);
     }
 
-    private record Submission(int challengeId, String payload, CodeSnapshot code, int quizIndex,
+    private record Submission(int challengeId, int revision, String payload, CodeSnapshot code, int quizIndex,
             int correctQuizIndex, String correctAnswer, UserSnapshot user,
             boolean saveToOracle, boolean practiceOnly, String requestId) { }
 
@@ -1693,7 +1729,7 @@ public class ChallengeFrame extends Stage {
 
     private boolean isPracticeOnly() {
         AppContext context = AppContext.getInstance();
-        return (currentUser != null && currentUser.getLives() <= 0)
+        return preview || (currentUser != null && currentUser.getLives() <= 0)
                 || (context.isOracleConnected() && !context.isOracleAvailable())
                 || isSimulatedCodeEvaluation();
     }
@@ -1705,6 +1741,7 @@ public class ChallengeFrame extends Stage {
     }
 
     private String practiceModeMessage() {
+        if (preview) return "Vista previa del estudiante. Prueba la plantilla y las opciones del reto.";
         if (isSimulatedCodeEvaluation()) {
             return "Práctica simulada: puedes probar tu idea, pero este resultado no modificará XP ni vidas hasta contar con ejecución real para este lenguaje.";
         }
@@ -1715,6 +1752,7 @@ public class ChallengeFrame extends Stage {
     }
 
     private String practiceSuccessMessage() {
+        if (preview) return "Vista previa completada.";
         if (isSimulatedCodeEvaluation()) {
             return "¡Práctica simulada completada! El resultado no modificó XP ni vidas.";
         }

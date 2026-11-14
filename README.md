@@ -1,5 +1,56 @@
 # LevelUp Code
 
+## Actualizaciones de aprendizaje
+
+La rama `feature/learning-experience` añade el centro de práctica y estadísticas reales por lenguaje.
+Para activar el cuaderno y los favoritos, ejecuta **una sola vez**, conectado como propietario
+del esquema, `database/05_student_notebook.sql` después de crear las tablas base de `01_schema.sql`.
+Es necesario tanto para instalaciones nuevas como para bases existentes; no borra datos previos.
+Las notas y favoritos son privados por usuario y se guardan en Oracle. En modo demo se muestran
+como funciones que requieren una cuenta conectada. Las estadísticas no utilizan actividad demo.
+
+Ejecuta también **una sola vez** `database/06_learning_goals.sql` para activar las metas personales.
+Permite objetivos diarios o de siete días de retos superados, lecturas, XP o días con XP.
+Su avance se consulta desde los registros existentes y no entrega recompensas adicionales;
+no requiere nuevos procedimientos PL/SQL. Instala ambos scripts con la aplicación cerrada.
+
+El laboratorio guarda manualmente un experimento por cuenta, modo y lenguaje en
+`.levelup-code/laboratory` dentro del directorio del usuario. Java utiliza el motor real
+existente y Python/C++ continúan mostrando resultados simulados. El comparador incorpora
+actividades de predicción con explicaciones, copia de código y controles de letra.
+
+Ejecuta **una sola vez** `database/07_user_preferences.sql` después del esquema base para guardar
+lenguaje inicial, tamaño del editor, indentación y reducción de animaciones. Las preferencias
+se recuperan al abrir el panel. Si la migración todavía no está instalada, el panel utiliza
+los valores predeterminados. El perfil permite editar nombre y apellido y cambiar la contraseña
+verificando la actual. El cambio de contraseña usa una actualización condicional para detectar
+modificaciones concurrentes. Las preferencias demo solo duran la sesión.
+
+Para la administración avanzada, aplica **una vez y en orden** `database/08_content_publication.sql`
+y `database/09_content_versions.sql` antes de ejecutar esta versión de la aplicación, tanto en
+bases nuevas como existentes. Los retos anteriores quedan publicados y se crea una copia inicial
+de su contenido actual. Las versiones de ediciones anteriores a esta migración no se pueden reconstruir.
+El panel permite guardar borradores, validar una solución de referencia privada, publicar, archivar,
+previsualizar, editar quizzes y administrar casos de prueba visibles u ocultos. Cada guardado crea
+una revisión y el historial de intentos conserva el enunciado de la versión evaluada. La XP se sigue
+otorgando una vez por reto, aunque haya varias versiones. Los envíos comprueban la revisión antes
+de evaluar y antes de confirmar la transacción. El trigger `TRG_INTENTO_VERSION` vincula los intentos
+creados por el paquete PL/SQL existente con la versión vigente.
+
+Después aplica **una vez** `database/10_challenge_types.sql` para habilitar predicción de salida,
+depuración y ordenamiento de fragmentos. La predicción amplía los quizzes con un fragmento de código,
+la depuración reutiliza plantillas y casos de `Reto_Codigo`, y el ordenamiento guarda fragmentos y
+su permutación correcta. El catálogo permite filtrar por estos tipos y el administrador puede
+crearlos, previsualizarlos y publicarlos. El modo demo incluye un ejemplo de cada tipo.
+Los ejercicios de ordenamiento usan Subir/Bajar, conservan borrador y registran resultados con
+el mismo servicio de XP e intentos. La vista previa evalúa de forma local.
+
+Antes de utilizar los envíos, recompila `database/03_plsql_gamificacion.sql` si la base aún usa
+la versión del paquete con `COMMIT` internos. Las pruebas incluyen una integración con rollback
+para las entradas/salidas vacías y otra para comprobar snapshots e impedir envíos a retos archivados.
+La segunda se omite hasta instalar las migraciones 08–10. Los scripts de este bloque se entregan
+para su instalación y no se ejecutan automáticamente al arrancar la aplicación.
+
 Plataforma interactiva para el aprendizaje comparativo y resolución de retos algorítmicos en Java, Python y C++.  
 **Universidad Popular del Cesar** — Ingeniería de Sistemas  
 **Asignaturas:** Programación III (Prof. Alfredo Bautista) · Bases de Datos (Prof. Amilkar Sierra)  
@@ -30,8 +81,16 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/02_seed.sql`](database/02_seed.sql) (catálogo limpio de despliegue: roles, lenguajes, módulos, lecciones, retos y logros)
    - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
+   - [`database/05_student_notebook.sql`](database/05_student_notebook.sql) (crea notas y retos favoritos por usuario)
+   - [`database/06_learning_goals.sql`](database/06_learning_goals.sql) (crea metas personales)
+   - [`database/07_user_preferences.sql`](database/07_user_preferences.sql) (crea preferencias del editor)
+   - [`database/08_content_publication.sql`](database/08_content_publication.sql) (añade estados de publicación y soluciones de referencia)
+   - [`database/09_content_versions.sql`](database/09_content_versions.sql) (conserva versiones del contenido y vincula intentos)
+   - [`database/10_challenge_types.sql`](database/10_challenge_types.sql) (añade predicción, depuración y ordenamiento)
 
-   Si ya tienes una base de datos creada, vuelve a ejecutar solo `database/03_plsql_gamificacion.sql` para activar la recuperación diaria de vidas, el bloqueo de intentos sin vidas y los reintentos idempotentes. No necesitas borrar ni volver a cargar los datos.
+   En una base existente, aplica una vez los scripts 05–10 que falten y recompila
+   `database/03_plsql_gamificacion.sql` para actualizar la gamificación y los reintentos idempotentes.
+   Comprueba las tablas instaladas antes de ejecutar cada script de creación.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:
@@ -65,6 +124,11 @@ El repositorio incluye **Maven Wrapper** (`mvnw` / `mvnw.cmd`), por lo que no re
 ./mvnw clean test
 ./mvnw javafx:run
 ```
+
+`OracleLearningStorageIntegrationTest` comprueba notas, favoritos, metas y preferencias
+mediante los repositorios reales. Necesita Oracle configurado y las migraciones instaladas.
+Crea cuentas temporales y elimina sus datos al finalizar cada prueba. Verifica también
+que una cuenta solo pueda consultar y modificar sus propios registros.
 
 ---
 

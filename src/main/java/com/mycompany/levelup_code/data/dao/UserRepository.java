@@ -20,6 +20,14 @@ public interface UserRepository {
     /** Actualiza un usuario existente. */
     User update(User user);
 
+    default void updateProfile(int userId, String firstName, String lastName) {
+        throw new UnsupportedOperationException("La edición del perfil requiere una cuenta conectada.");
+    }
+
+    default boolean compareAndSetPassword(int userId, String expectedHash, String replacementHash) {
+        throw new UnsupportedOperationException("El cambio de contraseña requiere una cuenta conectada.");
+    }
+
     /** Restores exhausted lives if the database's daily rule allows it. */
     default int recoverLivesIfEligible(int userId) {
         throw new UnsupportedOperationException("La recuperación de vidas no está disponible en este repositorio.");

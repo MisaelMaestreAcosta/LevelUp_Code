@@ -492,10 +492,10 @@ public class LessonFrame extends Stage {
                 if (challenge == null) {
                     continue;
                 }
-                boolean quiz = challenge.getType() == ChallengeType.QUIZ;
+                boolean quiz = challenge instanceof com.mycompany.levelup_code.domain.model.QuizChallenge;
                 String title = challenge.getTitle() == null || challenge.getTitle().isBlank()
                         ? quiz ? "Preguntas de repaso" : "Ejercicio de código" : challenge.getTitle();
-                Button launch = new Button(++index + ". " + (quiz ? "Quiz: " : "Código: ") + title
+                Button launch = new Button(++index + ". " + challenge.getType().label() + ": " + title
                         + " (+" + challenge.getExpReward() + " XP)");
                 launch.setMnemonicParsing(false);
                 launch.setWrapText(true);
@@ -503,7 +503,7 @@ public class LessonFrame extends Stage {
                 launch.setMinHeight(Region.USE_PREF_SIZE);
                 launch.getStyleClass().add("btn-secondary");
                 launch.setAccessibleText("Abrir " + launch.getText());
-                launch.setOnAction(event -> new ChallengeFrame(currentUser, challenge, onProgressCallback).show());
+                launch.setOnAction(event -> ChallengeFrame.open(currentUser, challenge, onProgressCallback));
                 challengeList.getChildren().add(launch);
             }
             ScrollPane challengesScroll = new ScrollPane(challengeList);

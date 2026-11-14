@@ -78,6 +78,14 @@ public final class InMemoryTestRepositories {
         }
 
         @Override
+        public boolean compareAndSetPassword(int userId, String expectedHash, String replacementHash) {
+            User user = byId.get(userId);
+            if (user == null || !java.util.Objects.equals(user.getPasswordHash(), expectedHash)) return false;
+            user.setPasswordHash(replacementHash);
+            return true;
+        }
+
+        @Override
         public int recoverLivesIfEligible(int userId) {
             User user = byId.get(userId);
             if (user == null) throw new IllegalArgumentException("Usuario desconocido");
@@ -210,6 +218,13 @@ public final class InMemoryTestRepositories {
         private final List<Attempt> attempts = new ArrayList<>();
         private final boolean transactionalGamification;
         private int seq = 1;
+
+        @Override
+        public Optional<Attempt> findByRequestId(int userId, int challengeId, String requestId) {
+            return attempts.stream().filter(attempt -> attempt.getUserId() == userId
+                    && attempt.getChallenge().getId() == challengeId
+                    && java.util.Objects.equals(attempt.getRequestId(), requestId)).findFirst();
+        }
 
         public FakeAttemptRepository() {
             this(false);

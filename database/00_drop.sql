@@ -1,12 +1,21 @@
 -- =============================================================================
 -- LEVELUP CODE - SCRIPT DE LIMPIEZA DE ESQUEMA (ORACLE SQL)
--- Elimina las 18 tablas en orden inverso de dependencias referenciales.
+-- Elimina las tablas base y las extensiones de aprendizaje. Esta operación borra sus datos.
 -- Ejecutar conectado con la conexión: level_up_admin
 -- =============================================================================
 
 BEGIN
     FOR t IN (
         SELECT table_name FROM user_tables WHERE table_name IN (
+            'VERSION_CASO_PRUEBA',
+            'VERSION_RETO',
+            'SOLUCION_REFERENCIA',
+            'RETO_PREDICCION',
+            'RETO_ORDENAMIENTO',
+            'PREFERENCIA_USUARIO',
+            'META_USUARIO',
+            'NOTA_ESTUDIO',
+            'RETO_FAVORITO',
             'USUARIO_LOGRO',
             'LOGRO_RETOS',
             'LOGRO_EXP',

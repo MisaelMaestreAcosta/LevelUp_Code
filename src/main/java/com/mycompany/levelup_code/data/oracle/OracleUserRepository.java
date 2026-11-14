@@ -48,6 +48,30 @@ public class OracleUserRepository implements UserRepository {
     }
 
     @Override
+    public void updateProfile(int userId, String firstName, String lastName) {
+        try (Connection connection = DatabaseConnection.getConnection();
+             var statement = connection.prepareStatement(
+                     "UPDATE Usuarios SET primer_nombre=?,primer_apellido=? WHERE id_usuario=?")) {
+            statement.setString(1, firstName);
+            statement.setString(2, lastName);
+            statement.setInt(3, userId);
+            if (statement.executeUpdate() != 1) throw new SQLException("La cuenta no existe.");
+        } catch (SQLException ex) { throw new BusinessException("No se pudo guardar el perfil.", ex); }
+    }
+
+    @Override
+    public boolean compareAndSetPassword(int userId, String expectedHash, String replacementHash) {
+        try (Connection connection = DatabaseConnection.getConnection();
+             var statement = connection.prepareStatement(
+                     "UPDATE Usuarios SET password_hash=? WHERE id_usuario=? AND password_hash=?")) {
+            statement.setString(1, replacementHash);
+            statement.setInt(2, userId);
+            statement.setString(3, expectedHash);
+            return statement.executeUpdate() == 1;
+        } catch (SQLException ex) { throw new BusinessException("No se pudo cambiar la contraseña.", ex); }
+    }
+
+    @Override
     public int recoverLivesIfEligible(int userId) {
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
