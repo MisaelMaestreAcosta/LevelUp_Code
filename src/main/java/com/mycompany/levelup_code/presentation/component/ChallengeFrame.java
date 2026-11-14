@@ -130,8 +130,7 @@ public class ChallengeFrame extends Stage {
     private Button btnHint;
 
     // Editor de código y numeración de líneas
-    private TextArea txtEditor;
-    private TextArea txtLineGutter;
+    private CodeEditor txtEditor;
 
     // Opciones de Quiz
     private VBox quizOptionsContainer;
@@ -554,20 +553,10 @@ public class ChallengeFrame extends Stage {
         HBox editorContainer = new HBox(0);
         VBox.setVgrow(editorContainer, Priority.ALWAYS);
 
-        txtLineGutter = new TextArea("1");
-        txtLineGutter.setEditable(false);
-        txtLineGutter.setFocusTraversable(false);
-        txtLineGutter.setPrefWidth(48);
-        txtLineGutter.setMinWidth(48);
-        txtLineGutter.setMaxWidth(48);
-        txtLineGutter.getStyleClass().add("line-gutter");
-
-        txtEditor = new TextArea();
+        txtEditor = new CodeEditor();
         txtEditor.setAccessibleText("Código de la solución");
         txtEditor.setAccessibleHelp("Ctrl+Enter para enviar. El borrador se conserva al cerrar y volver a abrir.");
         txtEditor.setMinWidth(0);
-        txtEditor.setPrefRowCount(12);
-        txtEditor.getStyleClass().add("code-editor");
         txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         HBox.setHgrow(txtEditor, Priority.ALWAYS);
 
@@ -580,12 +569,10 @@ public class ChallengeFrame extends Stage {
         });
 
         txtEditor.textProperty().addListener((obs, oldVal, newVal) -> {
-            updateLineGutter(newVal);
             scheduleDraftSave();
         });
-        txtEditor.scrollTopProperty().addListener((obs, oldVal, newVal) -> txtLineGutter.setScrollTop(newVal.doubleValue()));
 
-        editorContainer.getChildren().addAll(txtLineGutter, txtEditor);
+        editorContainer.getChildren().add(txtEditor);
         editorCard.getChildren().addAll(toolbar, editorContainer);
         return editorCard;
     }
@@ -595,21 +582,6 @@ public class ChallengeFrame extends Stage {
         txtEditor.setStyle("-fx-font-size: " + editorFontSize + "px;");
         txtEditor.setAccessibleHelp("Editor a " + editorFontSize
                 + " píxeles. Tab inserta la indentación configurada; Ctrl+Enter envía.");
-    }
-
-    private void updateLineGutter(String text) {
-        int lines = 1;
-        if (text != null && !text.isEmpty()) {
-            lines = text.split("\n", -1).length;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 1; i <= lines; i++) {
-            if (i > 1) {
-                sb.append("\n");
-            }
-            sb.append(i);
-        }
-        txtLineGutter.setText(sb.toString());
     }
 
     private VBox buildQuizCard() {
@@ -853,6 +825,7 @@ public class ChallengeFrame extends Stage {
             badgeType.getStyleClass().setAll("badge-indigo");
 
             String langName = resolveChallengeLanguageName(codeChallenge);
+            txtEditor.setLanguage(langName);
             boolean realJvm = codeRunner.supportsRealIsolatedExecution(langName);
             badgeExecutionMode.setText(realJvm
                     ? "EJECUCIÓN LOCAL JVM"

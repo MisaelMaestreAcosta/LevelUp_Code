@@ -24,7 +24,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
@@ -59,7 +58,7 @@ public class LessonFrame extends Stage {
     private boolean failed;
     private Task<ProgressResult> progressTask;
 
-    private TextArea txtComparativeCode;
+    private CodeEditor txtComparativeCode;
     private Label lblComparisonCaption;
     private ToggleButton btnTabJava;
     private ToggleButton btnTabPython;
@@ -414,14 +413,13 @@ public class LessonFrame extends Stage {
             }
         });
         FlowPane languageBar = new FlowPane(8, 6, btnTabJava, btnTabPython, btnTabCpp);
-        txtComparativeCode = new TextArea();
+        txtComparativeCode = new CodeEditor();
         txtComparativeCode.setEditable(false);
         txtComparativeCode.setWrapText(true);
         txtComparativeCode.setMinSize(0, 50);
-        txtComparativeCode.getStyleClass().add("code-editor");
         txtComparativeCode.setAccessibleText("Ejemplo de código de la lección");
         txtComparativeCode.setAccessibleHelp("Puedes seleccionar y copiar el código. Control más 1 vuelve a la explicación.");
-        // A read-only TextArea otherwise consumes Tab, trapping keyboard readers.
+        // Keep keyboard readers moving between the example and lesson actions.
         txtComparativeCode.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.TAB && !event.isControlDown() && !event.isAltDown()) {
                 if (event.isShiftDown()) {
@@ -533,6 +531,7 @@ public class LessonFrame extends Stage {
         updateLanguageButton(btnTabJava, "JAVA".equals(lang), "btn-java");
         updateLanguageButton(btnTabPython, "PYTHON".equals(lang), "btn-python");
         updateLanguageButton(btnTabCpp, "CPP".equals(lang), "btn-cpp");
+        txtComparativeCode.setLanguage(lang);
         txtComparativeCode.setText(snippet[0]);
         txtComparativeCode.positionCaret(0);
         txtComparativeCode.setScrollTop(0);

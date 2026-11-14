@@ -164,9 +164,9 @@ public class DashboardFrame {
     private final Map<Lesson, Boolean> expandedLessons = new HashMap<>();
 
     // Comparador de 3 lenguajes (6 tópicos curriculares)
-    private TextArea txtCompareJava;
-    private TextArea txtComparePython;
-    private TextArea txtCompareCpp;
+    private CodeEditor txtCompareJava;
+    private CodeEditor txtComparePython;
+    private CodeEditor txtCompareCpp;
     private Label lblCompareSummary;
     private ComparisonExercisePane comparisonExercise;
     private final List<Button> comparatorTopicButtons = new ArrayList<>();
@@ -1491,12 +1491,15 @@ public class DashboardFrame {
         txtCompareJava = createComparisonTextArea();
         txtComparePython = createComparisonTextArea();
         txtCompareCpp = createComparisonTextArea();
+        txtCompareJava.setLanguage("JAVA");
+        txtComparePython.setLanguage("PYTHON");
+        txtCompareCpp.setLanguage("CPP");
 
         TilePane threeColumns = new TilePane(14, 14);
         threeColumns.setPrefColumns(3);
         threeColumns.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
-                () -> Math.max(270, (threeColumns.getWidth() - (threeColumns.getWidth() >= 900 ? 28 : 0))
-                        / (threeColumns.getWidth() >= 900 ? 3 : 1)), threeColumns.widthProperty()));
+                () -> Math.max(270, Math.floor((threeColumns.getWidth() - 2 - (threeColumns.getWidth() >= 900 ? 28 : 0))
+                        / (threeColumns.getWidth() >= 900 ? 3 : 1))), threeColumns.widthProperty()));
         threeColumns.setMinHeight(350);
         VBox.setVgrow(threeColumns, Priority.ALWAYS);
 
@@ -1535,7 +1538,7 @@ public class DashboardFrame {
 
         bottomCallout.getChildren().addAll(lblCompareSummary, btnPractice);
         comparisonExercise = new ComparisonExercisePane(() -> {
-            List<TextArea> editors = List.of(txtCompareJava, txtComparePython, txtCompareCpp);
+            List<CodeEditor> editors = List.of(txtCompareJava, txtComparePython, txtCompareCpp);
             List<String> terms = comparisonExercise.terms();
             for (int i = 0; i < editors.size(); i++) {
                 int position = editors.get(i).getText().indexOf(terms.get(i));
@@ -1546,15 +1549,15 @@ public class DashboardFrame {
         return view;
     }
 
-    private TextArea createComparisonTextArea() {
-        TextArea area = new TextArea();
+    private CodeEditor createComparisonTextArea() {
+        CodeEditor area = new CodeEditor();
         area.setEditable(false);
-        area.getStyleClass().add("code-editor");
+        area.setWrapText(true);
         VBox.setVgrow(area, Priority.ALWAYS);
         return area;
     }
 
-    private VBox wrapCodeColumn(String langName, String paradigmTag, String cardClass, String badgeClass, TextArea editor) {
+    private VBox wrapCodeColumn(String langName, String paradigmTag, String cardClass, String badgeClass, CodeEditor editor) {
         VBox col = new VBox(10);
         col.getStyleClass().add(cardClass);
         col.setMinWidth(0);
@@ -1570,6 +1573,7 @@ public class DashboardFrame {
         badge.setWrapText(true);
         head.getChildren().addAll(lblLang, badge);
         Button copy = new Button("Copiar código");
+        copy.getStyleClass().add("btn-secondary");
         copy.setOnAction(event -> {
             javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
             content.putString(editor.getText());

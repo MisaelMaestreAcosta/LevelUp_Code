@@ -1046,3 +1046,32 @@
 .route-lesson > .title { -fx-background-color: transparent; -fx-padding: 10; }
 .route-lesson > .content { -fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 8 12 12 12; }
 .route-module:focused > .title, .route-lesson:focused > .title { -fx-border-color: #2563EB; -fx-border-radius: 8; }
+
+.syntax-editor {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-padding: 5;
+}
+.syntax-editor:editor-focused { -fx-border-color: #2563EB; }
+.source-code {
+    -fx-background-color: #F8FAFC;
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 14px;
+    -fx-highlight-fill: #BFDBFE;
+    -fx-highlight-text-fill: #0F172A;
+}
+.source-code .text { -fx-fill: #0F172A; }
+.source-code .lineno {
+    -fx-background-color: #EEF2F7;
+    -fx-text-fill: #64748B;
+    -fx-padding: 0 10;
+}
+.source-code .caret { -fx-stroke: #0F172A; }
+.source-code .syntax-keyword { -fx-fill: #6D28D9; -fx-font-weight: bold; }
+.source-code .syntax-string { -fx-fill: #15803D; }
+.source-code .syntax-comment { -fx-fill: #64748B; -fx-font-style: italic; }
+.source-code .syntax-number { -fx-fill: #B45309; }
+.source-code .syntax-bracket { -fx-fill: #1D4ED8; }
+.source-code .matching-bracket { -rtfx-background-color: #BFDBFE; -fx-font-weight: bold; }

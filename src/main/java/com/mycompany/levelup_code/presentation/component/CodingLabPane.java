@@ -16,7 +16,7 @@ public final class CodingLabPane extends VBox {
     private final LabDraftStore store = new LabDraftStore();
     private final String identity;
     private final ComboBox<String> language = new ComboBox<>();
-    private final TextArea code = new TextArea();
+    private final CodeEditor code = new CodeEditor();
     private final TextArea input = new TextArea();
     private final TextArea output = new TextArea();
     private final Label status = new Label();
@@ -43,9 +43,8 @@ public final class CodingLabPane extends VBox {
         language.setValue(activeLanguage);
         language.setPrefWidth(135);
         language.setAccessibleText("Lenguaje del laboratorio");
-        code.getStyleClass().add("code-editor");
         code.setStyle("-fx-font-size: " + preferences.fontSize() + "px;");
-        code.setPrefRowCount(12);
+        code.setPrefHeight(280);
         code.setMinHeight(210);
         code.setAccessibleText("Código del experimento");
         code.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
@@ -167,6 +166,7 @@ public final class CodingLabPane extends VBox {
 
     private void restore() {
         String selected = activeLanguage;
+        code.setLanguage(selected);
         executionMode.setText("Java".equals(selected)
                 ? "Java · Ejecución local · Método solve(String input) · Límite de 3 segundos"
                 : selected + " · Ejecución simulada de demostración");
