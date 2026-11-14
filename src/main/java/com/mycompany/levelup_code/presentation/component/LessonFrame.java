@@ -40,7 +40,18 @@ import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
 /** Lesson reader using the shared palette and background progress operations. */
-public class LessonFrame extends Stage {
+public class LessonFrame extends Stage implements LearningPage {
+    private BorderPane view;
+    private LearningNavigation navigator;
+
+    @Override public Region content() { return view; }
+    @Override public boolean canLeave() { return true; }
+    @Override public void disposePage() { closed = true; }
+    @Override public void setNavigator(LearningNavigation value) { navigator = value; }
+    @Override public void close() {
+        if (navigator != null) navigator.back();
+        else super.close();
+    }
 
     private static final Logger LOGGER = Logger.getLogger(LessonFrame.class.getName());
     // Serialize writes across lesson windows so a late start cannot undo a
@@ -277,6 +288,7 @@ public class LessonFrame extends Stage {
         setMinHeight(620);
 
         BorderPane root = new BorderPane();
+        view = root;
         root.getStyleClass().add("root-shell");
         root.setPadding(new Insets(16));
 
@@ -314,7 +326,7 @@ public class LessonFrame extends Stage {
         root.setBottom(bottomBar);
         BorderPane.setMargin(bottomBar, new Insets(12, 0, 0, 0));
         Scene scene = new Scene(root, 1100, 800);
-        scene.widthProperty().addListener((observable, oldWidth, newWidth) -> {
+        root.widthProperty().addListener((observable, oldWidth, newWidth) -> {
             if (newWidth.doubleValue() < 880 && root.getCenter() != compactTabs) {
                 split.getItems().clear();
                 theoryTab.setContent(theoryPane);
@@ -328,14 +340,15 @@ public class LessonFrame extends Stage {
                 split.setDividerPositions(0.52);
             }
         });
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT1, KeyCombination.CONTROL_DOWN), () -> focusPane(false));
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DIGIT2, KeyCombination.CONTROL_DOWN), () -> focusPane(true));
-        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN), () -> {
-            if (btnRetry.isVisible()) {
-                btnRetry.fire();
-            } else {
-                btnMarkComplete.fire();
-            }
+        root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (!event.isControlDown() || event.isAltDown()) return;
+            if (event.getCode() == KeyCode.DIGIT1) focusPane(false);
+            else if (event.getCode() == KeyCode.DIGIT2) focusPane(true);
+            else if (event.getCode() == KeyCode.ENTER) {
+                if (btnRetry.isVisible()) btnRetry.fire();
+                else btnMarkComplete.fire();
+            } else return;
+            event.consume();
         });
         Theme.applyCss(scene);
         setScene(scene);
@@ -501,7 +514,10 @@ public class LessonFrame extends Stage {
                 launch.setMinHeight(Region.USE_PREF_SIZE);
                 launch.getStyleClass().add("btn-secondary");
                 launch.setAccessibleText("Abrir " + launch.getText());
-                launch.setOnAction(event -> ChallengeFrame.open(currentUser, challenge, onProgressCallback));
+                launch.setOnAction(event -> {
+                    if (navigator != null) navigator.openChallenge(challenge);
+                    else ChallengeFrame.open(currentUser, challenge, onProgressCallback);
+                });
                 challengeList.getChildren().add(launch);
             }
             ScrollPane challengesScroll = new ScrollPane(challengeList);

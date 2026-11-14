@@ -1109,3 +1109,4 @@
     -fx-padding: 4;
 }
 .achievement-card-unlocked .progress-bar > .bar { -fx-background-color: #16A34A; }
+.learning-navigation { -fx-background-color: #FFFFFF; -fx-background-radius: 10; -fx-padding: 10; -fx-hgap: 10; -fx-vgap: 8; }

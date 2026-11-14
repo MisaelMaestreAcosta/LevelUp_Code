@@ -82,7 +82,14 @@ import javafx.stage.WindowEvent;
  * con numeración de líneas reactiva, casos de prueba visibles/ocultos y motor de evaluación
  * dinámica conectado a {@code Casos_Prueba} e {@code Intentos} en Oracle Database.
  */
-public class ChallengeFrame extends Stage {
+public class ChallengeFrame extends Stage implements LearningPage {
+    private BorderPane view;
+    private LearningNavigation navigator;
+
+    @Override public Region content() { return view; }
+    @Override public boolean canLeave() { return allowClose(); }
+    @Override public void disposePage() { draftSaveDelay.stop(); rememberDraft(); }
+    @Override public void setNavigator(LearningNavigation value) { navigator = value; }
 
     private static final Logger LOGGER = Logger.getLogger(ChallengeFrame.class.getName());
     private static final DateTimeFormatter ATTEMPT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -225,7 +232,8 @@ public class ChallengeFrame extends Stage {
     @Override
     public void close() {
         if (allowClose()) {
-            super.close();
+            if (navigator != null) navigator.back();
+            else super.close();
         }
     }
 
@@ -306,6 +314,7 @@ public class ChallengeFrame extends Stage {
         });
 
         BorderPane root = new BorderPane();
+        view = root;
         root.getStyleClass().add("root-shell");
         root.setPadding(new Insets(18, 22, 18, 22));
 
@@ -323,18 +332,18 @@ public class ChallengeFrame extends Stage {
 
         Scene scene = new Scene(root, 1140, 720);
         Runnable resizeWorkspace = () -> {
-            boolean narrow = scene.getWidth() < 900;
+            boolean narrow = root.getWidth() < 900;
             workspaceSplit.setOrientation(narrow ? Orientation.VERTICAL : Orientation.HORIZONTAL);
             workspaceSplit.setMinHeight(narrow ? 880 : 440);
             workspaceSplit.setPrefHeight(Math.max(narrow ? 880 : 440,
-                    scene.getHeight() - topHeader.getHeight() - bottomBar.getHeight() - 70));
+                    root.getHeight() - topHeader.getHeight() - bottomBar.getHeight() - 70));
         };
-        scene.widthProperty().addListener((obs, before, after) -> resizeWorkspace.run());
-        scene.heightProperty().addListener((obs, before, after) -> resizeWorkspace.run());
+        root.widthProperty().addListener((obs, before, after) -> resizeWorkspace.run());
+        root.heightProperty().addListener((obs, before, after) -> resizeWorkspace.run());
         topHeader.heightProperty().addListener((obs, before, after) -> resizeWorkspace.run());
         resizeWorkspace.run();
         KeyCombination submitShortcut = new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN);
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+        root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (submitShortcut.match(event)) {
                 evaluateSubmission();
                 event.consume();
@@ -409,7 +418,7 @@ public class ChallengeFrame extends Stage {
         if (activeChallenge == null || activeChallenge.getId() <= 0) return;
         int challengeId = activeChallenge.getId();
         Alert dialog = new Alert(Alert.AlertType.INFORMATION);
-        dialog.initOwner(this);
+        dialog.initOwner(ownerWindow());
         dialog.setTitle("Historial de intentos");
         dialog.setHeaderText("Tus intentos en " + activeChallenge.getTitle());
         dialog.getButtonTypes().setAll(ButtonType.CLOSE);
@@ -1014,7 +1023,7 @@ public class ChallengeFrame extends Stage {
                 "El contenido de este reto cambió desde que guardaste tu borrador. "
                 + "Puedes recuperar tu respuesta para copiarla o empezar con la versión actual.",
                 recover, useCurrent);
-        alert.initOwner(this);
+        alert.initOwner(ownerWindow());
         alert.setTitle("El reto fue actualizado");
         alert.setHeaderText("Tu borrador pertenece a una versión anterior");
         return alert.showAndWait().orElse(useCurrent) == recover;
@@ -1072,8 +1081,10 @@ public class ChallengeFrame extends Stage {
         if (incorrectAttempts.getOrDefault(activeChallenge, 0) >= 2) {
             lupoFeedback.setAction("Ver una pista", this::showPedagogicalHint);
         } else if (activeChallenge.getLesson() != null) {
-            lupoFeedback.setAction("Repasar la lección", () ->
-                    new LessonFrame(currentUser, activeChallenge.getLesson(), onSolvedCallback).show());
+            lupoFeedback.setAction("Repasar la lección", () -> {
+                if (navigator != null) navigator.openLesson(activeChallenge.getLesson());
+                else new LessonFrame(currentUser, activeChallenge.getLesson(), onSolvedCallback).show();
+            });
         } else {
             lupoFeedback.setAction("", null);
         }
@@ -1084,7 +1095,7 @@ public class ChallengeFrame extends Stage {
             return false;
         }
         Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
-        confirmation.initOwner(this);
+        confirmation.initOwner(ownerWindow());
         confirmation.setTitle(action);
         confirmation.setHeaderText("Se reemplazará el código de este reto");
         confirmation.setContentText("Puedes cancelar para conservar tu borrador. Esta acción reemplazará todo el contenido del editor.");
@@ -1584,7 +1595,7 @@ public class ChallengeFrame extends Stage {
         }
         if (saveUncertain && !isPracticeOnly()) {
             Alert retry = new Alert(Alert.AlertType.CONFIRMATION);
-            retry.initOwner(this);
+            retry.initOwner(ownerWindow());
             retry.setTitle("Confirmar nuevo envío");
             retry.setHeaderText("El guardado anterior no pudo confirmarse");
             retry.setContentText("Si mantienes la misma respuesta, Oracle comprobará la clave del envío y devolverá el intento existente sin duplicarlo.");
@@ -2009,7 +2020,7 @@ public class ChallengeFrame extends Stage {
                     + (availableChallenges.size() > 1 ? " Continúa con el siguiente reto." : ""), "text-success");
             Theme.playPulse(lblResultBanner);
             if (celebratedChallenges.add(activeChallenge)) {
-                CompletionDialog.show(this, activeChallenge.getTitle(), reward, currentUser, previousLevel,
+                CompletionDialog.show(ownerWindow(), activeChallenge.getTitle(), reward, currentUser, previousLevel,
                         persistence.savedToOracle, availableChallenges.size() > 1 ? this::advanceToNextChallenge : null);
             }
         } else {

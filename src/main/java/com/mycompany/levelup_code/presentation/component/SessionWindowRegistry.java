@@ -29,4 +29,6 @@ final class SessionWindowRegistry {
         }
         WINDOWS.clear();
     }
+
+    static void untrack(Stage window) { WINDOWS.remove(window); }
 }

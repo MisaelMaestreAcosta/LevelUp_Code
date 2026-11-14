@@ -23,7 +23,16 @@ import javafx.scene.input.KeyEvent;
 import javafx.css.PseudoClass;
 import javafx.stage.Stage;
 
-public final class CodeOrderingFrame extends Stage {
+public final class CodeOrderingFrame extends Stage implements LearningPage {
+    private ScrollPane view;
+    private LearningNavigation navigator;
+    @Override public Region content() { return view; }
+    @Override public void setNavigator(LearningNavigation value) { navigator = value; }
+    @Override public boolean canLeave() {
+        if (busy) status.setText("Espera a que termine el envío.");
+        return !busy;
+    }
+    @Override public void disposePage() { saveDraft(); drafts.shutdown(); }
     private static final DataFormat FRAGMENT_DATA = new DataFormat("application/x-levelup-fragment");
     private final String dragToken = UUID.randomUUID().toString();
     private record Fragment(int number, String code) {
@@ -100,8 +109,9 @@ public final class CodeOrderingFrame extends Stage {
         root.getStyleClass().addAll("root-shell", "learning-workspace", "ordering-workspace");
         root.setPadding(new javafx.geometry.Insets(20));
         ScrollPane scroll = new ScrollPane(root); scroll.setFitToWidth(true);
+        view = scroll;
         Scene scene = new Scene(scroll, 850, 650); Theme.applyCss(scene); setScene(scene);
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+        root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.isAltDown() && (event.getCode() == KeyCode.UP || event.getCode() == KeyCode.DOWN)) {
                 if (!busy && !controls.isDisabled()) move(event.getCode() == KeyCode.UP ? -1 : 1);
                 event.consume();
@@ -306,7 +316,7 @@ public final class CodeOrderingFrame extends Stage {
             saveDraft();
             if (result.correct() && !celebrated) {
                 celebrated = true;
-                CompletionDialog.show(this, challenge.getTitle(), result.saved() == null ? 0
+                CompletionDialog.show(ownerWindow(), challenge.getTitle(), result.saved() == null ? 0
                         : result.saved().getEarnedExperience(), user, previousLevel, result.saved() != null, null);
             }
             if (result.saved() != null && callback != null) callback.run();
@@ -333,7 +343,7 @@ public final class CodeOrderingFrame extends Stage {
                     .append("\nOrden enviado ").append(attempt.getSubmittedContent()).append("\n\n");
             TextArea text = new TextArea(content.isEmpty() ? "Todavía no hay intentos guardados." : content.toString());
             text.setEditable(false);
-            Alert dialog = new Alert(Alert.AlertType.INFORMATION); dialog.initOwner(this);
+            Alert dialog = new Alert(Alert.AlertType.INFORMATION); dialog.initOwner(ownerWindow());
             dialog.setHeaderText("Últimos 50 intentos"); dialog.getDialogPane().setContent(text); dialog.setResizable(true); dialog.show();
         });
         task.setOnFailed(event -> { controls.setDisable(false); status.setText("No se pudo consultar el historial."); });
