@@ -147,6 +147,7 @@ public class ChallengeFrame extends Stage {
     private TextArea txtConsoleOutput;
     private Label lblExecutionMetrics;
     private Label lblResultBanner;
+    private LupoGuide lupoFeedback;
 
     public ChallengeFrame() {
         this(null, createDefaultCodeChallenge(), null);
@@ -721,12 +722,9 @@ public class ChallengeFrame extends Stage {
         bottomBar.getStyleClass().add("surface-card");
         bottomBar.setAlignment(Pos.CENTER_LEFT);
 
-        lblResultBanner = new Label("Completa el reto para ganar experiencia y mantener tu racha activa.");
-        lblResultBanner.getStyleClass().add("body-text");
-        lblResultBanner.setGraphic(Theme.createIcon(Theme.IconKind.BOLT, 16, Theme.HEX_AMBER));
-        lblResultBanner.setGraphicTextGap(8);
-        lblResultBanner.setWrapText(true);
-        lblResultBanner.setMaxWidth(Double.MAX_VALUE);
+        lupoFeedback = new LupoGuide(Lupo.Expression.WELCOME, "Lupo te acompaña",
+                "Completa el reto para ganar experiencia y mantener tu racha activa.");
+        lblResultBanner = lupoFeedback.messageLabel();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -762,7 +760,7 @@ public class ChallengeFrame extends Stage {
         lblDraftStatus.setAccessibleText("Estado del borrador local");
         FlowPane actions = new FlowPane(10, 8, btnClose, btnNextChallenge, btnSubmit,
                 new Label("Ctrl+Enter"), busyIndicator, lblBusy, lblDraftStatus);
-        bottomBar.getChildren().addAll(lblResultBanner, actions);
+        bottomBar.getChildren().addAll(lupoFeedback, actions);
         return bottomBar;
     }
 
@@ -1048,7 +1046,8 @@ public class ChallengeFrame extends Stage {
             String pendingPayloadHash) { }
 
     private void showFeedback(String message, String style) {
-        lblResultBanner.setGraphic(null);
+        lupoFeedback.setExpression("text-success".equals(style)
+                ? Lupo.Expression.CELEBRATING : Lupo.Expression.THINKING);
         lblResultBanner.getStyleClass().setAll(style);
         lblResultBanner.setText(message);
     }
@@ -1213,6 +1212,7 @@ public class ChallengeFrame extends Stage {
         }
         txtConsoleOutput.setText(hint);
         consolePane.setExpanded(true);
+        showFeedback("Revisa la pista de Lupo en la consola y prueba tu respuesta paso a paso.", "body-text");
         Theme.playPulse(txtConsoleOutput);
     }
 
