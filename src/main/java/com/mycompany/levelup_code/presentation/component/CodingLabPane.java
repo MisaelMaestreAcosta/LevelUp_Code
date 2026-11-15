@@ -90,6 +90,7 @@ public final class CodingLabPane extends VBox {
             language.setValue(activeLanguage);
             loading = false;
             requestLeave(() -> {
+                if (!removeRecovery()) return;
                 activeLanguage = value;
                 loading = true;
                 language.setValue(value);
@@ -107,6 +108,7 @@ public final class CodingLabPane extends VBox {
         Button template = WorkspaceUi.button("Restablecer plantilla", "btn-secondary", null);
         template.setOnAction(event -> {
             requestLeave(() -> {
+                if (!removeRecovery()) return;
                 replace(template(), "");
                 setDirty(true);
                 WorkspaceUi.status(status, "Plantilla restablecida. Guarda para conservarla en este equipo.", "");
@@ -226,10 +228,7 @@ public final class CodingLabPane extends VBox {
         if (!dirty) { continuation.run(); return; }
         ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar el experimento de " + activeLanguage + " en este equipo?");
         if (choice == UnsavedChangesDialog.SAVE) save(continuation);
-        else if (choice == UnsavedChangesDialog.DISCARD && removeRecovery()) {
-            setDirty(false);
-            continuation.run();
-        }
+        else if (choice == UnsavedChangesDialog.DISCARD) continuation.run();
     }
 
     private void saveRecovery() {
@@ -252,7 +251,7 @@ public final class CodingLabPane extends VBox {
         writer.start();
     }
 
-    private boolean removeRecovery() {
+    boolean removeRecovery() {
         draftDelay.stop();
         draftRevision++;
         try {

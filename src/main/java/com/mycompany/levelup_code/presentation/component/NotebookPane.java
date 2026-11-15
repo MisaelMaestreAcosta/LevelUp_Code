@@ -115,6 +115,7 @@ public final class NotebookPane extends VBox {
             notes.getSelectionModel().select(old);
             changingSelection = false;
             requestLeave(() -> {
+                if (!removeRecovery()) return;
                 changingSelection = true;
                 notes.getSelectionModel().select(note);
                 changingSelection = false;
@@ -126,7 +127,7 @@ public final class NotebookPane extends VBox {
         search.textProperty().addListener((observable, old, value) -> filterNotes());
 
         Button create = WorkspaceUi.button("Nueva nota", "btn-secondary", Theme.IconKind.NOTE);
-        create.setOnAction(event -> requestLeave(this::clear));
+        create.setOnAction(event -> requestLeave(() -> { if (removeRecovery()) clear(); }));
         HBox libraryHeader = new HBox(10, noteCount, create);
         libraryHeader.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(noteCount, Priority.ALWAYS);
@@ -228,10 +229,7 @@ public final class NotebookPane extends VBox {
         if (!dirty) { continuation.run(); return; }
         ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar los cambios de tu nota en la cuenta?");
         if (choice == UnsavedChangesDialog.SAVE) save(continuation);
-        else if (choice == UnsavedChangesDialog.DISCARD && removeRecovery()) {
-            dirty = false;
-            continuation.run();
-        }
+        else if (choice == UnsavedChangesDialog.DISCARD) continuation.run();
     }
 
     private Note captureNote() {
@@ -266,7 +264,7 @@ public final class NotebookPane extends VBox {
         }
     }
 
-    private boolean removeRecovery() {
+    boolean removeRecovery() {
         draftDelay.stop();
         draftRevision++;
         try {

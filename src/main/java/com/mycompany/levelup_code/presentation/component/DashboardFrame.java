@@ -817,6 +817,8 @@ public class DashboardFrame {
     private void requestExit(Runnable continuation) {
         if (disposed || (learningWorkspace != null && !learningWorkspace.canLeave())) return;
         Runnable finish = () -> {
+            if (notebookPane != null && !notebookPane.removeRecovery()) return;
+            if (codingLab != null && !codingLab.removeRecovery()) return;
             if (learningWorkspace != null && !learningWorkspace.clear()) return;
             disposed = true;
             if (connectionWatch != null) connectionWatch.stop();
