@@ -47,6 +47,10 @@ public final class LabDraftStore {
         } finally { Files.deleteIfExists(temporary); }
     }
 
+    public void remove(String identity, String language) throws IOException {
+        Files.deleteIfExists(file(identity, language));
+    }
+
     private Path file(String identity, String language) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest((identity + "\n" + language).getBytes(StandardCharsets.UTF_8));

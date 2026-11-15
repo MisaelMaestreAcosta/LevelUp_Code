@@ -433,9 +433,8 @@ public class DashboardFrame {
         stage.setMinWidth(900);
         stage.setMinHeight(640);
         stage.setOnCloseRequest(event -> {
-            if (learningWorkspace != null && !learningWorkspace.clear()) { event.consume(); return; }
-            disposed = true;
-            if (connectionWatch != null) connectionWatch.stop();
+            event.consume();
+            requestExit(stage::hide);
         });
 
         BorderPane root = new BorderPane();
@@ -802,18 +801,37 @@ public class DashboardFrame {
         btnLogout.setGraphicTextGap(8);
         btnLogout.setMaxWidth(Double.MAX_VALUE);
         btnLogout.setOnAction(e -> {
-            if (!learningWorkspace.clear()) return;
-            disposed = true;
-            if (connectionWatch != null) connectionWatch.stop();
-            SessionWindowRegistry.closeAll();
-            LoginFrame loginFrame = new LoginFrame(stage);
-            loginFrame.show();
+            requestExit(() -> {
+                SessionWindowRegistry.closeAll();
+                LoginFrame loginFrame = new LoginFrame(stage);
+                loginFrame.show();
+            });
         });
 
         userBox.getChildren().addAll(profileTop, badgeConn, btnLogout);
         sidebar.setBottom(userBox);
 
         return sidebar;
+    }
+
+    private void requestExit(Runnable continuation) {
+        if (disposed || (learningWorkspace != null && !learningWorkspace.canLeave())) return;
+        Runnable finish = () -> {
+            if (learningWorkspace != null && !learningWorkspace.clear()) return;
+            disposed = true;
+            if (connectionWatch != null) connectionWatch.stop();
+            continuation.run();
+        };
+        Runnable checkAuthoring = () -> {
+            if (adminView instanceof ChallengeAuthoringPane authoring) authoring.requestLeave(stage, finish);
+            else finish.run();
+        };
+        Runnable checkLab = () -> {
+            if (codingLab != null) codingLab.requestLeave(stage, checkAuthoring);
+            else checkAuthoring.run();
+        };
+        if (notebookPane != null) notebookPane.requestLeave(stage, checkLab);
+        else checkLab.run();
     }
 
     private TilePane buildTopTelemetryBar() {

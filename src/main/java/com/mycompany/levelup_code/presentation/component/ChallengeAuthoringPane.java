@@ -49,6 +49,7 @@ public final class ChallengeAuthoringPane extends VBox {
     private final Label status = new Label();
     private int editingId;
     private int revision;
+    private List<String> savedFields = List.of();
 
     public ChallengeAuthoringPane(User administrator, List<Lesson> lessons, Consumer<AuthoredChallenge> savedCallback) {
         super(12);
@@ -192,12 +193,17 @@ public final class ChallengeAuthoringPane extends VBox {
     }
 
     private void save(PublicationState state) {
+        save(state, () -> { });
+    }
+
+    private void save(PublicationState state, Runnable continuation) {
         try {
             AuthoredChallenge captured = capture(state);
             run(() -> new AuthoringService().save(administrator.getId(), captured), saved -> {
                 show(saved);
                 savedCallback.accept(saved);
                 status.setText("Guardado como " + saved.state() + ". Actualiza la lista para consultar los cambios.");
+                continuation.run();
             });
         } catch (RuntimeException ex) { status.setText(ex.getMessage()); }
     }
@@ -214,7 +220,7 @@ public final class ChallengeAuthoringPane extends VBox {
         statement.setText(challenge.getDescription());
         difficulty.setValue(challenge.getDifficulty());
         reward.getValueFactory().setValue(challenge.getExpReward());
-        reference.setText(authored.referenceSolution());
+        reference.setText(java.util.Objects.requireNonNullElse(authored.referenceSolution(), ""));
         cases.getChildren().clear();
         caseFields.clear();
         options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
@@ -231,6 +237,7 @@ public final class ChallengeAuthoringPane extends VBox {
         }
         updateKind();
         status.setText("Editando " + authored.state() + " · revisión " + revision);
+        savedFields = currentFields();
     }
 
     private void reset() {
@@ -247,6 +254,31 @@ public final class ChallengeAuthoringPane extends VBox {
         addOption("", true); addOption("", false);
         updateKind();
         status.setText("Completa la plantilla y la solución de referencia en sus campos respectivos.");
+        savedFields = currentFields();
+    }
+
+    private List<String> currentFields() {
+        List<String> fields = new ArrayList<>(List.of(Integer.toString(editingId),
+                Integer.toString(lesson.getValue() == null ? 0 : lesson.getValue().getId()), kind.getValue(),
+                title.getText(), statement.getText(), template.getText(), reference.getText(), predictionSnippet.getText(),
+                fragments.getText(), correctOrder.getText(), difficulty.getValue().name(),
+                reward.getValue().toString(), timeout.getValue().toString()));
+        for (CaseFields value : caseFields) {
+            fields.add(value.input().getText()); fields.add(value.output().getText());
+            fields.add(Boolean.toString(value.hidden().isSelected()));
+        }
+        for (OptionFields value : optionFields) {
+            fields.add(value.text().getText()); fields.add(Boolean.toString(value.correct().isSelected()));
+        }
+        return List.copyOf(fields);
+    }
+
+    void requestLeave(javafx.stage.Window owner, Runnable continuation) {
+        if (form.isDisabled()) { UnsavedChangesDialog.showBusy(owner); return; }
+        if (currentFields().equals(savedFields)) { continuation.run(); return; }
+        ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar los cambios del reto como borrador?");
+        if (choice == UnsavedChangesDialog.SAVE) save(PublicationState.BORRADOR, continuation);
+        else if (choice == UnsavedChangesDialog.DISCARD) continuation.run();
     }
 
     private boolean confirmReplacement() {

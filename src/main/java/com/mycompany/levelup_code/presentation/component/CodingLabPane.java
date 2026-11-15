@@ -4,6 +4,10 @@ import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.data.local.LabDraftStore;
 import com.mycompany.levelup_code.domain.model.EditorPreferences;
 import com.mycompany.levelup_code.domain.model.User;
+import java.nio.file.Path;
+import java.util.Optional;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import javafx.concurrent.Task;
@@ -29,10 +33,16 @@ public final class CodingLabPane extends VBox {
     private boolean loading;
     private boolean busy;
     private boolean wide;
+    private final LabDraftStore recovery = new LabDraftStore(
+            Path.of(System.getProperty("user.home"), ".levelup-code", "laboratory-recovery"));
+    private final PauseTransition draftDelay = new PauseTransition(Duration.millis(900));
+    private final Object draftLock = new Object();
+    private volatile long draftRevision;
 
     public CodingLabPane(User user, boolean oracle) {
         getStyleClass().add("learning-workspace");
         identity = (oracle ? "oracle:" : "demo:") + user.getEmail();
+        draftDelay.setOnFinished(event -> saveRecovery());
         EditorPreferences preferences = EditorPreferences.forUser(user.getId());
         activeLanguage = switch (preferences.language()) {
             case "PYTHON" -> "Python";
@@ -76,14 +86,16 @@ public final class CodingLabPane extends VBox {
         input.textProperty().addListener((observable, old, value) -> { if (!loading) setDirty(true); });
         language.valueProperty().addListener((observable, old, value) -> {
             if (loading || value == null || value.equals(activeLanguage)) return;
-            if (busy || !confirmReplacement()) {
+            loading = true;
+            language.setValue(activeLanguage);
+            loading = false;
+            requestLeave(() -> {
+                activeLanguage = value;
                 loading = true;
-                language.setValue(activeLanguage);
+                language.setValue(value);
                 loading = false;
-                return;
-            }
-            activeLanguage = value;
-            restore();
+                restore();
+            });
         });
 
         Button run = WorkspaceUi.button("Ejecutar", "btn-primary", Theme.IconKind.PLAY);
@@ -94,11 +106,11 @@ public final class CodingLabPane extends VBox {
         save.setOnAction(event -> save());
         Button template = WorkspaceUi.button("Restablecer plantilla", "btn-secondary", null);
         template.setOnAction(event -> {
-            if (confirmReplacement()) {
+            requestLeave(() -> {
                 replace(template(), "");
                 setDirty(true);
                 WorkspaceUi.status(status, "Plantilla restablecida. Guarda para conservarla en este equipo.", "");
-            }
+            });
         });
         FlowPane toolbar = new FlowPane(10, 10, language, run, save, template);
         toolbar.getStyleClass().add("workspace-toolbar");
@@ -148,10 +160,15 @@ public final class CodingLabPane extends VBox {
 
     private void setDirty(boolean value) {
         dirty = value;
+        draftRevision++;
+        if (value) draftDelay.playFromStart();
+        else draftDelay.stop();
         savedState.setText(value ? "Cambios sin guardar" : "Sin cambios pendientes");
     }
 
-    private void save() {
+    private void save() { save(() -> { }); }
+
+    private void save(Runnable continuation) {
         if (busy) return;
         String selected = activeLanguage;
         LabDraftStore.Experiment experiment = new LabDraftStore.Experiment(code.getText(), input.getText());
@@ -160,7 +177,9 @@ public final class CodingLabPane extends VBox {
             return true;
         }, ignored -> {
             setDirty(false);
+            if (!removeRecovery()) return;
             WorkspaceUi.status(status, "Experimento guardado en este equipo.", "status-success");
+            continuation.run();
         });
     }
 
@@ -170,14 +189,23 @@ public final class CodingLabPane extends VBox {
         executionMode.setText("Java".equals(selected)
                 ? "Java · Ejecución local · Método solve(String input) · Límite de 3 segundos"
                 : selected + " · Ejecución simulada de demostración");
-        background(() -> store.load(identity, selected), saved -> {
+        background(() -> new RestoredExperiment(store.load(identity, selected), recovery.load(identity, selected)), restored -> {
+            Optional<LabDraftStore.Experiment> saved = restored.recovery().or(() -> restored.saved());
             replace(saved.map(LabDraftStore.Experiment::code).orElseGet(this::template),
                     saved.map(LabDraftStore.Experiment::input).orElse(""));
-            WorkspaceUi.status(status, saved.isPresent()
-                    ? "Experimento recuperado de este equipo."
-                    : "Tu experimento se conservará cuando pulses Guardar.", "");
+            if (restored.recovery().isPresent()) {
+                setDirty(true);
+                WorkspaceUi.status(status, "Recuperamos tus cambios pendientes. Guarda cuando quieras conservar esta versión.", "");
+            } else {
+                WorkspaceUi.status(status, saved.isPresent()
+                        ? "Experimento recuperado de este equipo."
+                        : "Tu experimento se conservará cuando pulses Guardar.", "");
+            }
         });
     }
+
+    private record RestoredExperiment(Optional<LabDraftStore.Experiment> saved,
+            Optional<LabDraftStore.Experiment> recovery) { }
 
     private void replace(String source, String data) {
         loading = true;
@@ -188,13 +216,52 @@ public final class CodingLabPane extends VBox {
         setDirty(false);
     }
 
-    private boolean confirmReplacement() {
-        if (!dirty) return true;
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                "Hay cambios sin guardar. ¿Reemplazar el experimento?", ButtonType.OK, ButtonType.CANCEL);
-        confirm.initOwner(getScene().getWindow());
-        Theme.applyCss(confirm.getDialogPane().getScene());
-        return confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+    private void requestLeave(Runnable continuation) { requestLeave(getScene().getWindow(), continuation); }
+
+    void requestLeave(javafx.stage.Window owner, Runnable continuation) {
+        if (busy) {
+            UnsavedChangesDialog.showBusy(owner);
+            return;
+        }
+        if (!dirty) { continuation.run(); return; }
+        ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar el experimento de " + activeLanguage + " en este equipo?");
+        if (choice == UnsavedChangesDialog.SAVE) save(continuation);
+        else if (choice == UnsavedChangesDialog.DISCARD && removeRecovery()) {
+            setDirty(false);
+            continuation.run();
+        }
+    }
+
+    private void saveRecovery() {
+        if (!dirty) return;
+        String selected = activeLanguage;
+        var experiment = new LabDraftStore.Experiment(code.getText(), input.getText());
+        long revision = draftRevision;
+        Thread writer = new Thread(() -> {
+            try {
+                synchronized (draftLock) {
+                    if (revision != draftRevision) return;
+                    recovery.save(identity, selected, experiment);
+                }
+            } catch (java.io.IOException ex) {
+                javafx.application.Platform.runLater(() -> WorkspaceUi.status(status,
+                        "No se pudo guardar la copia de recuperación. Guarda tu experimento.", "status-error"));
+            }
+        }, "laboratory-recovery");
+        writer.setDaemon(true);
+        writer.start();
+    }
+
+    private boolean removeRecovery() {
+        draftDelay.stop();
+        draftRevision++;
+        try {
+            synchronized (draftLock) { recovery.remove(identity, activeLanguage); }
+            return true;
+        } catch (java.io.IOException ex) {
+            WorkspaceUi.status(status, "No se pudo borrar la copia de recuperación. Vuelve a intentarlo.", "status-error");
+            return false;
+        }
     }
 
     private String template() {

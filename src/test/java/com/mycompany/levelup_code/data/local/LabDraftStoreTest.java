@@ -16,5 +16,9 @@ class LabDraftStoreTest {
         assertTrue(store.load("oracle:other@example.com", "Java").isEmpty());
         assertTrue(store.load("demo:student@example.com", "Java").isEmpty());
         assertTrue(store.load("oracle:student@example.com", "Python").isEmpty());
+        store.remove("oracle:student@example.com", "Python");
+        assertEquals(experiment, store.load("oracle:student@example.com", "Java").orElseThrow());
+        store.remove("oracle:student@example.com", "Java");
+        assertTrue(store.load("oracle:student@example.com", "Java").isEmpty());
     }
 }
