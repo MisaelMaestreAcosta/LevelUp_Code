@@ -25,15 +25,22 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     private final Runnable challengeRefresh;
     private final Runnable exit;
     private final Consumer<Boolean> focus;
+    private final Consumer<com.mycompany.levelup_code.domain.model.PracticeSession.Outcome> outcome;
     private final Label breadcrumb = WorkspaceUi.label("", "body-text");
     private final ToggleButton concentration = new ToggleButton("Concentrarme · F8");
 
     LearningWorkspace(User user, Runnable lessonRefresh, Runnable challengeRefresh, Runnable exit, Consumer<Boolean> focus) {
+        this(user, lessonRefresh, challengeRefresh, exit, focus, null);
+    }
+
+    LearningWorkspace(User user, Runnable lessonRefresh, Runnable challengeRefresh, Runnable exit, Consumer<Boolean> focus,
+            Consumer<com.mycompany.levelup_code.domain.model.PracticeSession.Outcome> outcome) {
         this.user = user;
         this.lessonRefresh = lessonRefresh;
         this.challengeRefresh = challengeRefresh;
         this.exit = exit;
         this.focus = focus;
+        this.outcome = outcome;
         setMinSize(0, 0);
         var back = WorkspaceUi.button("Volver", "btn-secondary", null);
         back.setOnAction(event -> back());
@@ -67,8 +74,12 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
         if (challenge == null || !canLeave()) return;
         LearningPage page = challenge instanceof CodeOrderingChallenge ordering
                 ? new CodeOrderingFrame(user, ordering, challengeRefresh, false)
-                : new ChallengeFrame(user, challenge, challengeRefresh);
+                : new ChallengeFrame(user, challenge, challengeRefresh, false, outcome != null);
         present(page, path(challenge.getLesson()) + " › " + challenge.getTitle());
+    }
+
+    @Override public void evaluated(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome result) {
+        if (outcome != null) outcome.accept(result);
     }
 
     private static String path(Lesson lesson) {

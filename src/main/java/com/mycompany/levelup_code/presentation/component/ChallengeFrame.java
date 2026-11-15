@@ -187,6 +187,10 @@ public class ChallengeFrame extends Stage implements LearningPage {
     private final boolean preview;
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview) {
+        this(user, challenge, onSolvedCallback, preview, false);
+    }
+
+    ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview, boolean singleChallenge) {
         this.preview = preview;
         this.currentUser = user;
         editorFontSize = EditorPreferences.forUser(user == null ? 0 : user.getId()).fontSize();
@@ -194,7 +198,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
         this.onSolvedCallback = onSolvedCallback;
         this.availableChallenges = new ArrayList<>();
         if (challenge != null) {
-            if (challenge.getLesson() != null && challenge.getLesson().getChallenges() != null
+            if (singleChallenge) {
+                this.availableChallenges.add(challenge);
+            } else if (challenge.getLesson() != null && challenge.getLesson().getChallenges() != null
                     && !challenge.getLesson().getChallenges().isEmpty()) {
                 this.availableChallenges.addAll(challenge.getLesson().getChallenges().stream()
                         .filter(value -> !(value instanceof CodeOrderingChallenge)).toList());
@@ -2000,6 +2006,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
             }
         }
         updateCoachAction();
+        if (navigator != null) navigator.evaluated(new com.mycompany.levelup_code.domain.model.PracticeSession.Outcome(
+                activeChallenge.getId(), effectiveSuccess, persistence.savedToOracle,
+                persistence.savedToOracle && persistence.attempt != null ? persistence.attempt.getEarnedExperience() : 0));
         if (onSolvedCallback != null) {
             try {
                 onSolvedCallback.run();

@@ -330,6 +330,9 @@ public final class CodeOrderingFrame extends Stage implements LearningPage {
                 CompletionDialog.show(ownerWindow(), challenge.getTitle(), result.saved() == null ? 0
                         : result.saved().getEarnedExperience(), user, previousLevel, result.saved() != null, null);
             }
+            if (navigator != null) navigator.evaluated(new com.mycompany.levelup_code.domain.model.PracticeSession.Outcome(
+                    challenge.getId(), result.correct(), result.saved() != null,
+                    result.saved() == null ? 0 : result.saved().getEarnedExperience()));
             if (result.saved() != null && callback != null) callback.run();
         });
         task.setOnFailed(event -> {

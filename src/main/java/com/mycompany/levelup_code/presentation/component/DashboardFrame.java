@@ -109,6 +109,8 @@ public class DashboardFrame {
     private Button navGoalsBtn;
     private Button navLabBtn;
     private CodingLabPane codingLab;
+    private GuidedPracticePane guidedPractice;
+    private boolean preparingPractice;
     private Label profileName;
     private ProfilePane profilePane;
     private NotebookPane notebookPane;
@@ -587,7 +589,9 @@ public class DashboardFrame {
                 openChallenge(recommendedChallenge);
             }
         });
-        VBox practice = new VBox(12, WorkspaceUi.label("Tu próximo reto", "card-title"), homeChallenge, homePractice);
+        Button guided = WorkspaceUi.button("Practicar una sesión de 5 retos", "btn-primary", Theme.IconKind.PLAY);
+        guided.setOnAction(event -> startGuidedPractice());
+        VBox practice = new VBox(12, WorkspaceUi.label("Tu próximo reto", "card-title"), homeChallenge, homePractice, guided);
         practice.getStyleClass().add("surface-card");
         homeGoal = new VBox(10);
         homeGoal.getStyleClass().add("surface-card");
@@ -816,10 +820,12 @@ public class DashboardFrame {
 
     private void requestExit(Runnable continuation) {
         if (disposed || (learningWorkspace != null && !learningWorkspace.canLeave())) return;
+        if (guidedPractice != null && !guidedPractice.canLeave()) return;
         Runnable finish = () -> {
             if (notebookPane != null && !notebookPane.removeRecovery()) return;
             if (codingLab != null && !codingLab.removeRecovery()) return;
             if (learningWorkspace != null && !learningWorkspace.clear()) return;
+            if (guidedPractice != null && !guidedPractice.dispose()) return;
             disposed = true;
             if (connectionWatch != null) connectionWatch.stop();
             continuation.run();
@@ -1074,6 +1080,9 @@ public class DashboardFrame {
 
     private VBox buildPracticeWorkspaceView() {
         VBox view = new VBox(14);
+        Button guided = WorkspaceUi.button("Iniciar o retomar una sesión de 5 retos", "btn-primary", Theme.IconKind.PLAY);
+        guided.setOnAction(event -> startGuidedPractice());
+        view.getChildren().add(guided);
         view.getChildren().add(Theme.createSectionHeader("Elige tu próximo reto", "Practica a tu ritmo", "badge-green"));
         view.getChildren().add(new LupoGuide(Lupo.Expression.THINKING, "Practica con Lupo",
                 "Empieza por un reto fácil o filtra los que quieras repasar."));
@@ -1123,6 +1132,46 @@ public class DashboardFrame {
         view.getChildren().addAll(filters, practiceCount, scroll);
         renderPracticeCatalog();
         return view;
+    }
+
+    private void startGuidedPractice() {
+        if (guidedPractice != null && !guidedPractice.finished()) { switchWorkspaceView("SESSION"); return; }
+        if (preparingPractice) return;
+        preparingPractice = true;
+        List<Challenge> catalog = selectedLessons().stream().flatMap(lesson -> lesson.getChallenges().stream()).toList();
+        Map<Integer, ChallengeProgress> progress = Map.copyOf(challengeProgress);
+        Node origin = workspaceContainer.getChildren().getFirst();
+        Task<com.mycompany.levelup_code.domain.model.PracticeSession> task = new Task<>() {
+            @Override protected com.mycompany.levelup_code.domain.model.PracticeSession call() throws Exception {
+                Map<Integer, LocalDate> last = oracleConnected
+                        ? new com.mycompany.levelup_code.data.oracle.OraclePracticeRepository().lastAttempts(currentUser.getId()) : Map.of();
+                return new com.mycompany.levelup_code.business.service.PracticePlanner().plan(catalog, progress, last, LocalDate.now(),
+                        challenge -> !(challenge instanceof CodeChallenge)
+                                || AppContext.getInstance().getCodeRunner().supportsRealIsolatedExecution(
+                                        challenge.getLesson().getModule().getLanguage().getName()));
+            }
+        };
+        task.setOnSucceeded(event -> {
+            preparingPractice = false;
+            if (disposed) return;
+            if (task.getValue().steps().isEmpty()) {
+                var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION,
+                        "Este curso todavía no tiene retos compatibles con una sesión guiada.");
+                alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
+                return;
+            }
+            guidedPractice = new GuidedPracticePane(currentUser, task.getValue(), this::onChallengeOrLessonCompleted);
+            if (workspaceContainer.getChildren().contains(origin)) switchWorkspaceView("SESSION");
+        });
+        task.setOnFailed(event -> {
+            preparingPractice = false;
+            LOGGER.log(Level.WARNING, "No se pudo preparar la sesión de práctica", task.getException());
+            if (disposed) return;
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "No pudimos preparar la sesión. Comprueba la conexión y vuelve a iniciar la práctica.");
+            alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
+        });
+        startTask(task, "practice-session-plan");
     }
 
     private void renderPracticeCatalog() {
@@ -2290,6 +2339,7 @@ public class DashboardFrame {
     }
 
     private void switchWorkspaceView(String cardKey) {
+        if (guidedPractice != null && !guidedPractice.canLeave()) return;
         if (learningWorkspace != null && !learningWorkspace.clear()) return;
         learningOrigin = null;
         workspaceScroll.setFitToHeight(false);
@@ -2321,6 +2371,8 @@ public class DashboardFrame {
                     allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
                     this::onChallengeOrLessonCompleted, this::openChallenge);
             target = notebookPane;
+        } else if ("SESSION".equals(cardKey) && guidedPractice != null) {
+            target = guidedPractice;
         } else if ("PRACTICE".equals(cardKey)) {
             renderPracticeCatalog();
             target = practiceView;
@@ -2336,7 +2388,7 @@ public class DashboardFrame {
 
         updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
         updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
-        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey) || "SESSION".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
         updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
         updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
         updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
