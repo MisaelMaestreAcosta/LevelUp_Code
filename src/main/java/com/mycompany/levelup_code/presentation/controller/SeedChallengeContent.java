@@ -125,7 +125,7 @@ public final class SeedChallengeContent {
                     """
                     import java.util.HashSet;
                     import java.util.Set;
-                    
+
                     public class DuplicateFinderSolver {
                         public static int primerDuplicado(int[] nums) {
                             // TODO: implementa la solución siguiendo el enunciado.
@@ -136,7 +136,7 @@ public final class SeedChallengeContent {
                     """
                     import java.util.HashSet;
                     import java.util.Set;
-                    
+
                     public class DuplicateFinderSolver {
                         public static int primerDuplicado(int[] nums) {
                             Set<Integer> vistos = new HashSet<>();
@@ -240,7 +240,7 @@ public final class SeedChallengeContent {
             Map.entry(105, new Exercise(
                     """
                     #include <string>
-                    
+
                     std::string emitirSonido(std::string tipo) {
                         // TODO: implementa la solución siguiendo el enunciado.
                         return "";
@@ -248,7 +248,7 @@ public final class SeedChallengeContent {
                     """,
                     """
                     #include <string>
-                    
+
                     std::string emitirSonido(std::string tipo) {
                         if (tipo == "Perro" || tipo == "PERRO" || tipo == "perro") {
                             return "Guau";
@@ -262,7 +262,7 @@ public final class SeedChallengeContent {
             Map.entry(303, new Exercise(
                     """
                     #include <string>
-                    
+
                     std::string nivelAcceso(std::string rol) {
                         // TODO: implementa la solución siguiendo el enunciado.
                         return "";
@@ -270,7 +270,7 @@ public final class SeedChallengeContent {
                     """,
                     """
                     #include <string>
-                    
+
                     std::string nivelAcceso(std::string rol) {
                         if (rol == "ADMIN" || rol == "admin") {
                             return "TOTAL";
@@ -284,7 +284,7 @@ public final class SeedChallengeContent {
             Map.entry(305, new Exercise(
                     """
                     #include <vector>
-                    
+
                     int search(const std::vector<int>& a, int target) {
                         // TODO: implementa la solución siguiendo el enunciado.
                         return 0;
@@ -292,7 +292,7 @@ public final class SeedChallengeContent {
                     """,
                     """
                     #include <vector>
-                    
+
                     int search(const std::vector<int>& a, int target) {
                         int low = 0;
                         int high = static_cast<int>(a.size()) - 1;
@@ -309,7 +309,7 @@ public final class SeedChallengeContent {
                     """
                     #include <string>
                     #include <cctype>
-                    
+
                     bool esPalindromo(std::string texto) {
                         // TODO: implementa la solución siguiendo el enunciado.
                         return false;
@@ -318,7 +318,7 @@ public final class SeedChallengeContent {
                     """
                     #include <string>
                     #include <cctype>
-                    
+
                     bool esPalindromo(std::string texto) {
                         int left = 0;
                         int right = static_cast<int>(texto.size()) - 1;
@@ -335,7 +335,7 @@ public final class SeedChallengeContent {
             Map.entry(309, new Exercise(
                     """
                     #include <vector>
-                    
+
                     int sumarPares(const std::vector<int>& nums) {
                         // TODO: implementa la solución siguiendo el enunciado.
                         return 0;
@@ -343,7 +343,7 @@ public final class SeedChallengeContent {
                     """,
                     """
                     #include <vector>
-                    
+
                     int sumarPares(const std::vector<int>& nums) {
                         int total = 0;
                         for (int n : nums) {
@@ -358,7 +358,7 @@ public final class SeedChallengeContent {
                     """
                     #include <vector>
                     #include <unordered_set>
-                    
+
                     int primerDuplicado(const std::vector<int>& nums) {
                         // TODO: implementa la solución siguiendo el enunciado.
                         return 0;
@@ -367,7 +367,7 @@ public final class SeedChallengeContent {
                     """
                     #include <vector>
                     #include <unordered_set>
-                    
+
                     int primerDuplicado(const std::vector<int>& nums) {
                         std::unordered_set<int> vistos;
                         for (int n : nums) {
@@ -389,4 +389,3 @@ public final class SeedChallengeContent {
         return exercise;
     }
 }
-
