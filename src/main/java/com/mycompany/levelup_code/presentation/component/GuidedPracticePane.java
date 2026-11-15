@@ -15,6 +15,10 @@ final class GuidedPracticePane extends VBox {
     private final VBox body = new VBox(12);
 
     GuidedPracticePane(User user, PracticeSession session, Runnable refresh) {
+        this(user, session, refresh, outcome -> { });
+    }
+
+    GuidedPracticePane(User user, PracticeSession session, Runnable refresh, java.util.function.Consumer<PracticeSession.Outcome> results) {
         super(14);
         this.session = session;
         getStyleClass().add("learning-workspace");
@@ -23,7 +27,7 @@ final class GuidedPracticePane extends VBox {
         progress.setMaxWidth(Double.MAX_VALUE);
         workspace = new LearningWorkspace(user, refresh, refresh, this::showPaused, focused -> {
             heading.setVisible(!focused); heading.setManaged(!focused);
-        }, outcome -> { session.record(outcome); updateNext(); });
+        }, outcome -> { session.record(outcome); results.accept(outcome); updateNext(); });
         VBox.setVgrow(body, Priority.ALWAYS);
         next.setOnAction(event -> {
             if (!workspace.clear()) return;

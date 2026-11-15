@@ -123,6 +123,7 @@ public class DashboardFrame {
     private ComboBox<String> practiceDifficulty;
     private ComboBox<String> practiceProgress;
     private Map<Integer, ChallengeProgress> challengeProgress = Map.of();
+    private final Map<Integer, ChallengeProgress> demoChallengeProgress = new java.util.concurrent.ConcurrentHashMap<>();
     private Button navComparatorBtn;
     private Button navAchievementsBtn;
     private Button navAdminBtn;
@@ -334,7 +335,7 @@ public class DashboardFrame {
                 controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered,
                 oracleConnected && currentUser.getId() > 0
                         ? AppContext.getInstance().getChallengeService().getProgressByUser(currentUser.getId())
-                        : Map.of());
+                        : Map.copyOf(demoChallengeProgress));
     }
 
     private boolean recoverExhaustedLivesOnOpen() {
@@ -501,7 +502,7 @@ public class DashboardFrame {
         ScrollPane centerScroll = new ScrollPane(centerShell);
         workspaceScroll = centerScroll;
         learningWorkspace = new LearningWorkspace(currentUser, this::onLessonStateChanged, this::onChallengeOrLessonCompleted,
-                this::returnFromLearning, this::setConcentration);
+                this::returnFromLearning, this::setConcentration, this::recordPracticeOutcome, false);
         centerScroll.setFitToWidth(true);
         centerScroll.getStyleClass().add("scroll-pane-clean");
         root.setCenter(centerScroll);
@@ -1160,7 +1161,7 @@ public class DashboardFrame {
                 alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
                 return;
             }
-            guidedPractice = new GuidedPracticePane(currentUser, task.getValue(), this::onChallengeOrLessonCompleted);
+            guidedPractice = new GuidedPracticePane(currentUser, task.getValue(), this::onChallengeOrLessonCompleted, this::recordPracticeOutcome);
             if (workspaceContainer.getChildren().contains(origin)) switchWorkspaceView("SESSION");
         });
         task.setOnFailed(event -> {
@@ -1396,7 +1397,7 @@ public class DashboardFrame {
         Lesson next = nextLesson();
         boolean courseCompleted = !selectedList.isEmpty() && next == null;
         continueSummary.setText(selectedList.isEmpty() ? "Este curso aún no tiene lecciones."
-                : courseCompleted ? "¡Curso completado! Puedes repasar cualquier lección cuando quieras."
+                : courseCompleted ? "Lecturas completadas. Pon a prueba lo aprendido con los retos finales de cada módulo."
                 : "Tu siguiente paso: " + next.getTitle());
         continueButton.setText(courseCompleted ? "Repasar desde el inicio" : "Continuar aprendiendo");
         continueButton.setDisable(selectedList.isEmpty());
@@ -1438,6 +1439,23 @@ public class DashboardFrame {
             progress.setMaxWidth(Double.MAX_VALUE);
             progress.setAccessibleText(readings + " de " + allModuleLessons.size() + " lecturas completadas");
             heading.getChildren().add(progress);
+            challenges.stream().filter(Challenge::isModuleFinal).findFirst().ifPresent(finalChallenge -> {
+                VBox summary = new VBox(10, WorkspaceUi.label("Lo que has practicado", "card-title"));
+                summary.getStyleClass().add("surface-card");
+                for (Lesson item : allModuleLessons) {
+                    List<Challenge> exercises = item.getChallenges().stream().filter(challenge -> !challenge.isModuleFinal()).toList();
+                    long completed = exercises.stream().filter(challenge -> challengeProgress.get(challenge.getId()) == ChallengeProgress.SOLVED).count();
+                    summary.getChildren().add(WorkspaceUi.label(item.getTitle() + " · " + completed + "/" + exercises.size() + " retos superados", "body-text"));
+                }
+                boolean passed = challengeProgress.get(finalChallenge.getId()) == ChallengeProgress.SOLVED;
+                summary.getChildren().add(WorkspaceUi.label(passed
+                        ? oracleConnected ? "Reto final superado y guardado" : "Reto final resuelto durante esta sesión de prueba"
+                        : "Resuelve el caso práctico para cerrar el módulo.", "body-text"));
+                Button openFinal = WorkspaceUi.button(passed ? "Repasar reto final" : "Resolver reto final", "btn-primary", Theme.IconKind.TROPHY);
+                openFinal.setOnAction(event -> openChallenge(finalChallenge));
+                summary.getChildren().add(openFinal);
+                route.getChildren().add(summary);
+            });
             TitledPane panel = new TitledPane("", route);
             panel.setMinWidth(0);
             panel.setGraphic(heading);
@@ -2409,6 +2427,15 @@ public class DashboardFrame {
     private void onLessonStateChanged() {
         this.lastKnownOfflineExp = currentUser.getTotalExp();
         refreshAllDashboardState();
+    }
+
+    private void recordPracticeOutcome(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome outcome) {
+        if (oracleConnected) return;
+        demoChallengeProgress.merge(outcome.challengeId(), outcome.correct() ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED,
+                (previous, next) -> previous == ChallengeProgress.SOLVED ? previous : next);
+        challengeProgress = Map.copyOf(demoChallengeProgress);
+        populateLessonsForLanguage(activeLanguageKey);
+        renderPracticeCatalog();
     }
 
     private void onChallengeOrLessonCompleted() {

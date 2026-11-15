@@ -38,6 +38,9 @@ class SeedContentConsistencyTest {
         String master = read("11_master_database.sql");
         assertTrue(master.contains(read("02_seed.sql").strip()));
         assertTrue(master.contains(migration.strip()));
+        assertTrue(master.contains(read("13_challenge_guidance.sql").strip()));
+        assertTrue(master.contains(read("14_module_finals.sql").strip()));
+        assertTrue(master.contains(read("00_drop.sql").strip()));
     }
 
     private String read(String filename) throws Exception {

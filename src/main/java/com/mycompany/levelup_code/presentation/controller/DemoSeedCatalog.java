@@ -86,6 +86,7 @@ public final class DemoSeedCatalog {
                 "Ordena el cálculo del doble", "Ordena estas instrucciones para ejecutarlas dentro de main e imprimir el doble de 3.",
                 practiceLesson, 30, List.of("System.out.println(doble);", "int numero = 3;", "int doble = numero * 2;"), List.of(2, 3, 1));
         practiceLesson.addChallenge(ordering);
+        SeedModuleFinals.addTo(languages);
         return languages;
     }
 

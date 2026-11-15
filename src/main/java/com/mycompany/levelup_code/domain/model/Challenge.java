@@ -15,6 +15,10 @@ public abstract class Challenge {
     private int id;
     private int revision;
     private ChallengeGuidance guidance = ChallengeGuidance.EMPTY;
+    private boolean moduleFinal;
+
+    public boolean isModuleFinal() { return moduleFinal; }
+    public void setModuleFinal(boolean moduleFinal) { this.moduleFinal = moduleFinal; }
 
     public ChallengeGuidance getGuidance() { return guidance; }
     public void setGuidance(ChallengeGuidance guidance) {

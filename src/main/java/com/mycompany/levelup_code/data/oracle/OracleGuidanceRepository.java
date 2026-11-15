@@ -36,7 +36,7 @@ final class OracleGuidanceRepository {
     static void save(Connection connection, Challenge challenge) throws SQLException {
         if (!installed(connection)) {
             if (challenge.getGuidance().isEmpty()) return;
-            throw new SQLException("Instala database/13_challenge_guidance.sql para guardar las pistas y explicaciones.");
+            throw new IllegalStateException("Instala database/13_challenge_guidance.sql para guardar las pistas y explicaciones.");
         }
         try (var statement = connection.prepareStatement("UPDATE Retos SET guia_didactica=? WHERE id_reto=?")) {
             statement.setString(1, ChallengeGuidanceCodec.encode(challenge.getGuidance()));

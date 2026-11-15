@@ -90,7 +90,7 @@ BEGIN
         'TGEgYWZpcm1hY2nDs24gwqtQb3JxdWUgZWwgb3BlcmFkb3IgKyBlc3TDoSBkZXNhY29uc2VqYWRvIGVuIHZlcnNpb25lcyByZWNpZW50ZXMgZGUgSmF2YcK7IG5vIGRlc2NyaWJlIGVsIGNvbmNlcHRvIGV2YWx1YWRvLiBsb3cgKyAoaGlnaCAtIGxvdykgLyAyIGV2aXRhIHN1bWFyIGRpcmVjdGFtZW50ZSBkb3Mgw61uZGljZXMgZ3JhbmRlcyBxdWUgcG9kcsOtYW4gZGVzYm9yZGFyIHVuIGludC4=' || CHR(10) ||
         'TGEgYWZpcm1hY2nDs24gwqtQb3JxdWUgY29udmllcnRlIGF1dG9tw6F0aWNhbWVudGUgZWwgYXJyZWdsbyBhIG7Dum1lcm9zIGRlIHB1bnRvIGZsb3RhbnRlwrsgbm8gZGVzY3JpYmUgZWwgY29uY2VwdG8gZXZhbHVhZG8uIGxvdyArIChoaWdoIC0gbG93KSAvIDIgZXZpdGEgc3VtYXIgZGlyZWN0YW1lbnRlIGRvcyDDrW5kaWNlcyBncmFuZGVzIHF1ZSBwb2Ryw61hbiBkZXNib3JkYXIgdW4gaW50Lg==' || CHR(10) ||
         'TGEgYWZpcm1hY2nDs24gwqtQb3JxdWUgcmVkdWNlIGxhIGNvbXBsZWppZGFkIGRlIE8obG9nIG4pIGEgTygxKSBjb25zdGFudGXCuyBubyBkZXNjcmliZSBlbCBjb25jZXB0byBldmFsdWFkby4gbG93ICsgKGhpZ2ggLSBsb3cpIC8gMiBldml0YSBzdW1hciBkaXJlY3RhbWVudGUgZG9zIMOtbmRpY2VzIGdyYW5kZXMgcXVlIHBvZHLDrWFuIGRlc2JvcmRhciB1biBpbnQu');
-    add_guidance(109, 'Dos Punteros: Verificador de Palíndromos', 'Implementa esPalindromo(String texto) usando dos índices para retornar true si la palabra se lee igual en ambos sentidos (ignorando mayúsculas), o false en caso contrario.',
+    add_guidance(109, 'Dos Punteros: Verificador de Palíndromos', 'Implementa esPalindromo(String texto) usando dos índices para retornar true si la palabra se lee igual de izquierda a derecha que de derecha a izquierda (ignorando mayúsculas), o false en caso contrario.',
         TO_CLOB('LEVELUP_OPTIONS_V2') || CHR(10) ||
         'VW4gcGFsw61uZHJvbW8gY29uc2VydmEgc3VzIGNhcmFjdGVyZXMgYWwgbGVlcmxvIGVuIHNlbnRpZG8gY29udHJhcmlvLg==' || CHR(10) ||
         'Tm9ybWFsaXphIGxhcyBtYXnDunNjdWxhcyB5IGNvbXBhcmEgbG9zIGRvcyBleHRyZW1vcyBkZSBsYSBzZWN1ZW5jaWEu' || CHR(10) ||
@@ -138,7 +138,7 @@ BEGIN
         'TGEgYWZpcm1hY2nDs24gwqtFbCBjw7NkaWdvIG5vIGNvbXBpbGEgcG9ycXVlIE9iamVjdCBubyBwcm92ZWUgdW5hIGltcGxlbWVudGFjacOzbiBiYXNlIGRlIGhhc2hDb2RlKCnCuyBubyBkZXNjcmliZSBlbCBjb25jZXB0byBldmFsdWFkby4gRG9zIG9iamV0b3MgaWd1YWxlcyBzZWfDum4gZXF1YWxzIGRlYmVuIHByb2R1Y2lyIGVsIG1pc21vIGhhc2hDb2RlLiBVbiBoYXNoIGNvaW5jaWRlbnRlIHBvciBzw60gc29sbyBubyBnYXJhbnRpemEgaWd1YWxkYWQu' || CHR(10) ||
         'TGEgYWZpcm1hY2nDs24gwqtFbCBIYXNoU2V0IGNvbnZpZXJ0ZSBhdXRvbcOhdGljYW1lbnRlIHRvZG9zIGxvcyBvYmpldG9zIGEgU3RyaW5nIGFudGVzIGRlIGd1YXJkYXJsb3PCuyBubyBkZXNjcmliZSBlbCBjb25jZXB0byBldmFsdWFkby4gRG9zIG9iamV0b3MgaWd1YWxlcyBzZWfDum4gZXF1YWxzIGRlYmVuIHByb2R1Y2lyIGVsIG1pc21vIGhhc2hDb2RlLiBVbiBoYXNoIGNvaW5jaWRlbnRlIHBvciBzw60gc29sbyBubyBnYXJhbnRpemEgaWd1YWxkYWQu' || CHR(10) ||
         'TGEgYWZpcm1hY2nDs24gwqtMYSBKVk0gbGFuemEgTnVsbFBvaW50ZXJFeGNlcHRpb24gYWwgaW52b2NhciBhZGQoKcK7IG5vIGRlc2NyaWJlIGVsIGNvbmNlcHRvIGV2YWx1YWRvLiBEb3Mgb2JqZXRvcyBpZ3VhbGVzIHNlZ8O6biBlcXVhbHMgZGViZW4gcHJvZHVjaXIgZWwgbWlzbW8gaGFzaENvZGUuIFVuIGhhc2ggY29pbmNpZGVudGUgcG9yIHPDrSBzb2xvIG5vIGdhcmFudGl6YSBpZ3VhbGRhZC4=');
-    add_guidance(104, 'Polimorfismo en Python: Sonidos por Especie', 'Completa la función emitir_sonido(tipo: str) -> str para retornar "Guau" con "Perro" y "Miau" con "Gato".',
+    add_guidance(104, 'Polimorfismo en Python: Sonidos por Especie', 'Completa la función emitir_sonido(tipo: str) -> str para retornar "Guau" con "Perro" y "Miau" con "Gato" (ignorando mayúsculas/minúsculas).',
         TO_CLOB('LEVELUP_OPTIONS_V2') || CHR(10) ||
         'SWRlbnRpZmljYSBxdcOpIHNvbmlkbyBjb3JyZXNwb25kZSBhIGNhZGEgZXNwZWNpZS4=' || CHR(10) ||
         'Q29tcGFyYSBsb3Mgbm9tYnJlcyBpZ25vcmFuZG8gbGFzIGRpZmVyZW5jaWFzIGVudHJlIG1hecO6c2N1bGFzIHkgbWluw7pzY3VsYXMu' || CHR(10) ||
