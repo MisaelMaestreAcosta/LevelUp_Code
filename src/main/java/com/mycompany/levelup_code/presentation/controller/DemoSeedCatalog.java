@@ -107,17 +107,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c101 = new CodeChallenge(101, "Polimorfismo: Despacho Dinámico de Sonidos",
                 "Implementa el método emitirSonido(String tipo) para que retorne \"Guau\" cuando reciba \"Perro\" y \"Miau\" cuando reciba \"Gato\" (sin importar mayúsculas o minúsculas).",
                 l1, 60,
-                "public class AnimalSoundSolver {\n"
-                + "    public static String emitirSonido(String tipo) {\n"
-                + "        if (\"Perro\".equalsIgnoreCase(tipo)) {\n"
-                + "            return \"Guau\";\n"
-                + "        }\n"
-                + "        if (\"Gato\".equalsIgnoreCase(tipo)) {\n"
-                + "            return \"Miau\";\n"
-                + "        }\n"
-                + "        return \"Desconocido\";\n"
-                + "    }\n"
-                + "}", 2);
+                SeedChallengeContent.forId(101).starter(), 2);
         c101.addTestCase(new TestCase(1, c101, "Perro", "Guau", false));
         c101.addTestCase(new TestCase(2, c101, "Gato", "Miau", false));
         c101.addTestCase(new TestCase(3, c101, "PERRO", "Guau", true));
@@ -142,17 +132,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c106 = new CodeChallenge(106, "Contratos SOLID: Clasificador de Nivel de Acceso",
                 "Implementa nivelAcceso(String rol) para que retorne \"TOTAL\" cuando reciba \"ADMIN\" y \"LECTURA\" cuando reciba \"ESTUDIANTE\" (ignorando mayúsculas/minúsculas).",
                 l10, 70,
-                "public class AccessPolicySolver {\n"
-                + "    public static String nivelAcceso(String rol) {\n"
-                + "        if (\"ADMIN\".equalsIgnoreCase(rol)) {\n"
-                + "            return \"TOTAL\";\n"
-                + "        }\n"
-                + "        if (\"ESTUDIANTE\".equalsIgnoreCase(rol)) {\n"
-                + "            return \"LECTURA\";\n"
-                + "        }\n"
-                + "        return \"DENEGADO\";\n"
-                + "    }\n"
-                + "}", 2);
+                SeedChallengeContent.forId(106).starter(), 2);
         c106.addTestCase(new TestCase(4, c106, "ADMIN", "TOTAL", false));
         c106.addTestCase(new TestCase(5, c106, "ESTUDIANTE", "LECTURA", false));
         c106.addTestCase(new TestCase(6, c106, "admin", "TOTAL", true));
@@ -177,18 +157,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c103 = new CodeChallenge(103, "Búsqueda Binaria Segura O(log n)",
                 "Implementa search(int[] a, int target) retornando el índice (0-based) del elemento buscado o -1 si no se encuentra en el arreglo ordenado.",
                 l2, 90,
-                "public class BinarySearchSolver {\n"
-                + "    public static int search(int[] a, int target) {\n"
-                + "        int low = 0, high = a.length - 1;\n"
-                + "        while (low <= high) {\n"
-                + "            int mid = low + (high - low) / 2;\n"
-                + "            if (a[mid] == target) return mid;\n"
-                + "            if (a[mid] < target) low = mid + 1;\n"
-                + "            else high = mid - 1;\n"
-                + "        }\n"
-                + "        return -1;\n"
-                + "    }\n"
-                + "}", 2);
+                SeedChallengeContent.forId(103).starter(), 2);
         c103.addTestCase(new TestCase(7, c103, "[2, 5, 8, 12, 16], target=12", "3", false));
         c103.addTestCase(new TestCase(8, c103, "[2, 5, 8, 12, 16], target=2", "0", false));
         c103.addTestCase(new TestCase(9, c103, "[2, 5, 8, 12, 16], target=7", "-1", true));
@@ -211,20 +180,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c109 = new CodeChallenge(109, "Dos Punteros: Verificador de Palíndromos",
                 "Implementa esPalindromo(String texto) usando dos índices para retornar true si la palabra se lee igual en ambos sentidos (ignorando mayúsculas), o false en caso contrario.",
                 l11, 85,
-                "public class PalindromeSolver {\n"
-                + "    public static boolean esPalindromo(String texto) {\n"
-                + "        String s = texto.toLowerCase();\n"
-                + "        int left = 0, right = s.length() - 1;\n"
-                + "        while (left < right) {\n"
-                + "            if (s.charAt(left) != s.charAt(right)) {\n"
-                + "                return false;\n"
-                + "            }\n"
-                + "            left++;\n"
-                + "            right--;\n"
-                + "        }\n"
-                + "        return true;\n"
-                + "    }\n"
-                + "}", 2);
+                SeedChallengeContent.forId(109).starter(), 2);
         c109.addTestCase(new TestCase(10, c109, "reconocer", "true", false));
         c109.addTestCase(new TestCase(11, c109, "levelup", "false", false));
         c109.addTestCase(new TestCase(12, c109, "Radar", "true", true));
@@ -247,17 +203,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c111 = new CodeChallenge(111, "Colecciones: Suma de Números Pares",
                 "Implementa sumarPares(int[] nums) para recorrer la secuencia y retornar la suma de todos los números pares contenidos en el arreglo.",
                 l3, 80,
-                "public class EvenSumSolver {\n"
-                + "    public static int sumarPares(int[] nums) {\n"
-                + "        int total = 0;\n"
-                + "        for (int n : nums) {\n"
-                + "            if (n % 2 == 0) {\n"
-                + "                total += n;\n"
-                + "            }\n"
-                + "        }\n"
-                + "        return total;\n"
-                + "    }\n"
-                + "}", 2);
+                SeedChallengeContent.forId(111).starter(), 2);
         c111.addTestCase(new TestCase(13, c111, "[4, 7, 2, 9, 6]", "12", false));
         c111.addTestCase(new TestCase(14, c111, "[1, 3, 5]", "0", false));
         c111.addTestCase(new TestCase(15, c111, "[10, 20, 3, 8]", "38", true));
@@ -280,18 +226,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c113 = new CodeChallenge(113, "Tablas Hash: Primer Elemento Duplicado en O(n)",
                 "Implementa primerDuplicado(int[] nums) usando un HashSet para retornar el primer número que aparece repetido al recorrer el arreglo, o -1 si todos son únicos.",
                 l12, 110,
-                "import java.util.HashSet;\nimport java.util.Set;\n\n"
-                + "public class DuplicateFinderSolver {\n"
-                + "    public static int primerDuplicado(int[] nums) {\n"
-                + "        Set<Integer> vistos = new HashSet<>();\n"
-                + "        for (int n : nums) {\n"
-                + "            if (!vistos.add(n)) {\n"
-                + "                return n;\n"
-                + "            }\n"
-                + "        }\n"
-                + "        return -1;\n"
-                + "    }\n"
-                + "}", 2);
+                SeedChallengeContent.forId(113).starter(), 2);
         c113.addTestCase(new TestCase(16, c113, "[3, 5, 2, 5, 8, 2]", "5", false));
         c113.addTestCase(new TestCase(17, c113, "[10, 20, 30, 10]", "10", false));
         c113.addTestCase(new TestCase(18, c113, "[1, 2, 3, 4]", "-1", true));
@@ -332,12 +267,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c104 = new CodeChallenge(104, "Polimorfismo en Python: Sonidos por Especie",
                 "Completa la función emitir_sonido(tipo: str) -> str para retornar \"Guau\" con \"Perro\" y \"Miau\" con \"Gato\".",
                 l4, 65,
-                "def emitir_sonido(tipo: str) -> str:\n"
-                + "    if tipo.lower() == \"perro\":\n"
-                + "        return \"Guau\"\n"
-                + "    elif tipo.lower() == \"gato\":\n"
-                + "        return \"Miau\"\n"
-                + "    return \"Desconocido\"\n", 2);
+                SeedChallengeContent.forId(104).starter(), 2);
         c104.addTestCase(new TestCase(19, c104, "Perro", "Guau", false));
         c104.addTestCase(new TestCase(20, c104, "Gato", "Miau", false));
         c104.addTestCase(new TestCase(21, c104, "PERRO", "Guau", true));
@@ -359,12 +289,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c203 = new CodeChallenge(203, "Protocolos en Python: Clasificador de Nivel de Acceso",
                 "Completa nivel_acceso(rol: str) -> str para retornar \"TOTAL\" cuando reciba \"ADMIN\" y \"LECTURA\" cuando reciba \"ESTUDIANTE\".",
                 l13, 70,
-                "def nivel_acceso(rol: str) -> str:\n"
-                + "    if rol.lower() == \"admin\":\n"
-                + "        return \"TOTAL\"\n"
-                + "    elif rol.lower() == \"estudiante\":\n"
-                + "        return \"LECTURA\"\n"
-                + "    return \"DENEGADO\"\n", 2);
+                SeedChallengeContent.forId(203).starter(), 2);
         c203.addTestCase(new TestCase(22, c203, "ADMIN", "TOTAL", false));
         c203.addTestCase(new TestCase(23, c203, "ESTUDIANTE", "LECTURA", false));
         c203.addTestCase(new TestCase(24, c203, "admin", "TOTAL", true));
@@ -386,18 +311,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c205 = new CodeChallenge(205, "Búsqueda Binaria en Python con División Entera (//)",
                 "Completa search(a: list, target: int) -> int para retornar el índice del elemento buscado en la lista ordenada o -1 si no existe.",
                 l5, 90,
-                "def search(a: list, target: int) -> int:\n"
-                + "    low = 0\n"
-                + "    high = len(a) - 1\n"
-                + "    while low <= high:\n"
-                + "        mid = (low + high) // 2\n"
-                + "        if a[mid] == target:\n"
-                + "            return mid\n"
-                + "        elif a[mid] < target:\n"
-                + "            low = mid + 1\n"
-                + "        else:\n"
-                + "            high = mid - 1\n"
-                + "    return -1\n", 2);
+                SeedChallengeContent.forId(205).starter(), 2);
         c205.addTestCase(new TestCase(25, c205, "[2, 5, 8, 12, 16], target=12", "3", false));
         c205.addTestCase(new TestCase(26, c205, "[2, 5, 8, 12, 16], target=2", "0", false));
         c205.addTestCase(new TestCase(27, c205, "[2, 5, 8, 12, 16], target=7", "-1", true));
@@ -419,9 +333,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c207 = new CodeChallenge(207, "Slicing en Python: Detector de Palíndromos",
                 "Completa es_palindromo(texto: str) -> bool invirtiendo o comparando la cadena en minúsculas para evaluar si es un palíndromo.",
                 l14, 85,
-                "def es_palindromo(texto: str) -> bool:\n"
-                + "    limpio = texto.lower()\n"
-                + "    return limpio == limpio[::-1]\n", 2);
+                SeedChallengeContent.forId(207).starter(), 2);
         c207.addTestCase(new TestCase(28, c207, "reconocer", "true", false));
         c207.addTestCase(new TestCase(29, c207, "python", "false", false));
         c207.addTestCase(new TestCase(30, c207, "Radar", "true", true));
@@ -443,12 +355,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c209 = new CodeChallenge(209, "Listas en Python: Suma de Elementos Pares",
                 "Completa sumar_pares(nums: list) -> int para retornar la suma acumulada de los números divisibles por 2.",
                 l6, 80,
-                "def sumar_pares(nums: list) -> int:\n"
-                + "    total = 0\n"
-                + "    for n in nums:\n"
-                + "        if n % 2 == 0:\n"
-                + "            total += n\n"
-                + "    return total\n", 2);
+                SeedChallengeContent.forId(209).starter(), 2);
         c209.addTestCase(new TestCase(31, c209, "[4, 7, 2, 9, 6]", "12", false));
         c209.addTestCase(new TestCase(32, c209, "[1, 3, 5]", "0", false));
         c209.addTestCase(new TestCase(33, c209, "[10, 20, 3, 8]", "38", true));
@@ -470,13 +377,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c211 = new CodeChallenge(211, "Conjuntos Hash en Python: Primer Duplicado en O(n)",
                 "Completa primer_duplicado(nums: list) -> int utilizando un conjunto (set) para retornar el primer valor repetido o -1 si no hay duplicados.",
                 l15, 110,
-                "def primer_duplicado(nums: list) -> int:\n"
-                + "    vistos = set()\n"
-                + "    for n in nums:\n"
-                + "        if n in vistos:\n"
-                + "            return n\n"
-                + "        vistos.add(n)\n"
-                + "    return -1\n", 2);
+                SeedChallengeContent.forId(211).starter(), 2);
         c211.addTestCase(new TestCase(34, c211, "[3, 5, 2, 5, 8, 2]", "5", false));
         c211.addTestCase(new TestCase(35, c211, "[10, 20, 30, 10]", "10", false));
         c211.addTestCase(new TestCase(36, c211, "[1, 2, 3, 4]", "-1", true));
@@ -517,16 +418,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c105 = new CodeChallenge(105, "Polimorfismo en C++: Clasificación de Sonidos",
                 "Completa emitirSonido(std::string tipo) para retornar \"Guau\" cuando reciba \"Perro\" y \"Miau\" cuando reciba \"Gato\".",
                 l7, 75,
-                "#include <string>\n\n"
-                + "std::string emitirSonido(std::string tipo) {\n"
-                + "    if (tipo == \"Perro\" || tipo == \"PERRO\" || tipo == \"perro\") {\n"
-                + "        return \"Guau\";\n"
-                + "    }\n"
-                + "    if (tipo == \"Gato\" || tipo == \"GATO\" || tipo == \"gato\") {\n"
-                + "        return \"Miau\";\n"
-                + "    }\n"
-                + "    return \"Desconocido\";\n"
-                + "}\n", 2);
+                SeedChallengeContent.forId(105).starter(), 2);
         c105.addTestCase(new TestCase(37, c105, "Perro", "Guau", false));
         c105.addTestCase(new TestCase(38, c105, "Gato", "Miau", false));
         c105.addTestCase(new TestCase(39, c105, "PERRO", "Guau", true));
@@ -548,16 +440,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c303 = new CodeChallenge(303, "Contratos en C++: Clasificador de Nivel de Acceso",
                 "Completa nivelAcceso(std::string rol) para retornar \"TOTAL\" cuando reciba \"ADMIN\" y \"LECTURA\" cuando reciba \"ESTUDIANTE\".",
                 l16, 75,
-                "#include <string>\n\n"
-                + "std::string nivelAcceso(std::string rol) {\n"
-                + "    if (rol == \"ADMIN\" || rol == \"admin\") {\n"
-                + "        return \"TOTAL\";\n"
-                + "    }\n"
-                + "    if (rol == \"ESTUDIANTE\" || rol == \"estudiante\") {\n"
-                + "        return \"LECTURA\";\n"
-                + "    }\n"
-                + "    return \"DENEGADO\";\n"
-                + "}\n", 2);
+                SeedChallengeContent.forId(303).starter(), 2);
         c303.addTestCase(new TestCase(40, c303, "ADMIN", "TOTAL", false));
         c303.addTestCase(new TestCase(41, c303, "ESTUDIANTE", "LECTURA", false));
         c303.addTestCase(new TestCase(42, c303, "admin", "TOTAL", true));
@@ -579,18 +462,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c305 = new CodeChallenge(305, "Búsqueda Binaria en C++ sobre const std::vector<int>&",
                 "Completa search(const std::vector<int>& a, int target) retornando el índice donde se ubica target o -1 si no está presente.",
                 l8, 95,
-                "#include <vector>\n\n"
-                + "int search(const std::vector<int>& a, int target) {\n"
-                + "    int low = 0;\n"
-                + "    int high = static_cast<int>(a.size()) - 1;\n"
-                + "    while (low <= high) {\n"
-                + "        int mid = low + (high - low) / 2;\n"
-                + "        if (a[mid] == target) return mid;\n"
-                + "        if (a[mid] < target) low = mid + 1;\n"
-                + "        else high = mid - 1;\n"
-                + "    }\n"
-                + "    return -1;\n"
-                + "}\n", 2);
+                SeedChallengeContent.forId(305).starter(), 2);
         c305.addTestCase(new TestCase(43, c305, "[2, 5, 8, 12, 16], target=12", "3", false));
         c305.addTestCase(new TestCase(44, c305, "[2, 5, 8, 12, 16], target=2", "0", false));
         c305.addTestCase(new TestCase(45, c305, "[2, 5, 8, 12, 16], target=7", "-1", true));
@@ -612,19 +484,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c307 = new CodeChallenge(307, "Dos Índices en C++: Verificador de Palíndromos",
                 "Completa esPalindromo(std::string texto) recorriendo desde los extremos left y right para evaluar si la cadena es palíndroma.",
                 l17, 90,
-                "#include <string>\n#include <cctype>\n\n"
-                + "bool esPalindromo(std::string texto) {\n"
-                + "    int left = 0;\n"
-                + "    int right = static_cast<int>(texto.size()) - 1;\n"
-                + "    while (left < right) {\n"
-                + "        if (std::tolower(texto[left]) != std::tolower(texto[right])) {\n"
-                + "            return false;\n"
-                + "        }\n"
-                + "        left++;\n"
-                + "        right--;\n"
-                + "    }\n"
-                + "    return true;\n"
-                + "}\n", 2);
+                SeedChallengeContent.forId(307).starter(), 2);
         c307.addTestCase(new TestCase(46, c307, "reconocer", "true", false));
         c307.addTestCase(new TestCase(47, c307, "puntero", "false", false));
         c307.addTestCase(new TestCase(48, c307, "Radar", "true", true));
@@ -646,16 +506,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c309 = new CodeChallenge(309, "STL std::vector: Acumulador de Elementos Pares",
                 "Completa sumarPares(const std::vector<int>& nums) para acumular y retornar la suma de todos los enteros pares del vector.",
                 l9, 85,
-                "#include <vector>\n\n"
-                + "int sumarPares(const std::vector<int>& nums) {\n"
-                + "    int total = 0;\n"
-                + "    for (int n : nums) {\n"
-                + "        if (n % 2 == 0) {\n"
-                + "            total += n;\n"
-                + "        }\n"
-                + "    }\n"
-                + "    return total;\n"
-                + "}\n", 2);
+                SeedChallengeContent.forId(309).starter(), 2);
         c309.addTestCase(new TestCase(49, c309, "[4, 7, 2, 9, 6]", "12", false));
         c309.addTestCase(new TestCase(50, c309, "[1, 3, 5]", "0", false));
         c309.addTestCase(new TestCase(51, c309, "[10, 20, 3, 8]", "38", true));
@@ -677,17 +528,7 @@ public final class DemoSeedCatalog {
         CodeChallenge c311 = new CodeChallenge(311, "STL std::unordered_set: Primer Duplicado en O(n)",
                 "Completa primerDuplicado(const std::vector<int>& nums) empleando std::unordered_set<int> para retornar el primer valor repetido o -1.",
                 l18, 115,
-                "#include <vector>\n#include <unordered_set>\n\n"
-                + "int primerDuplicado(const std::vector<int>& nums) {\n"
-                + "    std::unordered_set<int> vistos;\n"
-                + "    for (int n : nums) {\n"
-                + "        if (vistos.count(n) > 0) {\n"
-                + "            return n;\n"
-                + "        }\n"
-                + "        vistos.insert(n);\n"
-                + "    }\n"
-                + "    return -1;\n"
-                + "}\n", 2);
+                SeedChallengeContent.forId(311).starter(), 2);
         c311.addTestCase(new TestCase(52, c311, "[3, 5, 2, 5, 8, 2]", "5", false));
         c311.addTestCase(new TestCase(53, c311, "[10, 20, 30, 10]", "10", false));
         c311.addTestCase(new TestCase(54, c311, "[1, 2, 3, 4]", "-1", true));

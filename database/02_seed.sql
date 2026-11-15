@@ -625,7 +625,7 @@ VALUES (
 );
 
 -- =============================================================================
--- 6. RETO_CODIGO (18 Retos de Código con plantillas listas para evaluar)
+-- 6. RETO_CODIGO (18 Retos de Código con plantillas por completar)
 -- =============================================================================
 
 -- Java 101: Sonidos polimórficos
@@ -634,15 +634,11 @@ VALUES (
     101,
     'public class AnimalSoundSolver {' || CHR(10) ||
     '    public static String emitirSonido(String tipo) {' || CHR(10) ||
-    '        if ("Perro".equalsIgnoreCase(tipo)) {' || CHR(10) ||
-    '            return "Guau";' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        if ("Gato".equalsIgnoreCase(tipo)) {' || CHR(10) ||
-    '            return "Miau";' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        return "Desconocido";' || CHR(10) ||
+    '        // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '        return "";' || CHR(10) ||
     '    }' || CHR(10) ||
-    '}',
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -652,15 +648,11 @@ VALUES (
     106,
     'public class AccessPolicySolver {' || CHR(10) ||
     '    public static String nivelAcceso(String rol) {' || CHR(10) ||
-    '        if ("ADMIN".equalsIgnoreCase(rol)) {' || CHR(10) ||
-    '            return "TOTAL";' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        if ("ESTUDIANTE".equalsIgnoreCase(rol)) {' || CHR(10) ||
-    '            return "LECTURA";' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        return "DENEGADO";' || CHR(10) ||
+    '        // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '        return "";' || CHR(10) ||
     '    }' || CHR(10) ||
-    '}',
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -670,16 +662,11 @@ VALUES (
     103,
     'public class BinarySearchSolver {' || CHR(10) ||
     '    public static int search(int[] a, int target) {' || CHR(10) ||
-    '        int low = 0, high = a.length - 1;' || CHR(10) ||
-    '        while (low <= high) {' || CHR(10) ||
-    '            int mid = low + (high - low) / 2;' || CHR(10) ||
-    '            if (a[mid] == target) return mid;' || CHR(10) ||
-    '            if (a[mid] < target) low = mid + 1;' || CHR(10) ||
-    '            else high = mid - 1;' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        return -1;' || CHR(10) ||
+    '        // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '        return 0;' || CHR(10) ||
     '    }' || CHR(10) ||
-    '}',
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -689,18 +676,11 @@ VALUES (
     109,
     'public class PalindromeSolver {' || CHR(10) ||
     '    public static boolean esPalindromo(String texto) {' || CHR(10) ||
-    '        String s = texto.toLowerCase();' || CHR(10) ||
-    '        int left = 0, right = s.length() - 1;' || CHR(10) ||
-    '        while (left < right) {' || CHR(10) ||
-    '            if (s.charAt(left) != s.charAt(right)) {' || CHR(10) ||
-    '                return false;' || CHR(10) ||
-    '            }' || CHR(10) ||
-    '            left++;' || CHR(10) ||
-    '            right--;' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        return true;' || CHR(10) ||
+    '        // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '        return false;' || CHR(10) ||
     '    }' || CHR(10) ||
-    '}',
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -710,15 +690,11 @@ VALUES (
     111,
     'public class EvenSumSolver {' || CHR(10) ||
     '    public static int sumarPares(int[] nums) {' || CHR(10) ||
-    '        int total = 0;' || CHR(10) ||
-    '        for (int n : nums) {' || CHR(10) ||
-    '            if (n % 2 == 0) {' || CHR(10) ||
-    '                total += n;' || CHR(10) ||
-    '            }' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        return total;' || CHR(10) ||
+    '        // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '        return 0;' || CHR(10) ||
     '    }' || CHR(10) ||
-    '}',
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -727,18 +703,15 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     113,
     'import java.util.HashSet;' || CHR(10) ||
-    'import java.util.Set;' || CHR(10) || CHR(10) ||
+    'import java.util.Set;' || CHR(10) ||
+    '' || CHR(10) ||
     'public class DuplicateFinderSolver {' || CHR(10) ||
     '    public static int primerDuplicado(int[] nums) {' || CHR(10) ||
-    '        Set<Integer> vistos = new HashSet<>();' || CHR(10) ||
-    '        for (int n : nums) {' || CHR(10) ||
-    '            if (!vistos.add(n)) {' || CHR(10) ||
-    '                return n;' || CHR(10) ||
-    '            }' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        return -1;' || CHR(10) ||
+    '        // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '        return 0;' || CHR(10) ||
     '    }' || CHR(10) ||
-    '}',
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -747,11 +720,9 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     104,
     'def emitir_sonido(tipo: str) -> str:' || CHR(10) ||
-    '    if tipo.lower() == "perro":' || CHR(10) ||
-    '        return "Guau"' || CHR(10) ||
-    '    elif tipo.lower() == "gato":' || CHR(10) ||
-    '        return "Miau"' || CHR(10) ||
-    '    return "Desconocido"',
+    '    # TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return ""' || CHR(10) ||
+    '',
     2000
 );
 
@@ -760,11 +731,9 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     203,
     'def nivel_acceso(rol: str) -> str:' || CHR(10) ||
-    '    if rol.lower() == "admin":' || CHR(10) ||
-    '        return "TOTAL"' || CHR(10) ||
-    '    elif rol.lower() == "estudiante":' || CHR(10) ||
-    '        return "LECTURA"' || CHR(10) ||
-    '    return "DENEGADO"',
+    '    # TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return ""' || CHR(10) ||
+    '',
     2000
 );
 
@@ -773,17 +742,9 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     205,
     'def search(a: list, target: int) -> int:' || CHR(10) ||
-    '    low = 0' || CHR(10) ||
-    '    high = len(a) - 1' || CHR(10) ||
-    '    while low <= high:' || CHR(10) ||
-    '        mid = (low + high) // 2' || CHR(10) ||
-    '        if a[mid] == target:' || CHR(10) ||
-    '            return mid' || CHR(10) ||
-    '        elif a[mid] < target:' || CHR(10) ||
-    '            low = mid + 1' || CHR(10) ||
-    '        else:' || CHR(10) ||
-    '            high = mid - 1' || CHR(10) ||
-    '    return -1',
+    '    # TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return 0' || CHR(10) ||
+    '',
     2000
 );
 
@@ -792,8 +753,9 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     207,
     'def es_palindromo(texto: str) -> bool:' || CHR(10) ||
-    '    limpio = texto.lower()' || CHR(10) ||
-    '    return limpio == limpio[::-1]',
+    '    # TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return False' || CHR(10) ||
+    '',
     2000
 );
 
@@ -802,11 +764,9 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     209,
     'def sumar_pares(nums: list) -> int:' || CHR(10) ||
-    '    total = 0' || CHR(10) ||
-    '    for n in nums:' || CHR(10) ||
-    '        if n % 2 == 0:' || CHR(10) ||
-    '            total += n' || CHR(10) ||
-    '    return total',
+    '    # TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return 0' || CHR(10) ||
+    '',
     2000
 );
 
@@ -815,12 +775,9 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     211,
     'def primer_duplicado(nums: list) -> int:' || CHR(10) ||
-    '    vistos = set()' || CHR(10) ||
-    '    for n in nums:' || CHR(10) ||
-    '        if n in vistos:' || CHR(10) ||
-    '            return n' || CHR(10) ||
-    '        vistos.add(n)' || CHR(10) ||
-    '    return -1',
+    '    # TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return 0' || CHR(10) ||
+    '',
     2000
 );
 
@@ -828,16 +785,13 @@ VALUES (
 INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     105,
-    '#include <string>' || CHR(10) || CHR(10) ||
+    '#include <string>' || CHR(10) ||
+    '' || CHR(10) ||
     'std::string emitirSonido(std::string tipo) {' || CHR(10) ||
-    '    if (tipo == "Perro" || tipo == "PERRO" || tipo == "perro") {' || CHR(10) ||
-    '        return "Guau";' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    if (tipo == "Gato" || tipo == "GATO" || tipo == "gato") {' || CHR(10) ||
-    '        return "Miau";' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    return "Desconocido";' || CHR(10) ||
-    '}',
+    '    // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return "";' || CHR(10) ||
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -845,16 +799,13 @@ VALUES (
 INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     303,
-    '#include <string>' || CHR(10) || CHR(10) ||
+    '#include <string>' || CHR(10) ||
+    '' || CHR(10) ||
     'std::string nivelAcceso(std::string rol) {' || CHR(10) ||
-    '    if (rol == "ADMIN" || rol == "admin") {' || CHR(10) ||
-    '        return "TOTAL";' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    if (rol == "ESTUDIANTE" || rol == "estudiante") {' || CHR(10) ||
-    '        return "LECTURA";' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    return "DENEGADO";' || CHR(10) ||
-    '}',
+    '    // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return "";' || CHR(10) ||
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -862,18 +813,13 @@ VALUES (
 INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     305,
-    '#include <vector>' || CHR(10) || CHR(10) ||
+    '#include <vector>' || CHR(10) ||
+    '' || CHR(10) ||
     'int search(const std::vector<int>& a, int target) {' || CHR(10) ||
-    '    int low = 0;' || CHR(10) ||
-    '    int high = static_cast<int>(a.size()) - 1;' || CHR(10) ||
-    '    while (low <= high) {' || CHR(10) ||
-    '        int mid = low + (high - low) / 2;' || CHR(10) ||
-    '        if (a[mid] == target) return mid;' || CHR(10) ||
-    '        if (a[mid] < target) low = mid + 1;' || CHR(10) ||
-    '        else high = mid - 1;' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    return -1;' || CHR(10) ||
-    '}',
+    '    // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return 0;' || CHR(10) ||
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -882,19 +828,13 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     307,
     '#include <string>' || CHR(10) ||
-    '#include <cctype>' || CHR(10) || CHR(10) ||
+    '#include <cctype>' || CHR(10) ||
+    '' || CHR(10) ||
     'bool esPalindromo(std::string texto) {' || CHR(10) ||
-    '    int left = 0;' || CHR(10) ||
-    '    int right = static_cast<int>(texto.size()) - 1;' || CHR(10) ||
-    '    while (left < right) {' || CHR(10) ||
-    '        if (std::tolower(texto[left]) != std::tolower(texto[right])) {' || CHR(10) ||
-    '            return false;' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        left++;' || CHR(10) ||
-    '        right--;' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    return true;' || CHR(10) ||
-    '}',
+    '    // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return false;' || CHR(10) ||
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -902,16 +842,13 @@ VALUES (
 INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     309,
-    '#include <vector>' || CHR(10) || CHR(10) ||
+    '#include <vector>' || CHR(10) ||
+    '' || CHR(10) ||
     'int sumarPares(const std::vector<int>& nums) {' || CHR(10) ||
-    '    int total = 0;' || CHR(10) ||
-    '    for (int n : nums) {' || CHR(10) ||
-    '        if (n % 2 == 0) {' || CHR(10) ||
-    '            total += n;' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    return total;' || CHR(10) ||
-    '}',
+    '    // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return 0;' || CHR(10) ||
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
@@ -920,17 +857,13 @@ INSERT INTO Reto_Codigo (id_reto, codigo_inicial, limite_tiempo_ms)
 VALUES (
     311,
     '#include <vector>' || CHR(10) ||
-    '#include <unordered_set>' || CHR(10) || CHR(10) ||
+    '#include <unordered_set>' || CHR(10) ||
+    '' || CHR(10) ||
     'int primerDuplicado(const std::vector<int>& nums) {' || CHR(10) ||
-    '    std::unordered_set<int> vistos;' || CHR(10) ||
-    '    for (int n : nums) {' || CHR(10) ||
-    '        if (vistos.count(n) > 0) {' || CHR(10) ||
-    '            return n;' || CHR(10) ||
-    '        }' || CHR(10) ||
-    '        vistos.insert(n);' || CHR(10) ||
-    '    }' || CHR(10) ||
-    '    return -1;' || CHR(10) ||
-    '}',
+    '    // TODO: implementa la solución siguiendo el enunciado.' || CHR(10) ||
+    '    return 0;' || CHR(10) ||
+    '}' || CHR(10) ||
+    '',
     2000
 );
 
