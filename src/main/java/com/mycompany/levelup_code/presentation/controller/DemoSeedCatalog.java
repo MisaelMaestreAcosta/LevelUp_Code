@@ -59,6 +59,7 @@ public final class DemoSeedCatalog {
                 for (Lesson lesson : module.getLessons()) {
                     for (com.mycompany.levelup_code.domain.model.Challenge challenge : lesson.getChallenges()) {
                         int id = challenge.getId();
+                        challenge.setGuidance(SeedChallengeGuidance.forChallenge(challenge));
                         if (id == 113 || id == 114 || id == 211 || id == 212 || id == 311 || id == 312) {
                             challenge.setDifficulty(com.mycompany.levelup_code.domain.enums.ChallengeDifficulty.DIFICIL);
                         } else if (id == 101 || id == 102 || id == 106 || id == 107

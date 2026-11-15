@@ -101,6 +101,8 @@ public class OracleChallengeRepository implements ChallengeRepository {
             }
         }
 
+        OracleGuidanceRepository.load(conn, lessonsById.values().stream()
+                .flatMap(lesson -> lesson.getChallenges().stream()).toList());
         if (codeChallengesById.isEmpty()) return;
         String casesSql = "SELECT cp.id_caso, cp.id_reto, cp.entrada, cp.salida_esperada, cp.es_oculto "
                 + "FROM Casos_Prueba cp "
@@ -162,6 +164,7 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
     private Challenge mapChallengeWithLesson(Connection conn, ResultSet rs, Lesson lesson) throws SQLException {
         Challenge challenge = mapChallengeRow(rs, lesson);
+        OracleGuidanceRepository.load(conn, List.of(challenge));
         if (!(challenge instanceof CodeChallenge codeChallenge)) return challenge;
 
         String casesSql = "SELECT id_caso, entrada, salida_esperada, es_oculto "

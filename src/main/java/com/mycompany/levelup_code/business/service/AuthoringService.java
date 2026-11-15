@@ -29,6 +29,10 @@ public final class AuthoringService {
                 || !quiz.getOptions().contains(quiz.getCorrectAnswer()) || quiz.getCorrectAnswer().length() > 200)) {
             throw new IllegalArgumentException("Añade al menos dos opciones distintas y selecciona la respuesta correcta, de hasta 200 caracteres.");
         }
+        if (challenge instanceof QuizChallenge quiz && !challenge.getGuidance().optionFeedback().isEmpty()
+                && challenge.getGuidance().optionFeedback().size() != quiz.getOptions().size()) {
+            throw new IllegalArgumentException("Conserva una explicación por cada opción del quiz.");
+        }
         if (challenge instanceof OutputPredictionChallenge prediction
                 && (prediction.getCodeSnippet() == null || prediction.getCodeSnippet().isBlank())) {
             throw new IllegalArgumentException("Añade el código cuya salida debe predecir el estudiante.");

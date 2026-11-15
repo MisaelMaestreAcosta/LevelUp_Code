@@ -36,6 +36,7 @@ public final class DatabaseDiagnostics {
             new Requirement("09_content_versions.sql", List.of("VERSION_RETO/TABLE", "VERSION_CASO_PRUEBA/TABLE",
                     "TRG_INTENTO_VERSION/TRIGGER"), List.of("INTENTOS.ID_VERSION_RETO")),
             new Requirement("10_challenge_types.sql", List.of("RETO_PREDICCION/TABLE", "RETO_ORDENAMIENTO/TABLE"), List.of()),
+            new Requirement("13_challenge_guidance.sql", List.of(), List.of("RETOS.GUIA_DIDACTICA", "VERSION_RETO.GUIA_DIDACTICA")),
             new Requirement("03_plsql_gamificacion.sql", List.of("PKG_GAMIFICACION/PACKAGE",
                     "PKG_GAMIFICACION/PACKAGE BODY", "TRG_AUDIT_USUARIOS/TRIGGER"), List.of("INTENTOS.ID_SOLICITUD"))
     );

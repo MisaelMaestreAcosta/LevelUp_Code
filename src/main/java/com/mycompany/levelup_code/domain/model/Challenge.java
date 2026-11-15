@@ -14,6 +14,12 @@ public abstract class Challenge {
     // Identificador único del reto
     private int id;
     private int revision;
+    private ChallengeGuidance guidance = ChallengeGuidance.EMPTY;
+
+    public ChallengeGuidance getGuidance() { return guidance; }
+    public void setGuidance(ChallengeGuidance guidance) {
+        this.guidance = java.util.Objects.requireNonNull(guidance);
+    }
 
     public int getRevision() { return revision; }
     public void setRevision(int revision) { this.revision = revision; }

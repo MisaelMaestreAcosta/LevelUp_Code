@@ -87,6 +87,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/09_content_versions.sql`](database/09_content_versions.sql) (conserva versiones del contenido y vincula intentos)
    - [`database/10_challenge_types.sql`](database/10_challenge_types.sql) (añade predicción, depuración y ordenamiento)
    - [`database/12_seed_starter_templates.sql`](database/12_seed_starter_templates.sql) (separa las plantillas de las soluciones y conserva el historial)
+   - [`database/13_challenge_guidance.sql`](database/13_challenge_guidance.sql) (guarda pistas y explicaciones por versión del reto)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
    En una base existente, aplica una vez los scripts 05–10 que falten y recompila

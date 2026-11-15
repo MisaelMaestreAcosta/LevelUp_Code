@@ -59,6 +59,7 @@ public final class CodeOrderingFrame extends Stage implements LearningPage {
     private boolean uncertain;
     private boolean celebrated;
     private boolean showResult;
+    private int hintStage;
 
     public CodeOrderingFrame(User user, CodeOrderingChallenge challenge, Runnable callback, boolean preview) {
         this.user = user;
@@ -103,8 +104,15 @@ public final class CodeOrderingFrame extends Stage implements LearningPage {
         Button history = new Button("Ver intentos");
         history.setDisable(user == null || !AppContext.getInstance().isOracleConnected() || preview);
         history.setOnAction(event -> history());
+        Button hint = new Button("Ver pista");
+        hint.getStyleClass().add("btn-secondary");
+        hint.setOnAction(event -> {
+            hintStage = Math.min(3, hintStage + 1);
+            status.setText(challenge.getGuidance().hint(hintStage, challenge));
+            hint.setText(hintStage == 3 ? "Pistas completas" : "Ver pista " + (hintStage + 1));
+        });
         controls.getChildren().addAll(title, statement, WorkspaceUi.label("Arrastra los fragmentos para ordenarlos. También puedes seleccionar uno y usar Subir/Bajar o Alt + ↑/↓.", "body-text"),
-                fragments, new FlowPane(8, 8, up, down, submit, history));
+                fragments, new FlowPane(8, 8, up, down, submit, hint, history));
         VBox root = new VBox(12, controls, lupoFeedback, draftStatus);
         root.getStyleClass().addAll("root-shell", "learning-workspace", "ordering-workspace");
         root.setPadding(new javafx.geometry.Insets(20));
@@ -313,6 +321,9 @@ public final class CodeOrderingFrame extends Stage implements LearningPage {
             }
             status.setText((result.correct() ? "¡Orden correcto!" : "Ese orden aún no resuelve el ejercicio. Prueba de nuevo.")
                     + (result.saved() == null ? " Práctica local sin XP." : " Intento guardado · +" + result.saved().getEarnedExperience() + " XP."));
+            if (result.correct() && !challenge.getGuidance().explanation().isBlank()) {
+                status.setText(status.getText() + "\n" + challenge.getGuidance().explanation());
+            }
             saveDraft();
             if (result.correct() && !celebrated) {
                 celebrated = true;

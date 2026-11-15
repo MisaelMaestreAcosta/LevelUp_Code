@@ -18,7 +18,7 @@ import javafx.util.StringConverter;
 /** Editing fields are captured on the FX thread before any database or compilation work. */
 public final class ChallengeAuthoringPane extends VBox {
     private record CaseFields(TextArea input, TextArea output, CheckBox hidden, VBox row) { }
-    private record OptionFields(TextField text, RadioButton correct, HBox row) { }
+    private record OptionFields(TextField text, RadioButton correct, TextArea feedback, VBox row) { }
     private final User administrator;
     private final List<Lesson> lessons;
     private final Consumer<AuthoredChallenge> savedCallback;
@@ -39,6 +39,8 @@ public final class ChallengeAuthoringPane extends VBox {
     private final TextArea predictionSnippet = area(6);
     private final TextArea fragments = area(7);
     private final TextField correctOrder = new TextField();
+    private final List<TextArea> hints = List.of(area(2), area(2), area(2));
+    private final TextArea explanation = area(3);
     private final VBox orderingPanel = new VBox(10);
     private final VBox predictionPanel;
     private final Spinner<Integer> reward = new Spinner<>(0, 10000, 80);
@@ -114,10 +116,15 @@ public final class ChallengeAuthoringPane extends VBox {
                 ChallengeFrame.open(administrator, challenge, null, true);
             } catch (RuntimeException ex) { status.setText(ex.getMessage()); }
         });
+        VBox guidanceFields = new VBox(10);
+        for (int i = 0; i < hints.size(); i++) guidanceFields.getChildren().add(field("Pista " + (i + 1), hints.get(i)));
+        guidanceFields.getChildren().add(field("Explicación al resolver el reto", explanation));
+        TitledPane guidance = new TitledPane("Pistas y explicaciones de Lupo", guidanceFields);
+        guidance.setExpanded(false);
         form.getChildren().addAll(entries, new FlowPane(8, 8, load, fresh, duplicate, refresh),
                 field("Lección", lesson), field("Tipo", kind), field("Título", title), field("Enunciado", statement),
                 new FlowPane(12, 8, field("Dificultad", difficulty), field("XP", reward), field("Límite en segundos", timeout)),
-                codePanel, quizPanel, orderingPanel, new FlowPane(8, 8, draft, publish, archive, preview, versions));
+                codePanel, quizPanel, orderingPanel, guidance, new FlowPane(8, 8, draft, publish, archive, preview, versions));
         getChildren().addAll(heading, status, form);
         reset();
         refresh();
@@ -187,6 +194,8 @@ public final class ChallengeAuthoringPane extends VBox {
         }
         challenge.setDifficulty(difficulty.getValue());
         challenge.setRevision(revision);
+        challenge.setGuidance(new ChallengeGuidance(hints.stream().map(TextArea::getText).toList(), explanation.getText(),
+                challenge instanceof QuizChallenge ? optionFields.stream().map(value -> value.feedback().getText()).toList() : List.of()));
         AuthoredChallenge authored = new AuthoredChallenge(challenge, reference.getText(), state, revision);
         AuthoringService.validate(authored);
         return authored;
@@ -221,6 +230,8 @@ public final class ChallengeAuthoringPane extends VBox {
         difficulty.setValue(challenge.getDifficulty());
         reward.getValueFactory().setValue(challenge.getExpReward());
         reference.setText(java.util.Objects.requireNonNullElse(authored.referenceSolution(), ""));
+        for (int i = 0; i < hints.size(); i++) hints.get(i).setText(i < challenge.getGuidance().hints().size() ? challenge.getGuidance().hints().get(i) : "");
+        explanation.setText(challenge.getGuidance().explanation());
         cases.getChildren().clear();
         caseFields.clear();
         options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
@@ -230,6 +241,8 @@ public final class ChallengeAuthoringPane extends VBox {
             for (TestCase test : code.getTestCases()) addCase(test.getInput(), test.getExpectedOutput(), test.isHidden());
         } else if (challenge instanceof QuizChallenge quiz) {
             for (String option : quiz.getOptions()) addOption(option, option.equals(quiz.getCorrectAnswer()));
+            for (int i = 0; i < optionFields.size(); i++) optionFields.get(i).feedback().setText(
+                    i < challenge.getGuidance().optionFeedback().size() ? challenge.getGuidance().optionFeedback().get(i) : "");
             if (quiz instanceof OutputPredictionChallenge prediction) predictionSnippet.setText(prediction.getCodeSnippet());
         } else if (challenge instanceof CodeOrderingChallenge ordering) {
             fragments.setText(String.join("\n", ordering.getFragments()));
@@ -248,6 +261,8 @@ public final class ChallengeAuthoringPane extends VBox {
         kind.setValue("Código");
         title.clear(); statement.clear(); template.clear(); reference.clear();
         predictionSnippet.clear(); fragments.clear(); correctOrder.clear();
+        hints.forEach(TextArea::clear);
+        explanation.clear();
         cases.getChildren().clear(); caseFields.clear();
         addCase("", "", false);
         options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
@@ -269,7 +284,10 @@ public final class ChallengeAuthoringPane extends VBox {
         }
         for (OptionFields value : optionFields) {
             fields.add(value.text().getText()); fields.add(Boolean.toString(value.correct().isSelected()));
+            fields.add(value.feedback().getText());
         }
+        hints.forEach(hint -> fields.add(hint.getText()));
+        fields.add(explanation.getText());
         return List.copyOf(fields);
     }
 
@@ -307,14 +325,16 @@ public final class ChallengeAuthoringPane extends VBox {
         RadioButton correct = new RadioButton("Correcta");
         correct.setToggleGroup(correctOption);
         correct.setSelected(selected);
-        HBox row = new HBox(8);
-        OptionFields fields = new OptionFields(value, correct, row);
+        TextArea feedback = area(2);
+        feedback.setPromptText("Explica por qué esta opción es correcta o qué concepto confunde.");
+        VBox row = new VBox(6);
+        OptionFields fields = new OptionFields(value, correct, feedback, row);
         Button remove = button("Quitar", () -> {
             correctOption.getToggles().remove(correct);
             optionFields.remove(fields);
             options.getChildren().remove(row);
         });
-        row.getChildren().addAll(value, correct, remove);
+        row.getChildren().addAll(new HBox(8, value, correct, remove), field("Explicación de esta opción", feedback));
         optionFields.add(fields); options.getChildren().add(row);
     }
 
