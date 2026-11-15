@@ -1,5 +1,7 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
+
 import com.mycompany.levelup_code.data.oracle.OracleGoalRepository;
 import com.mycompany.levelup_code.domain.model.LearningGoal;
 import java.time.LocalDate;
@@ -134,7 +136,13 @@ public final class LearningGoalsPane extends VBox {
         refresh.setDisable(true);
         WorkspaceUi.status(status, "Actualizando tus metas…", "");
         Task<List<LearningGoal>> task = new Task<>() {
-            @Override protected List<LearningGoal> call() throws Exception { return action.call(); }
+            @Override protected List<LearningGoal> call() throws Exception {
+                try { return action.call(); }
+                catch (java.sql.SQLException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
+            }
         };
         task.setOnSucceeded(event -> {
             busy = false;
@@ -149,7 +157,7 @@ public final class LearningGoalsPane extends VBox {
             refresh.setDisable(false);
             String messageText = task.getException() instanceof IllegalArgumentException
                     ? task.getException().getMessage()
-                    : "No pudimos consultar tus metas. Comprueba la conexión y pulsa Actualizar. Si continúa, contacta con el administrador.";
+                    : "No pudimos consultar tus metas. " + task.getMessage();
             WorkspaceUi.status(status, messageText, "status-error");
         });
         Thread thread = new Thread(task, "learning-goals");

@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.data.oracle.OracleNotebookRepository;
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
 import com.mycompany.levelup_code.data.oracle.OracleNotebookRepository.Note;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.User;
@@ -319,7 +320,13 @@ public final class NotebookPane extends VBox {
         refresh.setDisable(true);
         WorkspaceUi.status(status, "Actualizando tu cuaderno…", "");
         Task<T> task = new Task<>() {
-            @Override protected T call() throws Exception { return action.call(); }
+            @Override protected T call() throws Exception {
+                try { return action.call(); }
+                catch (java.sql.SQLException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
+            }
         };
         task.setOnSucceeded(event -> {
             busy = false;
@@ -333,7 +340,7 @@ public final class NotebookPane extends VBox {
             refresh.setDisable(false);
             String message = task.getException() instanceof IllegalArgumentException
                     ? task.getException().getMessage()
-                    : "No pudimos acceder al cuaderno. Comprueba la conexión y pulsa Actualizar. Tus campos se conservan. Si continúa, contacta con el administrador.";
+                    : "No pudimos acceder al cuaderno. " + task.getMessage();
             WorkspaceUi.status(status, message, "status-error");
         });
         Thread thread = new Thread(task, "student-notebook");

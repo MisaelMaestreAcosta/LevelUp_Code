@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
 import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
@@ -268,10 +269,15 @@ public class DashboardFrame {
                     catch (Exception ex) { LOGGER.log(Level.WARNING, "No se pudieron cargar las preferencias", ex); }
                 }
                 EditorPreferences.remember(currentUser.getId(), preferences);
-                loadDomainDataFromOracleOrSeed();
-                loadEnrollmentsFromOracle();
-                loadAchievementsFromOracleOrSeed();
-                return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
+                try {
+                    loadDomainDataFromOracleOrSeed();
+                    loadEnrollmentsFromOracle();
+                    loadAchievementsFromOracleOrSeed();
+                    return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
+                } catch (RuntimeException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
             }
         };
         task.setOnSucceeded(e -> {
@@ -294,8 +300,9 @@ public class DashboardFrame {
         task.setOnFailed(e -> {
             LOGGER.log(Level.WARNING, "Unable to load dashboard", task.getException());
             indicator.setVisible(false);
-            message.setText("No pudimos cargar tus cursos. Comprueba la conexión e inténtalo de nuevo.");
+            message.setText("No pudimos cargar tus cursos. " + task.getMessage());
             message.setWrapText(true);
+            message.setMaxWidth(640);
             retry.setVisible(true);
             retry.setManaged(true);
         });
