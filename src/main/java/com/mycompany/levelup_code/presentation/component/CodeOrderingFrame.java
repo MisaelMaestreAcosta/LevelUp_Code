@@ -113,7 +113,10 @@ public final class CodeOrderingFrame extends Stage implements LearningPage {
         });
         controls.getChildren().addAll(title, statement, WorkspaceUi.label("Arrastra los fragmentos para ordenarlos. También puedes seleccionar uno y usar Subir/Bajar o Alt + ↑/↓.", "body-text"),
                 fragments, new FlowPane(8, 8, up, down, submit, hint, history));
-        VBox root = new VBox(12, controls, lupoFeedback, draftStatus);
+        ChallengeNotebookActions notebook = new ChallengeNotebookActions(user, preview, () ->
+                String.join("\n", fragments.getItems().stream().map(Fragment::code).toList()));
+        notebook.setChallenge(challenge);
+        VBox root = new VBox(12, controls, notebook, lupoFeedback, draftStatus);
         root.getStyleClass().addAll("root-shell", "learning-workspace", "ordering-workspace");
         root.setPadding(new javafx.geometry.Insets(20));
         ScrollPane scroll = new ScrollPane(root); scroll.setFitToWidth(true);

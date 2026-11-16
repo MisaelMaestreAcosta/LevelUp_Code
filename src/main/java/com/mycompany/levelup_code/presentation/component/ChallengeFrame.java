@@ -139,6 +139,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
     private Button btnNextChallenge;
     private Button btnSubmit;
     private Button btnHint;
+    private ChallengeNotebookActions notebookActions;
 
     // Editor de código y numeración de líneas
     private CodeEditor txtEditor;
@@ -390,6 +391,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
             topRow.getChildren().add(history);
         }
         headerCard.getChildren().addAll(lblChallengeTitle, topRow);
+        notebookActions = new ChallengeNotebookActions(currentUser, preview, () ->
+                activeChallenge instanceof CodeChallenge ? txtEditor.getText() : "");
+        headerCard.getChildren().add(notebookActions);
 
         switcherButtons.clear();
         if (availableChallenges.size() > 1) {
@@ -812,6 +816,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
         rememberDraft();
         viewLoaded = false;
         this.activeChallenge = challenge;
+        notebookActions.setChallenge(challenge);
         Draft draft = drafts.get(challenge);
         boolean outdatedDraftSkipped = false;
         if (draft == null && canPersistDraft(challenge)) {

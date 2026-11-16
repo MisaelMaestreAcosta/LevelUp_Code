@@ -219,6 +219,11 @@ public final class NotebookPane extends VBox {
         }
     }
 
+    void refreshFromAccount() {
+        if (controls.isDisabled() || busy) return;
+        run(() -> repository.load(userId), this::show);
+    }
+
     private void requestLeave(Runnable continuation) { requestLeave(getScene().getWindow(), continuation); }
 
     void requestLeave(javafx.stage.Window owner, Runnable continuation) {

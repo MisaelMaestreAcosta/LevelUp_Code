@@ -121,10 +121,14 @@ class OracleLearningStorageIntegrationTest {
 
         repository.favorite(userId, challengeId, true);
         repository.favorite(userId, challengeId, true);
+        assertTrue(repository.isFavorite(userId, challengeId));
+        assertFalse(repository.isFavorite(otherUserId, challengeId));
         assertEquals(Set.of(challengeId), repository.load(userId).favorites());
         assertTrue(repository.load(otherUserId).favorites().isEmpty());
         repository.favorite(otherUserId, challengeId, true);
         repository.favorite(userId, challengeId, false);
+        assertFalse(repository.isFavorite(userId, challengeId));
+        assertTrue(repository.isFavorite(otherUserId, challengeId));
         assertTrue(repository.load(userId).favorites().isEmpty());
         assertEquals(Set.of(challengeId), repository.load(otherUserId).favorites());
 

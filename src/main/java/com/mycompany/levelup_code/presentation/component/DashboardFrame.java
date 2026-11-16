@@ -2389,6 +2389,7 @@ public class DashboardFrame {
                     allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
                     this::onChallengeOrLessonCompleted, this::openChallenge);
             target = notebookPane;
+            if (oracleConnected) notebookPane.refreshFromAccount();
         } else if ("SESSION".equals(cardKey) && guidedPractice != null) {
             target = guidedPractice;
         } else if ("PRACTICE".equals(cardKey)) {

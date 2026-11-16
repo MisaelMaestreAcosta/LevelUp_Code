@@ -82,4 +82,13 @@ public final class OracleNotebookRepository {
             stmt.setInt(1,userId); stmt.setInt(2,challengeId); stmt.executeUpdate();
         }
     }
+
+    public boolean isFavorite(int userId, int challengeId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM Reto_Favorito WHERE id_usuario=? AND id_reto=?")) {
+            statement.setInt(1, userId);
+            statement.setInt(2, challengeId);
+            try (ResultSet result = statement.executeQuery()) { return result.next(); }
+        }
+    }
 }
