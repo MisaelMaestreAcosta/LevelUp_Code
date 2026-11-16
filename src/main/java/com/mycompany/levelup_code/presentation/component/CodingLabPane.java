@@ -271,7 +271,10 @@ public final class CodingLabPane extends VBox {
                 store.save(identity, selectedLanguage, experiment);
                 return experiment;
             }, experiment -> {
-                if (removeRecovery()) replaceExperiment(experiment);
+                if (removeRecovery()) {
+                    replaceExperiment(experiment);
+                    WorkspaceUi.status(status, "Experimento abierto. Puedes editarlo y guardar los cambios.", "");
+                }
             });
         });
     }
