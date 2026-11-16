@@ -1,0 +1,1123 @@
+/* ==========================================================================
+   LEVELUP CODE — HOJA DE ESTILOS OFICIAL JAVAFX (TEMA CLARO DAYLIGHT PAPER)
+   Identidad cromática por lenguaje:
+     - Java:   #E76F00 (Java Orange)
+     - Python: #3776AB (Python Blue)
+     - C++:    #00599C (C++ Steel Blue)
+   ========================================================================== */
+
+.root-shell {
+    -fx-background-color: #F3F5F9;
+    -fx-font-family: "Segoe UI", system-ui, sans-serif;
+    -fx-text-fill: #0F172A;
+}
+
+/* Lupo accompanies the student throughout the learning experience. */
+.lupo-brand-name {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+.lupo-brand-tagline {
+    -fx-font-size: 11px;
+    -fx-text-fill: #475569;
+}
+.lupo-guide {
+    -fx-padding: 12 16;
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 12;
+    -fx-border-color: #BFDBFE;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+.lupo-guide-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1D4ED8;
+}
+.lupo-guide .label {
+    -fx-text-fill: #334155;
+}
+.lupo-guide .lupo-guide-title { -fx-text-fill: #1D4ED8; }
+.lupo-guide .text-success { -fx-text-fill: #15803D; }
+.lupo-guide .text-danger { -fx-text-fill: #B91C1C; }
+.lupo-guide .text-warning { -fx-text-fill: #B45309; }
+.lupo-welcome {
+    -fx-padding: 14 18;
+    -fx-background-color: linear-gradient(to right, #EFF6FF, #FFFFFF);
+    -fx-background-radius: 14;
+    -fx-border-color: #BFDBFE;
+    -fx-border-radius: 14;
+}
+.lupo-login-hero .hero-title,
+.lupo-login-hero .hero-accent {
+    -fx-font-size: 28px;
+}
+.lupo-auth .check-box {
+    -fx-text-fill: #334155;
+}
+
+.sidebar {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent #D8DEE9 transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 22 18 20 18;
+}
+
+/* Superficies y Tarjetas */
+.surface-card {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.05), 12, 0, 0, 3);
+}
+
+.surface-subtle {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 12 14 12 14;
+}
+
+.surface-elevated {
+    -fx-background-color: #EEF2F7;
+    -fx-background-radius: 10;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 12 14 12 14;
+}
+
+/* Tarjetas con franja de identidad por lenguaje */
+.lang-card-java {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #E76F00;
+    -fx-border-width: 1 1 1 5;
+    -fx-border-radius: 12;
+    -fx-padding: 16;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(231, 111, 0, 0.08), 12, 0, 0, 3);
+}
+.lang-card-java:hover {
+    -fx-border-color: #E76F00 #E76F00 #E76F00 #E76F00;
+    -fx-effect: dropshadow(gaussian, rgba(231, 111, 0, 0.16), 14, 0, 0, 4);
+}
+
+.lang-card-python {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #3776AB;
+    -fx-border-width: 1 1 1 5;
+    -fx-border-radius: 12;
+    -fx-padding: 16;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(55, 118, 171, 0.08), 12, 0, 0, 3);
+}
+.lang-card-python:hover {
+    -fx-border-color: #3776AB #3776AB #3776AB #3776AB;
+    -fx-effect: dropshadow(gaussian, rgba(55, 118, 171, 0.16), 14, 0, 0, 4);
+}
+
+.lang-card-cpp {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #00599C;
+    -fx-border-width: 1 1 1 5;
+    -fx-border-radius: 12;
+    -fx-padding: 16;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 89, 156, 0.08), 12, 0, 0, 3);
+}
+.lang-card-cpp:hover {
+    -fx-border-color: #00599C #00599C #00599C #00599C;
+    -fx-effect: dropshadow(gaussian, rgba(0, 89, 156, 0.16), 14, 0, 0, 4);
+}
+
+/* Cabecera de Módulo en el Árbol de Habilidades */
+.module-header-card {
+    -fx-background-color: #EEF2F7;
+    -fx-background-radius: 10;
+    -fx-border-color: #CBD5E1 #CBD5E1 #CBD5E1 #2563EB;
+    -fx-border-width: 1 1 1 4;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+}
+
+/* Jerarquía tipográfica */
+.hero-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+
+.hero-accent {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2563EB;
+}
+
+.page-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+
+.card-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+
+.section-caption {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64748B;
+}
+
+.metric-value {
+    -fx-font-size: 21px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+
+.body-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #334155;
+}
+
+.muted-text {
+    -fx-font-size: 12px;
+    -fx-text-fill: #64748B;
+}
+
+.text-success {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #15803D;
+}
+
+.text-danger {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #DC2626;
+}
+
+.text-warning {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #D97706;
+}
+
+/* Botones modernos y Navegación */
+.btn-primary {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-background-radius: 8;
+    -fx-padding: 9 16 9 16;
+    -fx-cursor: hand;
+}
+.btn-primary:hover {
+    -fx-background-color: #1D4ED8;
+}
+
+.btn-success {
+    -fx-background-color: #16A34A;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-background-radius: 8;
+    -fx-padding: 9 16 9 16;
+    -fx-cursor: hand;
+}
+.btn-success:hover {
+    -fx-background-color: #15803D;
+}
+
+.btn-secondary {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #0F172A;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 8;
+    -fx-padding: 8 14 8 14;
+    -fx-cursor: hand;
+}
+.btn-secondary:hover {
+    -fx-background-color: #E2E8F0;
+    -fx-border-color: #CBD5E1;
+}
+
+.btn-ghost {
+    -fx-background-color: rgba(37, 99, 235, 0.08);
+    -fx-text-fill: #1D4ED8;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(37, 99, 235, 0.30);
+    -fx-border-radius: 8;
+    -fx-padding: 7 13 7 13;
+    -fx-cursor: hand;
+}
+.btn-ghost:hover {
+    -fx-background-color: rgba(37, 99, 235, 0.16);
+}
+
+.btn-ghost-green {
+    -fx-background-color: rgba(22, 163, 74, 0.08);
+    -fx-text-fill: #15803D;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(22, 163, 74, 0.32);
+    -fx-border-radius: 8;
+    -fx-padding: 8 14 8 14;
+    -fx-cursor: hand;
+}
+.btn-ghost-green:hover {
+    -fx-background-color: rgba(22, 163, 74, 0.16);
+}
+
+.nav-btn {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #334155;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-alignment: CENTER_LEFT;
+    -fx-background-radius: 8;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 8;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+.nav-btn:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #CBD5E1;
+}
+
+.nav-btn-active {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-alignment: CENTER_LEFT;
+    -fx-background-radius: 8;
+    -fx-border-color: #1D4ED8;
+    -fx-border-radius: 8;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+
+.btn-java {
+    -fx-background-color: #E76F00;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-padding: 7 14 7 14;
+    -fx-cursor: hand;
+}
+.btn-java:hover {
+    -fx-background-color: #C85F00;
+}
+
+.btn-python {
+    -fx-background-color: #3776AB;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-padding: 7 14 7 14;
+    -fx-cursor: hand;
+}
+.btn-python:hover {
+    -fx-background-color: #2C618E;
+}
+
+.btn-cpp {
+    -fx-background-color: #00599C;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-padding: 7 14 7 14;
+    -fx-cursor: hand;
+}
+.btn-cpp:hover {
+    -fx-background-color: #00477D;
+}
+
+/* Insignias tipo píldora (Pill Badges) */
+.badge-indigo {
+    -fx-background-color: rgba(37, 99, 235, 0.12);
+    -fx-text-fill: #1D4ED8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(37, 99, 235, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-green {
+    -fx-background-color: rgba(22, 163, 74, 0.12);
+    -fx-text-fill: #15803D;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(22, 163, 74, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-amber {
+    -fx-background-color: rgba(217, 119, 6, 0.12);
+    -fx-text-fill: #B45309;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(217, 119, 6, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-rose {
+    -fx-background-color: rgba(220, 38, 38, 0.12);
+    -fx-text-fill: #B91C1C;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(220, 38, 38, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-violet {
+    -fx-background-color: rgba(124, 58, 237, 0.12);
+    -fx-text-fill: #6D28D9;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(124, 58, 237, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-cyan {
+    -fx-background-color: rgba(2, 132, 199, 0.12);
+    -fx-text-fill: #0369A1;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(2, 132, 199, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-neutral {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #475569;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-java {
+    -fx-background-color: rgba(231, 111, 0, 0.12);
+    -fx-text-fill: #C25E00;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(231, 111, 0, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-python {
+    -fx-background-color: rgba(55, 118, 171, 0.12);
+    -fx-text-fill: #2B5B84;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(55, 118, 171, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+.badge-cpp {
+    -fx-background-color: rgba(0, 89, 156, 0.12);
+    -fx-text-fill: #004477;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(0, 89, 156, 0.35);
+    -fx-border-radius: 999;
+    -fx-padding: 3 10 3 10;
+}
+
+/* Nodos del Árbol de Habilidades (Skill-Tree) */
+.skill-node-completed {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #16A34A;
+    -fx-border-width: 1 1 1 5;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 14 18 14 18;
+    -fx-effect: dropshadow(gaussian, rgba(22, 163, 74, 0.06), 8, 0, 0, 2);
+}
+.skill-node-completed:hover {
+    -fx-border-color: #86EFAC #86EFAC #86EFAC #16A34A;
+    -fx-effect: dropshadow(gaussian, rgba(22, 163, 74, 0.14), 10, 0, 0, 3);
+}
+
+.skill-node-active {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #2563EB;
+    -fx-border-width: 1 1 1 5;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 14 18 14 18;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.07), 8, 0, 0, 2);
+}
+.skill-node-active:hover {
+    -fx-border-color: #93C5FD #93C5FD #93C5FD #2563EB;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.14), 10, 0, 0, 3);
+}
+
+.skill-node-pending {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #94A3B8;
+    -fx-border-width: 1 1 1 5;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 14 18 14 18;
+}
+.skill-node-pending:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #CBD5E1 #CBD5E1 #CBD5E1 #64748B;
+}
+
+/* Tarjetas de Logros e Insignias */
+.achievement-card-unlocked {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #86EFAC #86EFAC #86EFAC #16A34A;
+    -fx-border-width: 1 1 1 5;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(22, 163, 74, 0.08), 10, 0, 0, 3);
+}
+
+.achievement-card-locked {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #94A3B8;
+    -fx-border-width: 1 1 1 5;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 16;
+}
+
+/* Opciones de Quiz y Casos de Prueba */
+.quiz-option-card,
+.quiz-option-card-selected,
+.quiz-option-card-correct,
+.quiz-option-card-wrong {
+    -fx-text-fill: #0F172A;
+}
+
+.quiz-option-card:disabled,
+.quiz-option-card-selected:disabled,
+.quiz-option-card-correct:disabled,
+.quiz-option-card-wrong:disabled {
+    -fx-opacity: 1;
+    -fx-cursor: wait;
+}
+
+.quiz-option-card {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #D8DEE9 #D8DEE9 #D8DEE9 #94A3B8;
+    -fx-border-width: 1 1 1 4;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 14 18 14 16;
+    -fx-cursor: hand;
+}
+.quiz-option-card:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #CBD5E1 #CBD5E1 #CBD5E1 #2563EB;
+}
+
+.quiz-option-card-selected {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #2563EB #2563EB #2563EB #2563EB;
+    -fx-border-width: 1.5 1.5 1.5 5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 14 18 14 16;
+    -fx-cursor: hand;
+}
+
+.quiz-option-card-correct {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #16A34A #16A34A #16A34A #16A34A;
+    -fx-border-width: 1.5 1.5 1.5 5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 14 18 14 16;
+    -fx-cursor: hand;
+}
+
+.quiz-option-card-wrong {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #DC2626 #DC2626 #DC2626 #DC2626;
+    -fx-border-width: 1.5 1.5 1.5 5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 14 18 14 16;
+    -fx-cursor: hand;
+}
+
+.test-case-card {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #D8DEE9;
+    -fx-border-width: 1;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+.test-case-card:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #93C5FD;
+}
+
+.test-case-card-selected {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #2563EB;
+    -fx-border-width: 1.5;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+
+.test-case-card-passed {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #86EFAC #86EFAC #86EFAC #16A34A;
+    -fx-border-width: 1 1 1 4;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+
+.test-case-card-failed {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #FCA5A5 #FCA5A5 #FCA5A5 #DC2626;
+    -fx-border-width: 1 1 1 4;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-cursor: hand;
+}
+
+/* Celdas del Mapa de Calor (Heatmap Actividad_Diaria) */
+.heatmap-cell-0 {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 4;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 4;
+}
+.heatmap-cell-1 {
+    -fx-background-color: #BBF7D0;
+    -fx-background-radius: 4;
+    -fx-border-color: #86EFAC;
+    -fx-border-radius: 4;
+}
+.heatmap-cell-2 {
+    -fx-background-color: #4ADE80;
+    -fx-background-radius: 4;
+    -fx-border-color: #22C55E;
+    -fx-border-radius: 4;
+}
+.heatmap-cell-3 {
+    -fx-background-color: #16A34A;
+    -fx-background-radius: 4;
+    -fx-border-color: #15803D;
+    -fx-border-radius: 4;
+}
+
+/* Editores de Código, Gutter y Consola */
+.code-editor {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 13px;
+    -fx-control-inner-background: #F8FAFC;
+    -fx-background-color: #F8FAFC;
+    -fx-text-fill: #0F172A;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.line-gutter {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 13px;
+    -fx-control-inner-background: #EDF1F7;
+    -fx-background-color: #EDF1F7;
+    -fx-text-fill: #64748B;
+    -fx-border-color: #D8DEE9 transparent #D8DEE9 #D8DEE9;
+    -fx-border-radius: 8 0 0 8;
+    -fx-background-radius: 8 0 0 8;
+}
+
+.console-output {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 12.5px;
+    -fx-control-inner-background: #F8FAFC;
+    -fx-background-color: #F8FAFC;
+    -fx-text-fill: #334155;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+/* Campos de formulario y Controles */
+.input-field {
+    -fx-background-color: #F8FAFC;
+    -fx-text-fill: #0F172A;
+    -fx-prompt-text-fill: #94A3B8;
+    -fx-font-size: 13px;
+    -fx-background-radius: 8;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-padding: 9 12 9 12;
+}
+.input-field:focused {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #2563EB;
+    -fx-border-width: 1.5;
+}
+
+.combo-box-modern {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 13px;
+    -fx-padding: 3 8 3 8;
+}
+
+.progress-bar-indigo > .bar {
+    -fx-background-color: #2563EB;
+    -fx-background-radius: 999;
+    -fx-padding: 4;
+}
+.progress-bar-indigo > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+}
+
+.progress-bar-green > .bar {
+    -fx-background-color: #16A34A;
+    -fx-background-radius: 999;
+    -fx-padding: 4;
+}
+.progress-bar-green > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+}
+
+.progress-bar-rose > .bar {
+    -fx-background-color: #DC2626;
+    -fx-background-radius: 999;
+    -fx-padding: 4;
+}
+.progress-bar-rose > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+}
+
+.scroll-pane-clean {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-border-color: transparent;
+}
+.scroll-pane-clean > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* Consistent keyboard feedback without changing the existing palette. */
+.root {
+    -fx-focus-color: #2563EB;
+    -fx-faint-focus-color: transparent;
+}
+.button {
+    -fx-cursor: hand;
+    -fx-min-height: 36;
+}
+.button:focused, .toggle-button:focused, .check-box:focused > .box,
+.radio-button:focused > .radio, .combo-box:focused {
+    -fx-effect: dropshadow(gaussian, #2563EB, 5, 0.4, 0, 0);
+}
+.button:disabled {
+    -fx-opacity: 0.6;
+    -fx-cursor: default;
+}
+.text-input {
+    -fx-highlight-fill: #2563EB;
+    -fx-highlight-text-fill: #FFFFFF;
+}
+.input-field {
+    -fx-prompt-text-fill: #64748B;
+}
+.input-field:focused {
+    -fx-border-width: 1;
+}
+.scroll-pane-clean > .scroll-bar:vertical,
+.scroll-pane-clean > .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12;
+}
+.scroll-bar .thumb {
+    -fx-background-color: #CBD5E1;
+    -fx-background-radius: 8;
+}
+.scroll-bar .thumb:hover {
+    -fx-background-color: #94A3B8;
+}
+.resume-card {
+    -fx-background-color: #EEF2FF;
+    -fx-background-radius: 12;
+    -fx-border-color: #2563EB;
+    -fx-border-radius: 12;
+    -fx-border-width: 0 0 0 4;
+    -fx-padding: 18;
+}
+.course-selected {
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.22), 10, 0.12, 0, 2);
+}
+.empty-state {
+    -fx-padding: 28;
+    -fx-text-fill: #64748B;
+    -fx-font-size: 14;
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+}
+.split-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.split-pane > .split-pane-divider {
+    -fx-background-color: #D8DEE9;
+    -fx-padding: 0 3 0 3;
+}
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: #EEF2F7;
+}
+.tab-pane .tab {
+    -fx-padding: 8 16;
+    -fx-background-color: #F8FAFC;
+}
+.tab-pane .tab:selected {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent transparent #2563EB transparent;
+    -fx-border-width: 0 0 3 0;
+}
+.tooltip {
+    -fx-font-size: 12;
+    -fx-wrap-text: true;
+    -fx-max-width: 360;
+}
+
+/* Learning workspaces share the dashboard's paper surfaces and blue actions. */
+.learning-workspace {
+    -fx-spacing: 16;
+    -fx-padding: 2 2 8 2;
+}
+.learning-workspace .label {
+    -fx-text-fill: #334155;
+}
+.learning-workspace .page-title, .learning-workspace .card-title,
+.learning-workspace .metric-value {
+    -fx-text-fill: #0F172A;
+}
+.learning-workspace .muted-text, .learning-workspace .section-caption {
+    -fx-text-fill: #64748B;
+}
+.field-label {
+    -fx-text-fill: #334155;
+    -fx-font-size: 12;
+    -fx-font-weight: bold;
+}
+.workspace-status {
+    -fx-text-fill: #334155;
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 9;
+    -fx-padding: 10 14;
+    -fx-font-size: 12;
+    -fx-border-color: #BFDBFE;
+    -fx-border-radius: 9;
+}
+.learning-workspace .status-error {
+    -fx-background-color: #FEF2F2;
+    -fx-text-fill: #B91C1C;
+    -fx-border-color: #FECACA;
+}
+.learning-workspace .status-success {
+    -fx-background-color: #F0FDF4;
+    -fx-text-fill: #15803D;
+    -fx-border-color: #BBF7D0;
+}
+.workspace-empty {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-border-style: segments(5, 4);
+    -fx-padding: 24 16;
+}
+.learning-workspace .text-field, .learning-workspace .text-area,
+.learning-workspace .combo-box, .learning-workspace .spinner {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-text-fill: #0F172A;
+    -fx-prompt-text-fill: #64748B;
+    -fx-font-size: 13;
+    -fx-effect: null;
+}
+.learning-workspace .text-field {
+    -fx-padding: 10 12;
+}
+.learning-workspace .text-area {
+    -fx-padding: 4;
+}
+.learning-workspace .text-area .content {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 6;
+    -fx-padding: 10;
+}
+.learning-workspace .text-input:focused, .learning-workspace .combo-box:focused,
+.learning-workspace .spinner:focused {
+    -fx-border-color: #2563EB;
+}
+.learning-workspace .combo-box {
+    -fx-padding: 5 8;
+    -fx-min-height: 40;
+}
+.learning-workspace .combo-box > .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #0F172A;
+}
+.learning-workspace .spinner > .text-field {
+    -fx-border-width: 0;
+    -fx-background-color: transparent;
+    -fx-padding: 10 12;
+}
+.learning-workspace .spinner .increment-arrow-button,
+.learning-workspace .spinner .decrement-arrow-button {
+    -fx-background-color: #EEF2F7;
+    -fx-background-radius: 4;
+    -fx-padding: 5 10;
+}
+.learning-workspace .progress-bar {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-pref-height: 8;
+    -fx-min-height: 8;
+}
+.learning-workspace .progress-bar > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999;
+    -fx-border-width: 0;
+}
+.learning-workspace .progress-bar > .bar {
+    -fx-background-color: #2563EB;
+    -fx-background-insets: 0;
+    -fx-background-radius: 999;
+    -fx-padding: 4;
+}
+.learning-workspace .progress-bar-green > .bar { -fx-background-color: #16A34A; }
+.learning-workspace .progress-java > .bar { -fx-background-color: #E76F00; }
+.learning-workspace .progress-python > .bar { -fx-background-color: #3776AB; }
+.learning-workspace .progress-cpp > .bar { -fx-background-color: #00599C; }
+.learning-workspace .metric-tile {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 12;
+    -fx-padding: 14 18;
+}
+.learning-workspace .btn-danger {
+    -fx-background-color: #FEF2F2;
+    -fx-text-fill: #B91C1C;
+    -fx-background-radius: 8;
+    -fx-border-color: #FECACA;
+    -fx-border-radius: 8;
+    -fx-padding: 8 12;
+}
+.learning-workspace .btn-danger:hover { -fx-background-color: #FEE2E2; }
+.learning-workspace .notes-list {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+.learning-workspace .notes-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12;
+    -fx-border-color: transparent transparent #EEF2F7 transparent;
+}
+.learning-workspace .notes-list .list-cell:filled:hover { -fx-background-color: #F1F5F9; }
+.learning-workspace .notes-list .list-cell:filled:selected { -fx-background-color: #EFF6FF; }
+.learning-workspace .notes-list .list-cell:empty { -fx-border-width: 0; }
+.learning-workspace .notes-list .list-cell:selected .card-title { -fx-text-fill: #1D4ED8; }
+.learning-workspace .badge-indigo { -fx-text-fill: #1D4ED8; }
+.learning-workspace .badge-green { -fx-text-fill: #15803D; }
+.learning-workspace .badge-neutral { -fx-text-fill: #475569; }
+.learning-workspace .separator .line {
+    -fx-border-color: #E2E8F0;
+    -fx-border-width: 1 0 0 0;
+}
+.workspace-toolbar { -fx-alignment: center-left; -fx-hgap: 10; -fx-vgap: 10; }
+.learning-workspace .editor-heading { -fx-font-size: 13; -fx-font-weight: bold; }
+.learning-workspace .code-editor, .learning-workspace .console-output {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+}
+.learning-workspace .code-editor .content { -fx-padding: 14; }
+.sidebar .nav-btn, .sidebar .nav-btn-active {
+    -fx-min-height: 42;
+    -fx-padding: 10 12;
+}
+
+.compact-telemetry {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-padding: 10 16;
+}
+.home-greeting {
+    -fx-font-size: 24;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+.route-module > .title {
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 10;
+    -fx-padding: 14;
+}
+.route-module > .content {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 16 0 0 0;
+}
+.route-module .progress-bar { -fx-pref-height: 6; }
+.route-module .progress-bar > .track { -fx-background-color: #DBEAFE; -fx-background-radius: 10; }
+.route-module .progress-bar > .bar { -fx-background-color: #2563EB; -fx-background-radius: 10; -fx-padding: 3; }
+.route-step { -fx-padding: 0 0 12 0; }
+.course-filter { -fx-text-fill: #334155; }
+.route-marker {
+    -fx-background-color: #EFF6FF;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-color: #BFDBFE;
+    -fx-text-fill: #1D4ED8;
+    -fx-font-weight: bold;
+    -fx-padding: 10;
+}
+.route-connector { -fx-background-color: #BFDBFE; -fx-min-width: 2; -fx-max-width: 2; -fx-min-height: 18; }
+.route-lesson { -fx-padding: 2; }
+.route-lesson > .title { -fx-background-color: transparent; -fx-padding: 10; }
+.route-lesson > .content { -fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 8 12 12 12; }
+.route-module:focused > .title, .route-lesson:focused > .title { -fx-border-color: #2563EB; -fx-border-radius: 8; }
+
+.syntax-editor {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 8;
+    -fx-padding: 5;
+}
+.syntax-editor:editor-focused { -fx-border-color: #2563EB; }
+.source-code {
+    -fx-background-color: #F8FAFC;
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 14px;
+    -fx-highlight-fill: #BFDBFE;
+    -fx-highlight-text-fill: #0F172A;
+}
+.source-code .text { -fx-fill: #0F172A; }
+.source-code .lineno {
+    -fx-background-color: #EEF2F7;
+    -fx-text-fill: #64748B;
+    -fx-padding: 0 10;
+}
+.source-code .caret { -fx-stroke: #0F172A; }
+.source-code .syntax-keyword { -fx-fill: #6D28D9; -fx-font-weight: bold; }
+.source-code .syntax-string { -fx-fill: #15803D; }
+.source-code .syntax-comment { -fx-fill: #64748B; -fx-font-style: italic; }
+.source-code .syntax-number { -fx-fill: #B45309; }
+.source-code .syntax-bracket { -fx-fill: #1D4ED8; }
+.source-code .matching-bracket { -rtfx-background-color: #BFDBFE; -fx-font-weight: bold; }
+
+.completion-content { -fx-background-color: #F8FAFC; -fx-background-radius: 12; }
+.completion-content .completion-reward { -fx-text-fill: #15803D; -fx-font-size: 18; -fx-font-weight: bold; }
+
+.ordering-list { -fx-background-color: #F8FAFC; -fx-border-color: #D8DEE9; -fx-border-radius: 10; -fx-padding: 5; }
+.ordering-list .list-cell { -fx-background-color: #FFFFFF; -fx-padding: 12; -fx-border-color: transparent transparent #E2E8F0 transparent; -fx-cursor: hand; }
+.ordering-list .list-cell:empty { -fx-background-color: transparent; -fx-border-color: transparent; }
+.ordering-list .list-cell:filled:selected { -fx-background-color: #EFF6FF; }
+.ordering-list .list-cell:drop-before { -fx-border-color: #2563EB transparent transparent transparent; -fx-border-width: 3 0 0 0; }
+.ordering-list .list-cell:drop-after { -fx-border-color: transparent transparent #2563EB transparent; -fx-border-width: 0 0 3 0; }
+.ordering-list .fragment-code, .case-value { -fx-font-family: "Consolas", "Courier New", monospace; -fx-font-size: 13; -fx-text-fill: #0F172A; }
+.ordering-list .fragment-position { -fx-text-fill: #1D4ED8; -fx-font-weight: bold; -fx-background-color: #DBEAFE; -fx-padding: 5 9; -fx-background-radius: 6; }
+.case-value { -fx-background-color: #F1F5F9; -fx-background-radius: 6; -fx-padding: 8; }
+.ordering-workspace { -fx-padding: 20; }
+
+.achievement-card-unlocked .progress-bar, .achievement-card-locked .progress-bar {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-pref-height: 8;
+    -fx-min-height: 8;
+}
+.achievement-card-unlocked .progress-bar > .track, .achievement-card-locked .progress-bar > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+}
+.achievement-card-unlocked .progress-bar > .bar, .achievement-card-locked .progress-bar > .bar {
+    -fx-background-color: #2563EB;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+.achievement-card-unlocked .progress-bar > .bar { -fx-background-color: #16A34A; }
+.learning-navigation { -fx-background-color: #FFFFFF; -fx-background-radius: 10; -fx-padding: 10; -fx-hgap: 10; -fx-vgap: 8; }
+.xp-history .chart-plot-background { -fx-background-color: #F8FAFC; }
+.xp-history .chart-bar { -fx-bar-fill: #2563EB; -fx-background-radius: 4 4 0 0; }
+.xp-history .axis { -fx-tick-label-fill: #475569; }
+.learning-workspace .activity-day { -fx-text-fill: #0F172A; -fx-font-weight: bold; -fx-min-height: 40; }
+.trace-cell { -fx-background-color: #FFFFFF; -fx-border-color: #CBD5E1; -fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10 14; -fx-text-fill: #0F172A; -fx-font-size: 16; -fx-font-weight: bold; }
+.learning-workspace .trace-cell-active { -fx-background-color: #DBEAFE; -fx-border-color: #2563EB; -fx-text-fill: #1D4ED8; }
+.learning-workspace .trace-variables { -fx-font-family: "Consolas", "Courier New", monospace; -fx-text-fill: #1D4ED8; -fx-font-size: 13; }
+.learning-workspace .text-success { -fx-text-fill: #15803D; }
+.learning-workspace .text-warning { -fx-text-fill: #B45309; }
+.reading-section > .title { -fx-background-color: #EFF6FF; -fx-padding: 10; -fx-background-radius: 8; }
+.reading-section > .content { -fx-background-color: transparent; -fx-padding: 10; -fx-border-width: 0; }

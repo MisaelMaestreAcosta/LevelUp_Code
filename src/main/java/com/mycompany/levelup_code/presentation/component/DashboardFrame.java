@@ -1,0 +1,2649 @@
+package com.mycompany.levelup_code.presentation.component;
+
+import com.mycompany.levelup_code.app.AppContext;
+import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
+import com.mycompany.levelup_code.data.connection.DatabaseConnection;
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
+import com.mycompany.levelup_code.domain.enums.ChallengeType;
+import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
+import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
+import com.mycompany.levelup_code.domain.enums.ProgressStatus;
+import com.mycompany.levelup_code.domain.model.Achievement;
+import com.mycompany.levelup_code.domain.model.Challenge;
+import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
+import com.mycompany.levelup_code.domain.model.CodeChallenge;
+import com.mycompany.levelup_code.domain.model.CourseModule;
+import com.mycompany.levelup_code.domain.model.ExperienceAchievement;
+import com.mycompany.levelup_code.domain.model.Language;
+import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.StreakAchievement;
+import com.mycompany.levelup_code.domain.model.TestCase;
+import com.mycompany.levelup_code.domain.model.User;
+import com.mycompany.levelup_code.domain.model.EditorPreferences;
+import com.mycompany.levelup_code.data.oracle.OraclePreferenceRepository;
+import com.mycompany.levelup_code.data.oracle.OracleGoalRepository;
+import com.mycompany.levelup_code.domain.model.LearningGoal;
+import com.mycompany.levelup_code.presentation.controller.DashboardController;
+import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.concurrent.Task;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.TilePane;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.Slider;
+import javafx.scene.control.TitledPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+/**
+ * Panel principal (Dashboard) en JavaFX + CSS ({@code /styles/levelup.css}) con telemetría
+ * de gamificación en tiempo real, mapa de calor de 14 días ({@code Actividad_Diaria}),
+ * árbol conectado de habilidades ({@code Progreso_Leccion}), comparador sincronizado de
+ * 3 lenguajes, catálogo de logros ({@code Logros} / {@code Usuario_Logro}) y gestión CRUD
+ * de retos protegida por rol Administrador.
+ */
+public class DashboardFrame {
+
+    private static final Logger LOGGER = Logger.getLogger(DashboardFrame.class.getName());
+
+    private final Stage stage;
+    private final User currentUser;
+    private final boolean oracleConnected;
+    private final DashboardController controller;
+
+    private String activeLanguageKey = "JAVA";
+    private int solvedChallengesCount = 0;
+    private int lastKnownOfflineExp = 0;
+
+    private final List<Lesson> javaLessons = new ArrayList<>();
+    private final List<Lesson> pythonLessons = new ArrayList<>();
+    private final List<Lesson> cppLessons = new ArrayList<>();
+    private final List<Lesson> allLessonsForAdmin = new ArrayList<>();
+    private final List<Achievement> achievementsCatalog = new ArrayList<>();
+    private final Map<LocalDate, Integer> activityByDate = new HashMap<>();
+    private final Set<String> enrolledLanguages = new HashSet<>();
+
+    private Language javaLangModel;
+    private Language pythonLangModel;
+    private Language cppLangModel;
+
+    // Botones de navegación lateral
+    private Button navHomeBtn;
+    private Button navCoursesBtn;
+    private Button navPracticeBtn;
+    private Button navProgressBtn;
+    private Button navNotebookBtn;
+    private Button navGoalsBtn;
+    private Button navLabBtn;
+    private CodingLabPane codingLab;
+    private GuidedPracticePane guidedPractice;
+    private boolean preparingPractice;
+    private Label profileName;
+    private ProfilePane profilePane;
+    private NotebookPane notebookPane;
+    private VBox practiceView;
+    private VBox practiceResults;
+    private Label practiceCount;
+    private TextField practiceSearch;
+    private ComboBox<String> practiceLanguage;
+    private ComboBox<String> practiceType;
+    private ComboBox<String> practiceDifficulty;
+    private ComboBox<String> practiceProgress;
+    private Map<Integer, ChallengeProgress> challengeProgress = Map.of();
+    private final Map<Integer, ChallengeProgress> demoChallengeProgress = new java.util.concurrent.ConcurrentHashMap<>();
+    private Button navComparatorBtn;
+    private Button navAchievementsBtn;
+    private Button navAdminBtn;
+
+    // Contenedor central con transición de vistas
+    private StackPane workspaceContainer;
+    private ScrollPane workspaceScroll;
+    private LearningWorkspace learningWorkspace;
+    private Node learningOrigin;
+    private double learningOriginScroll;
+    private BorderPane dashboardShell;
+    private BorderPane sidebar;
+    private VBox dashboardHeader;
+    private final HBox achievementNotice = new HBox(12);
+    private VBox homeView;
+    private VBox homeGoal;
+    private Label homeNext;
+    private Label homeCoach;
+    private Button homeContinue;
+    private Label homeChallenge;
+    private Button homePractice;
+    private Challenge recommendedChallenge;
+    private boolean homeGoalLoading;
+    private VBox coursesView;
+    private VBox comparatorView;
+    private VBox achievementsView;
+    private VBox adminView;
+    private ChallengeAuthoringPane challengeAuthoring;
+    private CurriculumAuthoringPane curriculumAuthoring;
+    private boolean reloadingCurriculum;
+    private boolean curriculumReloadPending;
+
+    // Telemetría reactiva
+    private Label lblLevelVal;
+    private Label lblLevelSub;
+    private ProgressBar levelProgressBar;
+    private Label lblExpVal;
+    private Label lblExpSub;
+    private Label lblStreakVal;
+    private Label badgeMaxStreak;
+    private HBox heatmapGridBox;
+    private Label lblLivesVal;
+    private Label lblLivesSub;
+    private ProgressBar livesProgressBar;
+    private Button btnRecoverLives;
+
+    // Árbol de habilidades y cursos
+    private Label lblLessonsHeader;
+    private Label lblCourseStatus;
+    private VBox lessonsListBox;
+    private final Map<String, ProgressBar> courseProgressBars = new HashMap<>();
+    private final Map<String, Label> courseProgressLabels = new HashMap<>();
+    private final Map<String, Boolean> expandedModules = new HashMap<>();
+    private final Map<Lesson, Boolean> expandedLessons = new HashMap<>();
+
+    // Comparador de 3 lenguajes (6 tópicos curriculares)
+    private CodeEditor txtCompareJava;
+    private CodeEditor txtComparePython;
+    private CodeEditor txtCompareCpp;
+    private Label lblCompareSummary;
+    private ComparisonExercisePane comparisonExercise;
+    private final List<Button> comparatorTopicButtons = new ArrayList<>();
+    private int activeComparatorLessonIndex = 0;
+
+    // Logros e insignias
+    private GridPane achievementsGrid;
+    private Label lblAchievementsSummary;
+
+    // Formulario de Administración CRUD
+    private ComboBox<String> cmbAdminLesson;
+    private ComboBox<String> cmbAdminChallenge;
+    private final List<CodeChallenge> adminEditableChallenges = new ArrayList<>();
+    private CodeChallenge adminEditingChallenge;
+    private TextField txtAdminTitle;
+    private TextField txtAdminReward;
+    private ComboBox<ChallengeDifficulty> cmbAdminDifficulty;
+    private TextArea txtAdminStatement;
+    private TextArea txtAdminTemplate;
+    private TextField txtAdminCase1In;
+    private TextField txtAdminCase1Out;
+    private TextField txtAdminCase2In;
+    private TextField txtAdminCase2Out;
+    private Label lblAdminStatus;
+    private Button btnAdminSave;
+    private Button btnAdminValidate;
+    private String validatedAdminDraftFingerprint;
+    private TextField lessonSearch;
+    private CheckBox hideCompleted;
+    private Label lessonResults;
+    private Label continueSummary;
+    private Button continueButton;
+    private Label syncStatus;
+    private Label badgeConn;
+    private Button btnRetryConnection;
+    private Timeline connectionWatch;
+    private boolean healthChecking;
+    private boolean connectionAvailable;
+    private boolean dataStale;
+    private final Map<String, VBox> languageCards = new HashMap<>();
+    private Map<Lesson, ProgressStatus> lessonStatuses = Map.of();
+    private Set<Integer> unlockedAchievementIds = Set.of();
+    private boolean refreshing;
+    private boolean refreshPending;
+    private boolean disposed;
+
+    public DashboardFrame(User user) {
+        this(new Stage(), user);
+    }
+
+    public DashboardFrame(Stage targetStage, User user) {
+        this.stage = targetStage != null ? targetStage : new Stage();
+        this.currentUser = user != null ? user : DemoSeedCatalog.createDefaultStudent();
+        AppContext ctx = AppContext.getInstance();
+        this.oracleConnected = ctx.isOracleConnected();
+        this.connectionAvailable = ctx.isOracleAvailable();
+        this.controller = new DashboardController(this.currentUser, ctx);
+        this.lastKnownOfflineExp = this.currentUser.getTotalExp();
+
+        showLoadingScreen();
+    }
+
+    public Stage getStage() {
+        return stage;
+    }
+
+    private void showLoadingScreen() {
+        stage.setTitle("LevelUp Code · Tu espacio de aprendizaje");
+        stage.setMinWidth(900);
+        stage.setMinHeight(640);
+        Label message = new Label("Lupo está preparando tus cursos y tu progreso…");
+        message.getStyleClass().add("card-title");
+        ProgressIndicator indicator = new ProgressIndicator();
+        indicator.setMaxSize(36, 36);
+        Button retry = new Button("Volver a intentar");
+        retry.getStyleClass().add("btn-primary");
+        retry.setVisible(false);
+        retry.setManaged(false);
+        retry.setOnAction(e -> showLoadingScreen());
+        VBox loading = new VBox(18, Lupo.portrait(Lupo.Expression.THINKING, 112), indicator, message, retry);
+        loading.getStyleClass().add("root-shell");
+        loading.setAlignment(Pos.CENTER);
+        Scene scene = new Scene(loading, 1260, 780);
+        Theme.applyCss(scene);
+        stage.setScene(scene);
+        Task<DashboardState> task = new Task<>() {
+            @Override protected DashboardState call() {
+                EditorPreferences preferences = EditorPreferences.DEFAULT;
+                if (oracleConnected) {
+                    try { preferences = new OraclePreferenceRepository().load(currentUser.getId()); }
+                    catch (Exception ex) { LOGGER.log(Level.WARNING, "No se pudieron cargar las preferencias", ex); }
+                }
+                EditorPreferences.remember(currentUser.getId(), preferences);
+                try {
+                    loadDomainDataFromOracleOrSeed();
+                    loadEnrollmentsFromOracle();
+                    loadAchievementsFromOracleOrSeed();
+                    return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
+                } catch (RuntimeException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
+            }
+        };
+        task.setOnSucceeded(e -> {
+            if (disposed || stage.getScene() != scene) return;
+            applyDashboardState(task.getValue());
+            EditorPreferences preferences = EditorPreferences.forUser(currentUser.getId());
+            Theme.setReducedMotion(preferences.reducedMotion());
+            activeLanguageKey = preferences.language();
+            initUi();
+            populateLessonsForLanguage(activeLanguageKey);
+            refreshCourseProgressBars();
+            loadComparisonTopic("POLYMORPHISM");
+            refreshAchievementsGrid();
+            refreshGamificationTelemetry();
+            if (task.getValue().livesRecovered()) {
+                syncStatus.setText("¡Tus 5 vidas diarias se recuperaron automáticamente!");
+            }
+            startConnectionWatch();
+        });
+        task.setOnFailed(e -> {
+            LOGGER.log(Level.WARNING, "Unable to load dashboard", task.getException());
+            indicator.setVisible(false);
+            message.setText("No pudimos cargar tus cursos. " + task.getMessage());
+            message.setWrapText(true);
+            message.setMaxWidth(640);
+            retry.setVisible(true);
+            retry.setManaged(true);
+        });
+        startTask(task, "dashboard-load");
+    }
+
+    private record DashboardState(int solved, Map<LocalDate, Integer> activity,
+            Map<Lesson, ProgressStatus> progress, Set<Integer> achievements,
+            boolean livesRecovered, Map<Integer, ChallengeProgress> challengeProgress) { }
+
+    private DashboardState fetchDashboardState(int offlineSolved, boolean livesRecovered) {
+        int solved = controller.syncTelemetryAndGetSolvedChallenges(offlineSolved);
+        Map<Lesson, ProgressStatus> progress = new HashMap<>();
+        Map<Integer, ProgressStatus> savedStatuses = controller.loadLessonProgressStatuses();
+        for (List<Lesson> lessons : List.of(javaLessons, pythonLessons, cppLessons)) {
+            for (int i = 0; i < lessons.size(); i++) {
+                Lesson lesson = lessons.get(i);
+                ProgressStatus status = LessonFrame.isLocallyCompleted(currentUser, lesson)
+                        ? ProgressStatus.COMPLETED
+                        : oracleConnected
+                                ? savedStatuses.getOrDefault(lesson.getId(), ProgressStatus.PENDING)
+                                : controller.resolveLessonProgressStatus(lesson, i);
+                progress.put(lesson, status);
+            }
+        }
+        return new DashboardState(solved, controller.loadRecentActivityHistory(), progress,
+                controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered,
+                oracleConnected && currentUser.getId() > 0
+                        ? AppContext.getInstance().getChallengeService().getProgressByUser(currentUser.getId())
+                        : Map.copyOf(demoChallengeProgress));
+    }
+
+    private boolean recoverExhaustedLivesOnOpen() {
+        if (!oracleConnected || currentUser.getId() <= 0 || currentUser.getLives() > 0) {
+            return false;
+        }
+        try {
+            return AppContext.getInstance().getGamificationService()
+                    .recoverLivesIfEligible(currentUser) > 0;
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.WARNING,
+                    "No se pudo comprobar la recuperación automática de vidas", ex);
+            return false;
+        }
+    }
+
+    private void applyDashboardState(DashboardState state) {
+        solvedChallengesCount = state.solved();
+        activityByDate.clear();
+        activityByDate.putAll(state.activity());
+        lessonStatuses = state.progress();
+        unlockedAchievementIds = state.achievements();
+        challengeProgress = state.challengeProgress();
+        lastKnownOfflineExp = currentUser.getTotalExp();
+    }
+
+    private static void startTask(Task<?> task, String name) {
+        Thread thread = new Thread(task, name);
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    public void show() {
+        stage.show();
+        stage.toFront();
+    }
+
+    public void setVisible(boolean visible) {
+        if (visible) {
+            show();
+        } else {
+            stage.close();
+        }
+    }
+
+    private void loadEnrollmentsFromOracle() {
+        this.enrolledLanguages.clear();
+        this.enrolledLanguages.addAll(
+                controller.loadEnrolledLanguageKeys(javaLangModel, pythonLangModel, cppLangModel)
+        );
+    }
+
+    private void loadDomainDataFromOracleOrSeed() {
+        applyCatalog(controller.loadLanguages());
+    }
+
+    private void applyCatalog(List<Language> languages) {
+        javaLessons.clear();
+        pythonLessons.clear();
+        cppLessons.clear();
+        allLessonsForAdmin.clear();
+
+        javaLangModel = null; pythonLangModel = null; cppLangModel = null;
+        for (Language lang : languages) {
+            String name = lang.getName() != null ? lang.getName().toLowerCase(Locale.ROOT) : "";
+            List<Lesson> targetList;
+            if (name.contains("python")) {
+                pythonLangModel = lang;
+                targetList = pythonLessons;
+            } else if (name.contains("c++") || name.contains("cpp")) {
+                cppLangModel = lang;
+                targetList = cppLessons;
+            } else {
+                javaLangModel = lang;
+                targetList = javaLessons;
+            }
+            if (lang.getModules() != null) {
+                for (CourseModule mod : lang.getModules()) {
+                    if (mod.getLessons() != null) {
+                        for (Lesson lesson : mod.getLessons()) {
+                            targetList.add(lesson);
+                            allLessonsForAdmin.add(lesson);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void loadAchievementsFromOracleOrSeed() {
+        achievementsCatalog.clear();
+        achievementsCatalog.addAll(controller.loadAchievementsCatalog());
+    }
+
+    private void loadActivityHistoryFromOracle() {
+        activityByDate.clear();
+        activityByDate.putAll(controller.loadRecentActivityHistory());
+    }
+
+    private void initUi() {
+        stage.setTitle("LevelUp Code · Tu espacio de aprendizaje");
+        stage.setMinWidth(900);
+        stage.setMinHeight(640);
+        stage.setOnCloseRequest(event -> {
+            event.consume();
+            requestExit(stage::hide);
+        });
+
+        BorderPane root = new BorderPane();
+        dashboardShell = root;
+        root.getStyleClass().add("root-shell");
+
+        sidebar = buildLeftSidebar();
+        root.setLeft(sidebar);
+
+        VBox centerShell = new VBox(16);
+        centerShell.setPadding(new Insets(18, 22, 18, 22));
+
+        TilePane topTelemetry = buildTopTelemetryBar();
+
+        workspaceContainer = new StackPane();
+        workspaceContainer.setMinWidth(0);
+        VBox.setVgrow(workspaceContainer, Priority.ALWAYS);
+
+        coursesView = buildCoursesWorkspaceView();
+        practiceView = buildPracticeWorkspaceView();
+        comparatorView = buildComparatorWorkspaceView();
+        achievementsView = buildAchievementsWorkspaceView();
+        if (currentUser != null && currentUser.isAdministrator()) {
+            if (oracleConnected) {
+                challengeAuthoring = new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
+                    if (disposed) return;
+                    Challenge challenge = saved.challenge();
+                    for (Lesson lesson : allLessonsForAdmin) {
+                        lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
+                        if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
+                                && lesson.getId() == challenge.getLessonId()) {
+                            challenge.setLesson(lesson);
+                            lesson.addChallenge(challenge);
+                        }
+                    }
+                    refreshAllDashboardState();
+                });
+                curriculumAuthoring = new CurriculumAuthoringPane(currentUser, this::reloadCurriculum);
+                javafx.scene.control.Tab challenges = new javafx.scene.control.Tab("Retos", challengeAuthoring);
+                javafx.scene.control.Tab curriculum = new javafx.scene.control.Tab("Módulos y lecciones", curriculumAuthoring);
+                challenges.setClosable(false); curriculum.setClosable(false);
+                javafx.scene.control.TabPane administration = new javafx.scene.control.TabPane(challenges, curriculum);
+                Button reloadCourses = WorkspaceUi.button("Actualizar cursos", "btn-secondary", Theme.IconKind.REFRESH);
+                reloadCourses.setOnAction(event -> reloadCurriculum());
+                adminView = new VBox(12, reloadCourses, administration);
+            } else adminView = buildAdminCrudWorkspaceView();
+        }
+
+        homeView = buildHomeWorkspace(topTelemetry);
+        workspaceContainer.getChildren().setAll(homeView);
+        syncStatus = new Label(oracleConnected ? "Tu progreso se guarda automáticamente."
+                : "Modo de prueba · Los cambios duran esta sesión.");
+        syncStatus.getStyleClass().add("muted-text");
+        syncStatus.setWrapText(true);
+        btnRetryConnection = new Button("Reintentar");
+        btnRetryConnection.getStyleClass().add("btn-secondary");
+        btnRetryConnection.setOnAction(event -> {
+            if (oracleConnected) checkConnection();
+            else refreshAllDashboardState();
+        });
+        btnRetryConnection.setVisible(false);
+        btnRetryConnection.setManaged(false);
+        HBox syncBar = new HBox(10, syncStatus, btnRetryConnection);
+        syncBar.setAlignment(Pos.CENTER_LEFT);
+        achievementNotice.setVisible(false);
+        achievementNotice.setManaged(false);
+        achievementNotice.setAlignment(Pos.CENTER_LEFT);
+        achievementNotice.getStyleClass().add("lupo-welcome");
+        dashboardHeader = new VBox(12, syncBar, buildCompactTelemetry(), achievementNotice);
+        centerShell.getChildren().addAll(dashboardHeader, workspaceContainer);
+        centerShell.setMinWidth(0);
+        ScrollPane centerScroll = new ScrollPane(centerShell);
+        workspaceScroll = centerScroll;
+        learningWorkspace = new LearningWorkspace(currentUser, this::onLessonStateChanged, this::onChallengeOrLessonCompleted,
+                this::returnFromLearning, this::setConcentration, this::recordPracticeOutcome, false);
+        centerScroll.setFitToWidth(true);
+        centerScroll.getStyleClass().add("scroll-pane-clean");
+        root.setCenter(centerScroll);
+
+        Scene scene = new Scene(root, 1260, 780);
+        scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (learningWorkspace.hasPages()) learningWorkspace.handleShortcut(event);
+        });
+        Theme.applyCss(scene);
+        stage.setScene(scene);
+        switchWorkspaceView("HOME");
+    }
+
+    private void setConcentration(boolean focused) {
+        dashboardShell.setLeft(focused ? null : sidebar);
+        dashboardHeader.setVisible(!focused);
+        dashboardHeader.setManaged(!focused);
+    }
+
+    private void openLesson(Lesson lesson) { openLearning(() -> learningWorkspace.openLesson(lesson)); }
+    private void openChallenge(Challenge challenge) { openLearning(() -> learningWorkspace.openChallenge(challenge)); }
+
+    private void openLearning(Runnable open) {
+        if (!learningWorkspace.hasPages()) {
+            learningOrigin = workspaceContainer.getChildren().getFirst();
+            learningOriginScroll = workspaceScroll.getVvalue();
+        }
+        open.run();
+        if (!learningWorkspace.hasPages()) return;
+        homeView.setVisible(false);
+        workspaceContainer.getChildren().setAll(learningWorkspace);
+        workspaceScroll.setFitToHeight(true);
+        workspaceScroll.setVvalue(0);
+    }
+
+    private void returnFromLearning() {
+        Node origin = learningOrigin == null ? coursesView : learningOrigin;
+        double scroll = learningOriginScroll;
+        homeView.setVisible(origin == homeView);
+        workspaceContainer.getChildren().setAll(origin);
+        workspaceScroll.setFitToHeight(false);
+        javafx.application.Platform.runLater(() -> {
+            if (workspaceContainer.getChildren().contains(origin)) workspaceScroll.setVvalue(scroll);
+        });
+        learningOrigin = null;
+    }
+
+    private FlowPane buildCompactTelemetry() {
+        FlowPane bar = new FlowPane(18, 8);
+        bar.getStyleClass().add("compact-telemetry");
+        for (Label source : List.of(lblLevelVal, lblExpVal, lblStreakVal, lblLivesVal)) {
+            Label value = WorkspaceUi.label("", "body-text");
+            value.textProperty().bind(source.textProperty());
+            bar.getChildren().add(value);
+        }
+        Label lives = (Label) bar.getChildren().getLast();
+        lives.textProperty().unbind();
+        lives.textProperty().bind(lblLivesVal.textProperty().concat(" vidas"));
+        bar.visibleProperty().bind(homeView.visibleProperty().not());
+        bar.managedProperty().bind(bar.visibleProperty());
+        return bar;
+    }
+
+    private VBox buildHomeWorkspace(TilePane telemetry) {
+        Label greeting = WorkspaceUi.label("Hola, " + currentUser.getUsername(), "home-greeting");
+        greeting.textProperty().bind(javafx.beans.binding.Bindings.concat("Hola, ", profileName.textProperty()));
+        homeCoach = WorkspaceUi.label("", "body-text");
+        homeNext = WorkspaceUi.label("", "card-title");
+        homeContinue = WorkspaceUi.button("Continuar aprendiendo", "btn-primary", Theme.IconKind.PLAY);
+        homeContinue.setOnAction(event -> {
+            Lesson lesson = lessonForPrimaryAction();
+            if (lesson != null) openLesson(lesson);
+        });
+        VBox welcomeText = new VBox(10, greeting,
+                homeCoach, homeNext, homeContinue);
+        welcomeText.setMinWidth(0);
+        HBox.setHgrow(welcomeText, Priority.ALWAYS);
+        HBox welcome = new HBox(22, Lupo.portrait(Lupo.Expression.WELCOME, 110), welcomeText);
+        welcome.setAlignment(Pos.CENTER_LEFT);
+        welcome.getStyleClass().add("lupo-welcome");
+        homeChallenge = WorkspaceUi.label("", "body-text");
+        homePractice = WorkspaceUi.button("Practicar este reto", "btn-secondary", Theme.IconKind.CODE);
+        homePractice.setOnAction(event -> {
+            if (recommendedChallenge != null) {
+                openChallenge(recommendedChallenge);
+            }
+        });
+        Button guided = WorkspaceUi.button("Practicar una sesión de 5 retos", "btn-primary", Theme.IconKind.PLAY);
+        guided.setOnAction(event -> startGuidedPractice());
+        VBox practice = new VBox(12, WorkspaceUi.label("Tu próximo reto", "card-title"), homeChallenge, homePractice, guided);
+        practice.getStyleClass().add("surface-card");
+        homeGoal = new VBox(10);
+        homeGoal.getStyleClass().add("surface-card");
+        TilePane suggestions = new TilePane(16, 16, practice, homeGoal);
+        suggestions.setPrefColumns(2);
+        suggestions.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(220, Math.floor((suggestions.getWidth() - 2 - (suggestions.getWidth() >= 650 ? 16 : 0))
+                        / (suggestions.getWidth() >= 650 ? 2 : 1))), suggestions.widthProperty()));
+        for (VBox card : List.of(practice, homeGoal)) card.setMaxWidth(Double.MAX_VALUE);
+        VBox view = new VBox(18, welcome, suggestions, telemetry);
+        view.setMinWidth(0);
+        return view;
+    }
+
+    private void refreshHome() {
+        if (homeNext == null) return;
+        Lesson lesson = lessonForPrimaryAction();
+        homeNext.setText(lesson == null ? "Elige un curso para comenzar."
+                : (nextLesson() == null ? "Repasa " : "Continúa con ") + lesson.getTitle());
+        homeContinue.setDisable(lesson == null);
+        boolean started = selectedLessons().stream().anyMatch(item ->
+                lessonStatuses.getOrDefault(item, ProgressStatus.PENDING) != ProgressStatus.PENDING);
+        homeCoach.setText(lesson == null ? "Soy Lupo. Elige un curso y empezamos juntos."
+                : nextLesson() == null ? "¡Completaste las lecturas de este curso! Sigue con sus retos para ponerlas en práctica."
+                : started ? "Retomemos donde ibas. Tu siguiente lección está lista."
+                : "Soy Lupo. Empieza por esta lección y prueba lo que aprendas con un reto.");
+        recommendedChallenge = selectedLessons().stream().flatMap(item -> item.getChallenges().stream())
+                .filter(item -> challengeProgress.get(item.getId()) != ChallengeProgress.SOLVED)
+                .findFirst().orElse(null);
+        homeChallenge.setText(recommendedChallenge == null
+                ? "Has recorrido los retos de este curso. Puedes elegir otro curso o repasar."
+                : recommendedChallenge.getTitle() + " · " + recommendedChallenge.getDifficulty().label());
+        homePractice.setDisable(recommendedChallenge == null);
+    }
+
+    private void loadHomeGoal() {
+        if (homeGoalLoading) return;
+        Button open = WorkspaceUi.button("Ver mis metas", "btn-secondary", Theme.IconKind.TARGET);
+        open.setOnAction(event -> switchWorkspaceView("GOALS"));
+        homeGoal.getChildren().setAll(WorkspaceUi.label("Tu meta", "card-title"),
+                WorkspaceUi.label(oracleConnected ? "Consultando tu meta…" : "Crea una meta al entrar con tu cuenta.", "body-text"), open);
+        if (!oracleConnected) return;
+        homeGoalLoading = true;
+        Task<List<LearningGoal>> task = new Task<>() {
+            @Override protected List<LearningGoal> call() throws Exception {
+                return new OracleGoalRepository().load(currentUser.getId());
+            }
+        };
+        task.setOnSucceeded(event -> {
+            homeGoalLoading = false;
+            if (disposed) return;
+            LearningGoal goal = task.getValue().stream()
+                    .filter(item -> !item.completed() && !item.start().isAfter(LocalDate.now())
+                            && !item.end().isBefore(LocalDate.now()))
+                    .min(java.util.Comparator.comparing(LearningGoal::end)).orElse(null);
+            if (goal == null) {
+                ((Label) homeGoal.getChildren().get(1)).setText("Elige una meta pequeña para tu próxima sesión.");
+            } else {
+                ProgressBar progress = new ProgressBar(goal.fraction());
+                progress.setMaxWidth(Double.MAX_VALUE);
+                String text = goal.type() + " · " + Math.min(goal.current(), goal.target()) + " de " + goal.target();
+                progress.setAccessibleText(text);
+                homeGoal.getChildren().setAll(WorkspaceUi.label("Tu meta", "card-title"),
+                        WorkspaceUi.label(text, "body-text"), progress, open);
+            }
+        });
+        task.setOnFailed(event -> {
+            homeGoalLoading = false;
+            if (!disposed) ((Label) homeGoal.getChildren().get(1)).setText("Tu meta no está disponible. Abre Mis metas para reintentar.");
+        });
+        startTask(task, "home-goal");
+    }
+
+    private BorderPane buildLeftSidebar() {
+        BorderPane sidebar = new BorderPane();
+        sidebar.getStyleClass().add("sidebar");
+        sidebar.setPrefWidth(240);
+        sidebar.setMinWidth(240);
+
+        VBox navColumn = new VBox(8);
+
+        HBox brand = Lupo.brand();
+        VBox.setMargin(brand, new Insets(0, 0, 14, 0));
+
+        Label lblNavSection = new Label("NAVEGACIÓN PRINCIPAL");
+        lblNavSection.getStyleClass().add("section-caption");
+
+        navHomeBtn = WorkspaceUi.button("Inicio", "nav-btn", Theme.IconKind.SPARK);
+        navHomeBtn.setMaxWidth(Double.MAX_VALUE);
+        navHomeBtn.setOnAction(event -> switchWorkspaceView("HOME"));
+        navCoursesBtn = new Button("Mis cursos");
+        navCoursesBtn.getStyleClass().add("nav-btn-active");
+        navCoursesBtn.setGraphic(Theme.createIcon(Theme.IconKind.BOOK, 16, Theme.HEX_WHITE));
+        navCoursesBtn.setGraphicTextGap(10);
+        navCoursesBtn.setMaxWidth(Double.MAX_VALUE);
+        navPracticeBtn = new Button("Practicar");
+        navPracticeBtn.getStyleClass().add("nav-btn");
+        navPracticeBtn.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 16, Theme.HEX_GREEN));
+        navPracticeBtn.setGraphicTextGap(10);
+        navPracticeBtn.setMaxWidth(Double.MAX_VALUE);
+        navPracticeBtn.setOnAction(e -> switchWorkspaceView("PRACTICE"));
+        navProgressBtn = new Button("Mi progreso");
+        navProgressBtn.getStyleClass().add("nav-btn");
+        navProgressBtn.setGraphic(Theme.createIcon(Theme.IconKind.CHART, 16, Theme.HEX_INDIGO));
+        navProgressBtn.setGraphicTextGap(10);
+        navProgressBtn.setMaxWidth(Double.MAX_VALUE);
+        navProgressBtn.setOnAction(e -> switchWorkspaceView("PROGRESS"));
+        navNotebookBtn = new Button("Mi cuaderno");
+        navNotebookBtn.getStyleClass().add("nav-btn");
+        navNotebookBtn.setGraphic(Theme.createIcon(Theme.IconKind.NOTE, 16, Theme.HEX_INDIGO));
+        navNotebookBtn.setGraphicTextGap(10);
+        navNotebookBtn.setMaxWidth(Double.MAX_VALUE);
+        navNotebookBtn.setOnAction(e -> switchWorkspaceView("NOTEBOOK"));
+        navGoalsBtn = new Button("Mis metas");
+        navGoalsBtn.getStyleClass().add("nav-btn");
+        navGoalsBtn.setGraphic(Theme.createIcon(Theme.IconKind.TARGET, 16, Theme.HEX_GREEN));
+        navGoalsBtn.setGraphicTextGap(10);
+        navGoalsBtn.setMaxWidth(Double.MAX_VALUE);
+        navGoalsBtn.setOnAction(e -> switchWorkspaceView("GOALS"));
+        navLabBtn = new Button("Laboratorio");
+        navLabBtn.getStyleClass().add("nav-btn");
+        navLabBtn.setGraphic(Theme.createIcon(Theme.IconKind.TERMINAL, 16, Theme.HEX_INDIGO));
+        navLabBtn.setGraphicTextGap(10);
+        navLabBtn.setMaxWidth(Double.MAX_VALUE);
+        navLabBtn.setOnAction(e -> switchWorkspaceView("LAB"));
+
+        navComparatorBtn = new Button("Comparar lenguajes");
+        navComparatorBtn.getStyleClass().add("nav-btn");
+        navComparatorBtn.setGraphic(Theme.createIcon(Theme.IconKind.CODE, 16, Theme.HEX_CYAN));
+        navComparatorBtn.setGraphicTextGap(10);
+        navComparatorBtn.setMaxWidth(Double.MAX_VALUE);
+
+        navAchievementsBtn = new Button("Logros e Insignias");
+        navAchievementsBtn.getStyleClass().add("nav-btn");
+        navAchievementsBtn.setGraphic(Theme.createIcon(Theme.IconKind.TROPHY, 16, Theme.HEX_AMBER));
+        navAchievementsBtn.setGraphicTextGap(10);
+        navAchievementsBtn.setMaxWidth(Double.MAX_VALUE);
+
+        if (currentUser != null && currentUser.isAdministrator()) {
+            navAdminBtn = new Button("Administración");
+            navAdminBtn.getStyleClass().add("nav-btn");
+            navAdminBtn.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 16, Theme.HEX_GREEN));
+            navAdminBtn.setGraphicTextGap(10);
+            navAdminBtn.setMaxWidth(Double.MAX_VALUE);
+            navAdminBtn.setOnAction(e -> switchWorkspaceView("ADMIN"));
+        }
+
+        Button btnQuickLab = new Button("Practicar un reto");
+        btnQuickLab.getStyleClass().add("btn-ghost-green");
+        btnQuickLab.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_GREEN));
+        btnQuickLab.setGraphicTextGap(8);
+        btnQuickLab.setMaxWidth(Double.MAX_VALUE);
+        VBox.setMargin(btnQuickLab, new Insets(8, 0, 0, 0));
+
+        navCoursesBtn.setOnAction(e -> switchWorkspaceView("COURSES"));
+        navComparatorBtn.setOnAction(e -> switchWorkspaceView("COMPARATOR"));
+        navAchievementsBtn.setOnAction(e -> {
+            refreshAchievementsGrid();
+            switchWorkspaceView("ACHIEVEMENTS");
+        });
+        btnQuickLab.setOnAction(e -> switchWorkspaceView("PRACTICE"));
+
+        navColumn.getChildren().addAll(
+                brand, lblNavSection,
+                navHomeBtn, navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
+        );
+        if (navAdminBtn != null) {
+            navColumn.getChildren().add(navAdminBtn);
+        }
+        navColumn.getChildren().add(btnQuickLab);
+        ScrollPane navigationScroll = new ScrollPane(navColumn);
+        navigationScroll.setFitToWidth(true);
+        navigationScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        navigationScroll.getStyleClass().add("scroll-pane-clean");
+        sidebar.setCenter(navigationScroll);
+
+        // Tarjeta inferior de perfil activo y cierre de sesión
+        VBox userBox = new VBox(10);
+        userBox.getStyleClass().add("surface-subtle");
+
+        HBox profileTop = new HBox(10);
+        profileTop.setAlignment(Pos.CENTER_LEFT);
+
+        String roleHex = currentUser.isAdministrator() ? Theme.HEX_GREEN : Theme.HEX_INDIGO;
+        VBox userTextCol = new VBox(2);
+        Label lblUserName = new Label(currentUser.getUsername());
+        profileName = lblUserName;
+        lblUserName.getStyleClass().add("card-title");
+
+        String roleLabel = currentUser.isAdministrator() ? "Rol: Administrador" : "Rol: Estudiante";
+        Label lblUserRole = new Label(roleLabel);
+        lblUserRole.getStyleClass().add(currentUser.isAdministrator() ? "text-success" : "muted-text");
+        userTextCol.getChildren().addAll(lblUserName, lblUserRole);
+        Button profile = new Button("Mi perfil");
+        profile.getStyleClass().add("btn-secondary");
+        profile.setOnAction(event -> switchWorkspaceView("PROFILE"));
+        userTextCol.getChildren().add(profile);
+
+        profileTop.getChildren().addAll(
+                Theme.createIcon(Theme.IconKind.USER, 22, roleHex),
+                userTextCol
+        );
+
+        String connLabel = oracleConnected ? "CONECTADO" : "MODO DE PRUEBA";
+        String connClass = oracleConnected ? "badge-green" : "badge-amber";
+        badgeConn = Theme.createPillBadge(connLabel, connClass);
+
+        Button btnLogout = new Button("Cerrar Sesión");
+        btnLogout.getStyleClass().add("btn-secondary");
+        btnLogout.setGraphic(Theme.createIcon(Theme.IconKind.LOGOUT, 14, Theme.HEX_SECONDARY));
+        btnLogout.setGraphicTextGap(8);
+        btnLogout.setMaxWidth(Double.MAX_VALUE);
+        btnLogout.setOnAction(e -> {
+            requestExit(() -> {
+                SessionWindowRegistry.closeAll();
+                LoginFrame loginFrame = new LoginFrame(stage);
+                loginFrame.show();
+            });
+        });
+
+        userBox.getChildren().addAll(profileTop, badgeConn, btnLogout);
+        sidebar.setBottom(userBox);
+
+        return sidebar;
+    }
+
+    private void requestExit(Runnable continuation) {
+        if (disposed || (learningWorkspace != null && !learningWorkspace.canLeave())) return;
+        if (guidedPractice != null && !guidedPractice.canLeave()) return;
+        Runnable finish = () -> {
+            if (notebookPane != null && !notebookPane.removeRecovery()) return;
+            if (codingLab != null && !codingLab.removeRecovery()) return;
+            if (learningWorkspace != null && !learningWorkspace.clear()) return;
+            if (guidedPractice != null && !guidedPractice.dispose()) return;
+            disposed = true;
+            if (connectionWatch != null) connectionWatch.stop();
+            continuation.run();
+        };
+        Runnable checkAuthoring = () -> {
+            Runnable checkCurriculum = () -> {
+                if (curriculumAuthoring != null) curriculumAuthoring.requestLeave(stage, finish);
+                else finish.run();
+            };
+            if (challengeAuthoring != null) challengeAuthoring.requestLeave(stage, checkCurriculum);
+            else checkCurriculum.run();
+        };
+        Runnable checkLab = () -> {
+            if (codingLab != null) codingLab.requestLeave(stage, checkAuthoring);
+            else checkAuthoring.run();
+        };
+        if (notebookPane != null) notebookPane.requestLeave(stage, checkLab);
+        else checkLab.run();
+    }
+
+    private TilePane buildTopTelemetryBar() {
+        TilePane telemetryBar = new TilePane(12, 12);
+        telemetryBar.setPrefColumns(4);
+        telemetryBar.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(180, Math.floor((telemetryBar.getWidth() - 2 - (telemetryBar.getWidth() >= 900 ? 36 : 12))
+                        / (telemetryBar.getWidth() >= 900 ? 4 : 2))), telemetryBar.widthProperty()));
+
+        // 1. Nivel y barra de progreso
+        VBox cardLevel = new VBox(6);
+        cardLevel.getStyleClass().add("surface-card");
+        HBox.setHgrow(cardLevel, Priority.ALWAYS);
+
+        HBox lvlTop = new HBox(8);
+        lvlTop.setAlignment(Pos.CENTER_LEFT);
+        Label lblLvlCap = new Label("NIVEL ACTUAL");
+        lblLvlCap.getStyleClass().add("section-caption");
+        Region sp1 = new Region();
+        HBox.setHgrow(sp1, Priority.ALWAYS);
+        lvlTop.getChildren().addAll(lblLvlCap, sp1, Theme.createIcon(Theme.IconKind.STAR, 16, Theme.HEX_INDIGO));
+
+        HBox lvlMid = new HBox(10);
+        lvlMid.setAlignment(Pos.BASELINE_LEFT);
+        lblLevelVal = new Label("Nivel " + currentUser.getLevel());
+        lblLevelVal.getStyleClass().add("metric-value");
+        Region sp1b = new Region();
+        HBox.setHgrow(sp1b, Priority.ALWAYS);
+        lblLevelSub = new Label();
+        lblLevelSub.getStyleClass().add("muted-text");
+        lvlMid.getChildren().add(lblLevelVal);
+        lblLevelSub.setWrapText(true);
+
+        levelProgressBar = new ProgressBar(0.5);
+        levelProgressBar.getStyleClass().add("progress-bar-indigo");
+        levelProgressBar.setMaxWidth(Double.MAX_VALUE);
+        cardLevel.getChildren().addAll(lvlTop, lvlMid, lblLevelSub, levelProgressBar);
+
+        // 2. Experiencia Total
+        VBox cardExp = new VBox(6);
+        cardExp.getStyleClass().add("surface-card");
+        HBox.setHgrow(cardExp, Priority.ALWAYS);
+
+        HBox expTop = new HBox(8);
+        expTop.setAlignment(Pos.CENTER_LEFT);
+        Label lblExpCap = new Label("EXPERIENCIA TOTAL");
+        lblExpCap.getStyleClass().add("section-caption");
+        Region sp2 = new Region();
+        HBox.setHgrow(sp2, Priority.ALWAYS);
+        expTop.getChildren().addAll(lblExpCap, sp2, Theme.createIcon(Theme.IconKind.BOLT, 16, Theme.HEX_AMBER));
+
+        lblExpVal = new Label(currentUser.getTotalExp() + " XP");
+        lblExpVal.getStyleClass().add("metric-value");
+        lblExpSub = new Label("Cada paso cuenta");
+        lblExpSub.setWrapText(true);
+        lblExpSub.getStyleClass().add("muted-text");
+        cardExp.getChildren().addAll(expTop, lblExpVal, lblExpSub);
+
+        // 3. Racha y Mapa de Calor de 14 días (Actividad_Diaria)
+        VBox cardStreak = new VBox(6);
+        cardStreak.getStyleClass().add("surface-card");
+        HBox.setHgrow(cardStreak, Priority.ALWAYS);
+
+        HBox strTop = new HBox(8);
+        strTop.setAlignment(Pos.CENTER_LEFT);
+        Label lblStrCap = new Label("RACHA · ÚLTIMOS 14 DÍAS");
+        lblStrCap.getStyleClass().add("section-caption");
+        Region sp3 = new Region();
+        HBox.setHgrow(sp3, Priority.ALWAYS);
+        strTop.getChildren().addAll(lblStrCap, sp3, Theme.createIcon(Theme.IconKind.FLAME, 16, Theme.HEX_GREEN));
+
+        HBox strMid = new HBox(8);
+        strMid.setAlignment(Pos.CENTER_LEFT);
+        lblStreakVal = new Label(currentUser.getCurrentStreak() + " Días");
+        lblStreakVal.getStyleClass().add("metric-value");
+        Region sp3b = new Region();
+        HBox.setHgrow(sp3b, Priority.ALWAYS);
+        badgeMaxStreak = Theme.createPillBadge("Máx: " + currentUser.getMaxStreak() + "d", "badge-amber");
+        strMid.getChildren().addAll(lblStreakVal, sp3b, badgeMaxStreak);
+
+        heatmapGridBox = new HBox(4);
+        heatmapGridBox.setAlignment(Pos.CENTER_LEFT);
+        rebuildHeatmapCells();
+
+        cardStreak.getChildren().addAll(strTop, strMid, heatmapGridBox);
+
+        // 4. Vidas Disponibles
+        VBox cardLives = new VBox(6);
+        cardLives.getStyleClass().add("surface-card");
+        HBox.setHgrow(cardLives, Priority.ALWAYS);
+
+        HBox livTop = new HBox(8);
+        livTop.setAlignment(Pos.CENTER_LEFT);
+        Label lblLivCap = new Label("VIDAS DISPONIBLES");
+        lblLivCap.getStyleClass().add("section-caption");
+        Region sp4 = new Region();
+        HBox.setHgrow(sp4, Priority.ALWAYS);
+        livTop.getChildren().addAll(lblLivCap, sp4, Theme.createIcon(Theme.IconKind.HEART, 16, Theme.HEX_ROSE));
+
+        HBox livMid = new HBox(8);
+        livMid.setAlignment(Pos.BASELINE_LEFT);
+        lblLivesVal = new Label(currentUser.getLives() + " / 5");
+        lblLivesVal.getStyleClass().add("metric-value");
+        Region sp4b = new Region();
+        HBox.setHgrow(sp4b, Priority.ALWAYS);
+        lblLivesSub = new Label("Energía lista");
+        lblLivesSub.getStyleClass().add("muted-text");
+        livMid.getChildren().add(lblLivesVal);
+
+        livesProgressBar = new ProgressBar(currentUser.getLives() / 5.0);
+        livesProgressBar.getStyleClass().add("progress-bar-rose");
+        livesProgressBar.setMaxWidth(Double.MAX_VALUE);
+        btnRecoverLives = new Button("Recuperar vidas");
+        btnRecoverLives.getStyleClass().add("btn-secondary");
+        btnRecoverLives.setOnAction(event -> recoverLives());
+        cardLives.getChildren().addAll(livTop, livMid, lblLivesSub, livesProgressBar, btnRecoverLives);
+
+        telemetryBar.getChildren().addAll(cardLevel, cardExp, cardStreak, cardLives);
+        for (Node card : telemetryBar.getChildren()) {
+            ((Region) card).setMinWidth(0);
+            ((Region) card).setMaxWidth(Double.MAX_VALUE);
+        }
+        return telemetryBar;
+    }
+
+    private void rebuildHeatmapCells() {
+        if (heatmapGridBox == null) {
+            return;
+        }
+        heatmapGridBox.getChildren().clear();
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd MMM");
+        for (int i = 13; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            int xp = activityByDate.getOrDefault(day, 0);
+            Region cell = new Region();
+            cell.setPrefSize(13, 13);
+            cell.setMinSize(13, 13);
+            cell.setMaxSize(13, 13);
+            String styleClass = xp <= 0 ? "heatmap-cell-0"
+                    : (xp <= 70 ? "heatmap-cell-1" : (xp <= 150 ? "heatmap-cell-2" : "heatmap-cell-3"));
+            cell.getStyleClass().add(styleClass);
+            Tooltip.install(cell, new Tooltip(day.format(fmt) + ": +" + xp + " XP"));
+            heatmapGridBox.getChildren().add(cell);
+        }
+    }
+
+    private VBox buildCoursesWorkspaceView() {
+        VBox view = new VBox(16);
+        view.setMinWidth(0);
+
+        HBox secHeader = Theme.createSectionHeader(
+                "¿Qué quieres aprender hoy?",
+                "3 lenguajes", "badge-indigo"
+        );
+
+        TilePane langGrid = new TilePane(12, 12);
+        langGrid.setPrefColumns(3);
+        langGrid.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(200, Math.floor((langGrid.getWidth() - 2 - (langGrid.getWidth() >= 840 ? 24 : 0))
+                        / (langGrid.getWidth() >= 840 ? 3 : 1))), langGrid.widthProperty()));
+        Node cardJava = createLanguageCard(
+                "JAVA", "Java 21 LTS",
+                "Construye aplicaciones con clases, interfaces y colecciones.",
+                "lang-card-java", "btn-java", javaLessons.size()
+        );
+        Node cardPython = createLanguageCard(
+                "PYTHON", "Python 3.12",
+                "Resuelve problemas con una sintaxis clara y directa.",
+                "lang-card-python", "btn-python", pythonLessons.size()
+        );
+        Node cardCpp = createLanguageCard(
+                "CPP", "ISO C++ 20",
+                "Aprende rendimiento, memoria y estructuras de datos.",
+                "lang-card-cpp", "btn-cpp", cppLessons.size()
+        );
+        HBox.setHgrow(cardJava, Priority.ALWAYS);
+        HBox.setHgrow(cardPython, Priority.ALWAYS);
+        HBox.setHgrow(cardCpp, Priority.ALWAYS);
+        langGrid.getChildren().addAll(cardJava, cardPython, cardCpp);
+
+        VBox lessonsWrapper = new VBox(12);
+        lessonsWrapper.getStyleClass().add("surface-card");
+        lessonsWrapper.setMinWidth(0);
+        VBox.setVgrow(lessonsWrapper, Priority.ALWAYS);
+
+        lblCourseStatus = new Label("Elige un curso y avanza a tu ritmo.");
+        lblCourseStatus.getStyleClass().add("muted-text");
+        lblCourseStatus.setWrapText(true);
+
+        HBox listHeader = new HBox(10);
+        listHeader.setAlignment(Pos.CENTER_LEFT);
+        lblLessonsHeader = new Label("LECCIONES · JAVA");
+        lblLessonsHeader.getStyleClass().add("section-caption");
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+        lessonResults = new Label();
+        lessonResults.getStyleClass().add("muted-text");
+        listHeader.getChildren().addAll(lblLessonsHeader, sp, lessonResults);
+
+        lessonSearch = new TextField();
+        lessonSearch.setPromptText("Buscar una lección o un módulo…");
+        lessonSearch.setAccessibleText("Buscar lecciones en el curso seleccionado");
+        lessonSearch.getStyleClass().add("input-field");
+        lessonSearch.setPrefWidth(300);
+        lessonSearch.textProperty().addListener((obs, old, value) -> populateLessonsForLanguage(activeLanguageKey));
+        hideCompleted = new CheckBox("Solo por completar");
+        hideCompleted.getStyleClass().add("course-filter");
+        hideCompleted.setOnAction(e -> populateLessonsForLanguage(activeLanguageKey));
+        Button clear = new Button("Limpiar filtros");
+        clear.getStyleClass().add("btn-ghost");
+        clear.setOnAction(e -> { hideCompleted.setSelected(false); lessonSearch.clear(); populateLessonsForLanguage(activeLanguageKey); });
+        FlowPane filters = new FlowPane(12, 10, lessonSearch, hideCompleted, clear);
+        filters.setAlignment(Pos.CENTER_LEFT);
+
+        continueSummary = new Label();
+        continueSummary.setWrapText(true);
+        continueSummary.getStyleClass().add("card-title");
+        continueButton = new Button("Continuar aprendiendo");
+        continueButton.getStyleClass().add("btn-primary");
+        continueButton.setOnAction(e -> {
+            Lesson lesson = lessonForPrimaryAction();
+            if (lesson != null) openLesson(lesson);
+        });
+        VBox resumeActions = new VBox(10, continueSummary, continueButton);
+        resumeActions.setMinWidth(0);
+        HBox.setHgrow(resumeActions, Priority.ALWAYS);
+        HBox resumeContent = new HBox(16, Lupo.portrait(Lupo.Expression.WELCOME, 88), resumeActions);
+        resumeContent.setAlignment(Pos.CENTER_LEFT);
+        VBox resume = new VBox(resumeContent);
+        resume.getStyleClass().add("lupo-welcome");
+
+        lessonsListBox = new VBox(12);
+        lessonsWrapper.getChildren().addAll(listHeader, lblCourseStatus, filters, lessonsListBox);
+        view.getChildren().addAll(secHeader, resume, langGrid, lessonsWrapper);
+        return view;
+    }
+
+    private VBox buildPracticeWorkspaceView() {
+        VBox view = new VBox(14);
+        Button guided = WorkspaceUi.button("Iniciar o retomar una sesión de 5 retos", "btn-primary", Theme.IconKind.PLAY);
+        guided.setOnAction(event -> startGuidedPractice());
+        view.getChildren().add(guided);
+        view.getChildren().add(Theme.createSectionHeader("Elige tu próximo reto", "Practica a tu ritmo", "badge-green"));
+        view.getChildren().add(new LupoGuide(Lupo.Expression.THINKING, "Practica con Lupo",
+                "Empieza por un reto fácil o filtra los que quieras repasar."));
+        practiceSearch = new TextField();
+        practiceSearch.setPromptText("Buscar reto, lección o módulo…");
+        practiceSearch.setAccessibleText("Buscar retos");
+        practiceSearch.getStyleClass().add("input-field");
+        practiceSearch.setPrefWidth(260);
+        practiceLanguage = new ComboBox<>();
+        practiceLanguage.getItems().setAll("Todos los lenguajes", "Java", "Python", "C++");
+        practiceLanguage.getSelectionModel().selectFirst();
+        practiceType = new ComboBox<>();
+        practiceType.getItems().setAll("Todos los tipos", "Código", "Quiz", "Predicción de salida", "Depuración", "Ordenar fragmentos");
+        practiceType.getSelectionModel().selectFirst();
+        practiceDifficulty = new ComboBox<>();
+        practiceDifficulty.getItems().setAll("Todas las dificultades", "Fácil", "Medio", "Difícil");
+        practiceDifficulty.getSelectionModel().selectFirst();
+        practiceProgress = new ComboBox<>();
+        practiceProgress.getItems().setAll("Todos los estados", "Pendiente", "Intentado",
+                "Superado", "Repasar errores");
+        practiceProgress.getSelectionModel().selectFirst();
+        for (ComboBox<String> combo : List.of(practiceLanguage, practiceType,
+                practiceDifficulty, practiceProgress)) {
+            combo.getStyleClass().add("combo-box-modern");
+            combo.valueProperty().addListener((obs, previous, selected) -> renderPracticeCatalog());
+        }
+        practiceSearch.textProperty().addListener((obs, previous, value) -> renderPracticeCatalog());
+        Button clear = new Button("Limpiar filtros");
+        clear.getStyleClass().add("btn-secondary");
+        clear.setOnAction(e -> {
+            practiceSearch.clear();
+            practiceLanguage.getSelectionModel().selectFirst();
+            practiceType.getSelectionModel().selectFirst();
+            practiceDifficulty.getSelectionModel().selectFirst();
+            practiceProgress.getSelectionModel().selectFirst();
+        });
+        FlowPane filters = new FlowPane(10, 10, practiceSearch, practiceLanguage,
+                practiceType, practiceDifficulty, practiceProgress, clear);
+        filters.getStyleClass().add("surface-card");
+        practiceCount = new Label();
+        practiceCount.getStyleClass().add("muted-text");
+        practiceResults = new VBox(10);
+        ScrollPane scroll = new ScrollPane(practiceResults);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("scroll-pane-clean");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+        view.getChildren().addAll(filters, practiceCount, scroll);
+        renderPracticeCatalog();
+        return view;
+    }
+
+    private void startGuidedPractice() {
+        if (guidedPractice != null && !guidedPractice.finished()) { switchWorkspaceView("SESSION"); return; }
+        if (preparingPractice) return;
+        preparingPractice = true;
+        List<Challenge> catalog = selectedLessons().stream().flatMap(lesson -> lesson.getChallenges().stream()).toList();
+        Map<Integer, ChallengeProgress> progress = Map.copyOf(challengeProgress);
+        Node origin = workspaceContainer.getChildren().getFirst();
+        Task<com.mycompany.levelup_code.domain.model.PracticeSession> task = new Task<>() {
+            @Override protected com.mycompany.levelup_code.domain.model.PracticeSession call() throws Exception {
+                Map<Integer, LocalDate> last = oracleConnected
+                        ? new com.mycompany.levelup_code.data.oracle.OraclePracticeRepository().lastAttempts(currentUser.getId()) : Map.of();
+                return new com.mycompany.levelup_code.business.service.PracticePlanner().plan(catalog, progress, last, LocalDate.now(),
+                        challenge -> !(challenge instanceof CodeChallenge)
+                                || AppContext.getInstance().getCodeRunner().supportsRealIsolatedExecution(
+                                        challenge.getLesson().getModule().getLanguage().getName()));
+            }
+        };
+        task.setOnSucceeded(event -> {
+            preparingPractice = false;
+            if (disposed) return;
+            if (task.getValue().steps().isEmpty()) {
+                var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION,
+                        "Este curso todavía no tiene retos compatibles con una sesión guiada.");
+                alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
+                return;
+            }
+            guidedPractice = new GuidedPracticePane(currentUser, task.getValue(), this::onChallengeOrLessonCompleted, this::recordPracticeOutcome);
+            if (workspaceContainer.getChildren().contains(origin)) switchWorkspaceView("SESSION");
+        });
+        task.setOnFailed(event -> {
+            preparingPractice = false;
+            LOGGER.log(Level.WARNING, "No se pudo preparar la sesión de práctica", task.getException());
+            if (disposed) return;
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "No pudimos preparar la sesión. Comprueba la conexión y vuelve a iniciar la práctica.");
+            alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
+        });
+        startTask(task, "practice-session-plan");
+    }
+
+    private void renderPracticeCatalog() {
+        if (practiceResults == null) return;
+        practiceResults.getChildren().clear();
+        String query = practiceSearch.getText().strip().toLowerCase(Locale.ROOT);
+        int total = 0;
+        int shown = 0;
+        for (Lesson lesson : allLessonsForAdmin) {
+            for (Challenge challenge : lesson.getChallenges()) {
+                total++;
+                String language = lesson.getModule().getLanguage().getName();
+                String type = challenge.getType().label();
+                ChallengeProgress progress = challengeProgress.getOrDefault(challenge.getId(),
+                        ChallengeProgress.PENDING);
+                if (!"Todos los lenguajes".equals(practiceLanguage.getValue())
+                        && !language.equalsIgnoreCase(practiceLanguage.getValue())) continue;
+                if (!"Todos los tipos".equals(practiceType.getValue())
+                        && !type.equals(practiceType.getValue())) continue;
+                if (!"Todas las dificultades".equals(practiceDifficulty.getValue())
+                        && !challenge.getDifficulty().label().equals(practiceDifficulty.getValue())) continue;
+                String progressFilter = practiceProgress.getValue();
+                if (!"Todos los estados".equals(progressFilter)
+                        && !("Repasar errores".equals(progressFilter)
+                                ? progress == ChallengeProgress.ATTEMPTED
+                                : progress.label().equals(progressFilter))) continue;
+                String searchable = challenge.getTitle() + " " + lesson.getTitle() + " "
+                        + lesson.getModule().getTitle();
+                if (!searchable.toLowerCase(Locale.ROOT).contains(query)) continue;
+                shown++;
+                VBox card = new VBox(8);
+                card.getStyleClass().add("surface-card");
+                Label title = new Label(challenge.getTitle());
+                title.getStyleClass().add("card-title");
+                title.setWrapText(true);
+                Label details = new Label(language + " · " + lesson.getTitle() + " · " + type
+                        + " · " + challenge.getDifficulty().label() + " · +"
+                        + challenge.getExpReward() + " XP · " + progress.label());
+                details.setWrapText(true);
+                details.getStyleClass().add("muted-text");
+                Button open = new Button("Abrir reto");
+                open.getStyleClass().add("btn-primary");
+                open.setOnAction(e -> openChallenge(challenge));
+                card.getChildren().addAll(title, details);
+                if (progress == ChallengeProgress.ATTEMPTED) {
+                    Label review = new Label("Tu último intento no aprobó este reto. Puedes volver a intentarlo.");
+                    review.getStyleClass().add("text-warning");
+                    review.setWrapText(true);
+                    card.getChildren().add(review);
+                }
+                card.getChildren().add(open);
+                practiceResults.getChildren().add(card);
+            }
+        }
+        practiceCount.setText(shown + " de " + total + " retos");
+        if (shown == 0) {
+            Label empty = new Label("No hay retos con estos filtros. Prueba otra búsqueda.");
+            empty.getStyleClass().add("empty-state");
+            practiceResults.getChildren().add(empty);
+        }
+    }
+
+    private VBox createLanguageCard(
+            final String langKey,
+            String title,
+            String description,
+            String cardStyleClass,
+            String btnStyleClass,
+            int lessonCount
+    ) {
+        VBox card = new VBox(8);
+        card.getStyleClass().add(cardStyleClass);
+        card.setMinWidth(0);
+        card.setMaxWidth(Double.MAX_VALUE);
+        languageCards.put(langKey, card);
+
+        HBox topRow = new HBox(8);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+        Label lblTitle = new Label(title);
+        lblTitle.getStyleClass().add("card-title");
+
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+
+        boolean isEnrolled = enrolledLanguages.contains(langKey);
+        final Label enrollBadge = Theme.createPillBadge(
+                isEnrolled ? "INSCRITO ✓" : "DISPONIBLE",
+                isEnrolled ? "badge-green" : "badge-neutral"
+        );
+        topRow.getChildren().addAll(lblTitle, sp, enrollBadge);
+
+        Label lblDesc = new Label(description);
+        lblDesc.setWrapText(true);
+        lblDesc.getStyleClass().add("muted-text");
+        lblDesc.setWrapText(true);
+
+        ProgressBar langProgress = new ProgressBar(0.0);
+        langProgress.getStyleClass().add("progress-bar-green");
+        langProgress.setMaxWidth(Double.MAX_VALUE);
+        courseProgressBars.put(langKey, langProgress);
+
+        Label lblProgressInfo = new Label("0 / " + lessonCount + " completadas (0%)");
+        lblProgressInfo.getStyleClass().add("muted-text");
+        courseProgressLabels.put(langKey, lblProgressInfo);
+
+        FlowPane bottomRow = new FlowPane(8, 8);
+        bottomRow.setAlignment(Pos.CENTER_LEFT);
+        Label badgeCount = Theme.createPillBadge(lessonCount + " lecciones", "badge-indigo");
+
+        final Button btnEnroll = new Button(isEnrolled ? "Ver lecciones" : "Empezar curso");
+        btnEnroll.getStyleClass().add(btnStyleClass);
+        btnEnroll.setAccessibleText((isEnrolled ? "Ver lecciones de " : "Empezar curso de ") + title);
+        btnEnroll.setOnAction(e -> {
+            if (!enrolledLanguages.contains(langKey)) {
+                btnEnroll.setDisable(true);
+                btnEnroll.setText("Inscribiendo…");
+                Language target = "PYTHON".equals(langKey) ? pythonLangModel
+                        : "CPP".equals(langKey) ? cppLangModel : javaLangModel;
+                Task<Void> enroll = new Task<>() {
+                    @Override protected Void call() {
+                        if (oracleConnected && currentUser.getId() > 0) controller.enrollInLanguage(target);
+                        return null;
+                    }
+                };
+                enroll.setOnSucceeded(done -> {
+                    if (disposed) return;
+                    enrolledLanguages.add(langKey);
+                    enrollBadge.setText("INSCRITO ✓");
+                    enrollBadge.getStyleClass().setAll("badge-green");
+                    btnEnroll.setText("Ver lecciones");
+                    btnEnroll.setDisable(false);
+                    lblCourseStatus.setText("¡Ya puedes empezar! Selecciona una lección.");
+                    populateLessonsForLanguage(langKey);
+                });
+                enroll.setOnFailed(failed -> {
+                    LOGGER.log(Level.WARNING, "Enrollment failed", enroll.getException());
+                    btnEnroll.setDisable(false);
+                    btnEnroll.setText("Reintentar inscripción");
+                    lblCourseStatus.setText("No pudimos inscribirte. Comprueba la conexión y vuelve a intentarlo.");
+                });
+                startTask(enroll, "course-enrollment");
+                return;
+            }
+            populateLessonsForLanguage(langKey);
+        });
+
+        bottomRow.getChildren().addAll(badgeCount, btnEnroll);
+        card.getChildren().addAll(topRow, lblDesc, langProgress, lblProgressInfo, bottomRow);
+        return card;
+    }
+
+    private void refreshCourseProgressBars() {
+        updateSingleCourseProgress("JAVA", javaLessons);
+        updateSingleCourseProgress("PYTHON", pythonLessons);
+        updateSingleCourseProgress("CPP", cppLessons);
+    }
+
+    private void updateSingleCourseProgress(String langKey, List<Lesson> lessons) {
+        ProgressBar bar = courseProgressBars.get(langKey);
+        Label label = courseProgressLabels.get(langKey);
+        if (bar == null || label == null) {
+            return;
+        }
+        int total = lessons != null ? lessons.size() : 0;
+        int completed = 0;
+        for (int i = 0; i < total; i++) {
+            if (resolveLessonProgressStatus(lessons.get(i), i) == ProgressStatus.COMPLETED) {
+                completed++;
+            }
+        }
+        double ratio = total > 0 ? (double) completed / total : 0.0;
+        int pct = (int) Math.round(ratio * 100.0);
+        bar.setProgress(ratio);
+        label.setText(completed + " / " + total + " lecciones completadas (" + pct + "%)");
+    }
+
+    private boolean persistEnrollmentInOracle(String langKey) {
+        if (!oracleConnected || currentUser.getId() <= 0) {
+            return true;
+        }
+        Language targetLang = "PYTHON".equals(langKey) ? pythonLangModel
+                : ("CPP".equals(langKey) ? cppLangModel : javaLangModel);
+        try {
+            controller.enrollInLanguage(targetLang);
+            if (lblCourseStatus != null) {
+                lblCourseStatus.getStyleClass().setAll("text-success");
+                lblCourseStatus.setText("Inscripción guardada en tabla Inscripciones (" + langKey + ").");
+            }
+            return true;
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Error al guardar inscripción de lenguaje " + langKey + " en Oracle", ex);
+            if (lblCourseStatus != null) {
+                lblCourseStatus.getStyleClass().setAll("text-danger");
+                lblCourseStatus.setText("Error al guardar inscripción en Oracle: " + ex.getMessage());
+            }
+            return false;
+        }
+    }
+
+    private void populateLessonsForLanguage(String langKey) {
+        this.activeLanguageKey = langKey;
+        lessonsListBox.getChildren().clear();
+
+        List<Lesson> selectedList;
+        String langLabel;
+        if ("PYTHON".equals(langKey)) {
+            selectedList = pythonLessons;
+            langLabel = "PYTHON 3.12";
+        } else if ("CPP".equals(langKey)) {
+            selectedList = cppLessons;
+            langLabel = "ISO C++ 20";
+        } else {
+            selectedList = javaLessons;
+            langLabel = "JAVA 21 LTS";
+        }
+
+        lblLessonsHeader.setText("LECCIONES · " + langLabel);
+        languageCards.forEach((key, card) -> {
+            card.getStyleClass().remove("course-selected");
+            if (key.equals(langKey)) card.getStyleClass().add("course-selected");
+        });
+        Lesson next = nextLesson();
+        boolean courseCompleted = !selectedList.isEmpty() && next == null;
+        continueSummary.setText(selectedList.isEmpty() ? "Este curso aún no tiene lecciones."
+                : courseCompleted ? "Lecturas completadas. Pon a prueba lo aprendido con los retos finales de cada módulo."
+                : "Tu siguiente paso: " + next.getTitle());
+        continueButton.setText(courseCompleted ? "Repasar desde el inicio" : "Continuar aprendiendo");
+        continueButton.setDisable(selectedList.isEmpty());
+        String query = lessonSearch.getText().strip().toLowerCase(Locale.ROOT);
+        int shown = 0;
+
+        Map<CourseModule, List<Lesson>> visibleModules = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < selectedList.size(); i++) {
+            Lesson lesson = selectedList.get(i);
+            CourseModule module = lesson.getModule();
+            String modTitle = (module != null && module.getTitle() != null)
+                    ? module.getTitle()
+                    : "Módulo Curricular";
+            ProgressStatus status = resolveLessonProgressStatus(lesson, i);
+            if (hideCompleted.isSelected() && status == ProgressStatus.COMPLETED) continue;
+            if (!(lesson.getTitle() + " " + modTitle).toLowerCase(Locale.ROOT).contains(query)) continue;
+            shown++;
+            visibleModules.computeIfAbsent(module, key -> new ArrayList<>()).add(lesson);
+        }
+        visibleModules.forEach((module, lessons) -> {
+            List<Lesson> allModuleLessons = selectedList.stream().filter(item -> item.getModule() == module).toList();
+            VBox route = new VBox(0);
+            route.setMinWidth(0);
+            route.getStyleClass().add("course-route");
+            for (Lesson lesson : lessons) {
+                route.getChildren().add(createSkillNodeRow(selectedList.indexOf(lesson) + 1, lesson,
+                        resolveLessonProgressStatus(lesson, 0)));
+            }
+            String title = module == null ? "Módulo curricular" : module.getTitle();
+            String key = langKey + ":" + (module == null ? "default" : module.getId());
+            long readings = allModuleLessons.stream().filter(item -> lessonStatuses.get(item) == ProgressStatus.COMPLETED).count();
+            List<Challenge> challenges = allModuleLessons.stream().flatMap(item -> item.getChallenges().stream()).toList();
+            long solved = challenges.stream().filter(item -> challengeProgress.get(item.getId()) == ChallengeProgress.SOLVED).count();
+            VBox heading = new VBox(6, WorkspaceUi.label(title, "card-title"),
+                    WorkspaceUi.label(readings + "/" + allModuleLessons.size() + " lecturas · "
+                            + solved + "/" + challenges.size() + " retos superados", "muted-text"));
+            heading.setMinWidth(0);
+            ProgressBar progress = new ProgressBar(allModuleLessons.isEmpty() ? 0 : (double) readings / allModuleLessons.size());
+            progress.setMaxWidth(Double.MAX_VALUE);
+            progress.setAccessibleText(readings + " de " + allModuleLessons.size() + " lecturas completadas");
+            heading.getChildren().add(progress);
+            challenges.stream().filter(Challenge::isModuleFinal).findFirst().ifPresent(finalChallenge -> {
+                VBox summary = new VBox(10, WorkspaceUi.label("Lo que has practicado", "card-title"));
+                summary.getStyleClass().add("surface-card");
+                for (Lesson item : allModuleLessons) {
+                    List<Challenge> exercises = item.getChallenges().stream().filter(challenge -> !challenge.isModuleFinal()).toList();
+                    long completed = exercises.stream().filter(challenge -> challengeProgress.get(challenge.getId()) == ChallengeProgress.SOLVED).count();
+                    summary.getChildren().add(WorkspaceUi.label(item.getTitle() + " · " + completed + "/" + exercises.size() + " retos superados", "body-text"));
+                }
+                boolean passed = challengeProgress.get(finalChallenge.getId()) == ChallengeProgress.SOLVED;
+                summary.getChildren().add(WorkspaceUi.label(passed
+                        ? oracleConnected ? "Reto final superado y guardado" : "Reto final resuelto durante esta sesión de prueba"
+                        : "Resuelve el caso práctico para cerrar el módulo.", "body-text"));
+                Button openFinal = WorkspaceUi.button(passed ? "Repasar reto final" : "Resolver reto final", "btn-primary", Theme.IconKind.TROPHY);
+                openFinal.setOnAction(event -> openChallenge(finalChallenge));
+                summary.getChildren().add(openFinal);
+                route.getChildren().add(summary);
+            });
+            TitledPane panel = new TitledPane("", route);
+            panel.setMinWidth(0);
+            panel.setGraphic(heading);
+            heading.prefWidthProperty().bind(panel.widthProperty().subtract(65));
+            panel.getStyleClass().add("route-module");
+            panel.setAnimated(false);
+            panel.setExpanded(!query.isEmpty() || hideCompleted.isSelected()
+                    || expandedModules.getOrDefault(key, allModuleLessons.contains(next)));
+            panel.expandedProperty().addListener((observable, old, expanded) -> expandedModules.put(key, expanded));
+            panel.setAccessibleText(title + ", " + readings + " lecturas completadas");
+            lessonsListBox.getChildren().add(panel);
+        });
+        lessonResults.setText(shown + " de " + selectedList.size() + " lecciones");
+        if (shown == 0) {
+            Label empty = new Label(selectedList.isEmpty() ? "Pronto encontrarás lecciones aquí."
+                    : "No hay lecciones con estos filtros. Prueba otra búsqueda o limpia los filtros.");
+            empty.setWrapText(true);
+            empty.getStyleClass().add("empty-state");
+            lessonsListBox.getChildren().add(empty);
+        }
+        Theme.playFadeIn(lessonsListBox);
+        refreshHome();
+    }
+
+    private List<Lesson> selectedLessons() {
+        return "PYTHON".equals(activeLanguageKey) ? pythonLessons
+                : "CPP".equals(activeLanguageKey) ? cppLessons : javaLessons;
+    }
+
+    private Lesson nextLesson() {
+        List<Lesson> lessons = selectedLessons();
+        return lessons.stream().filter(l -> resolveLessonProgressStatus(l, 0) == ProgressStatus.IN_PROGRESS)
+                .findFirst().orElseGet(() -> lessons.stream()
+                        .filter(l -> resolveLessonProgressStatus(l, 0) != ProgressStatus.COMPLETED)
+                        .findFirst().orElse(null));
+    }
+
+    private Lesson lessonForPrimaryAction() {
+        Lesson next = nextLesson();
+        List<Lesson> lessons = selectedLessons();
+        return next != null ? next : lessons.isEmpty() ? null : lessons.get(0);
+    }
+
+    private ProgressStatus resolveLessonProgressStatus(Lesson lesson, int indexInList) {
+        return lessonStatuses.getOrDefault(lesson, ProgressStatus.PENDING);
+    }
+
+    private HBox createSkillNodeRow(int orderNum, final Lesson lesson, ProgressStatus status) {
+        HBox row = new HBox(14);
+        row.setAlignment(Pos.CENTER_LEFT);
+
+        String nodeStyleClass;
+        String statusText;
+        String badgeStyleClass;
+        Theme.IconKind iconKind;
+        String iconHex;
+
+        if (status == ProgressStatus.COMPLETED) {
+            nodeStyleClass = "skill-node-completed";
+            statusText = "COMPLETADA";
+            badgeStyleClass = "badge-green";
+            iconKind = Theme.IconKind.CHECK;
+            iconHex = Theme.HEX_GREEN;
+        } else if (status == ProgressStatus.IN_PROGRESS) {
+            nodeStyleClass = "skill-node-active";
+            statusText = "EN CURSO";
+            badgeStyleClass = "badge-indigo";
+            iconKind = Theme.IconKind.PLAY;
+            iconHex = Theme.HEX_INDIGO;
+        } else {
+            nodeStyleClass = "skill-node-pending";
+            statusText = "PENDIENTE";
+            badgeStyleClass = "badge-neutral";
+            iconKind = Theme.IconKind.BOOK;
+            iconHex = Theme.HEX_MUTED;
+        }
+        row.getStyleClass().add("route-step");
+
+        FlowPane titleLine = new FlowPane(10, 8);
+        titleLine.setMinWidth(0);
+        titleLine.setAlignment(Pos.CENTER_LEFT);
+        Label lblTitle = new Label(lesson.getTitle());
+        lblTitle.setWrapText(true);
+        lblTitle.getStyleClass().add("card-title");
+
+        Label statusBadge = Theme.createPillBadge(statusText, badgeStyleClass);
+        Label xpBadge = Theme.createPillBadge("+" + lesson.getExpReward() + " XP", "badge-amber");
+
+        int challengeCount = lesson.getChallenges() != null ? lesson.getChallenges().size() : 0;
+        Label chBadge = Theme.createPillBadge(challengeCount + " Retos", "badge-violet");
+
+        titleLine.getChildren().addAll(lblTitle, statusBadge, xpBadge, chBadge);
+
+        String preview = lesson.getTheory() != null ? lesson.getTheory().replace("\n", " ") : "";
+        if (preview.length() > 115) {
+            preview = preview.substring(0, 115) + "...";
+        }
+        Label lblPreview = new Label(preview);
+        lblPreview.getStyleClass().add("muted-text");
+        lblPreview.setWrapText(true);
+
+        VBox details = new VBox(10, lblPreview);
+
+        FlowPane actions = new FlowPane(8, 8);
+        actions.setAlignment(Pos.CENTER_LEFT);
+
+        Button btnTheory = new Button(status == ProgressStatus.COMPLETED ? "Repasar lección" : "Abrir lección");
+        btnTheory.getStyleClass().add("btn-secondary");
+        btnTheory.setOnAction(e -> openLesson(lesson));
+        actions.getChildren().add(btnTheory);
+
+        List<Challenge> lessonChallenges = lesson.getChallenges();
+        if (lessonChallenges != null && !lessonChallenges.isEmpty()) {
+            for (final Challenge ch : lessonChallenges) {
+                boolean isQuiz = ch instanceof com.mycompany.levelup_code.domain.model.QuizChallenge;
+                Button btnChallenge = new Button(ch.getType().label());
+                btnChallenge.getStyleClass().add(isQuiz ? "btn-ghost" : "btn-primary");
+                btnChallenge.setOnAction(e -> openChallenge(ch));
+                actions.getChildren().add(btnChallenge);
+            }
+        }
+
+        details.getChildren().add(actions);
+        TitledPane lessonPanel = new TitledPane("", details);
+        lessonPanel.setGraphic(titleLine);
+        titleLine.prefWrapLengthProperty().bind(lessonPanel.widthProperty().subtract(65));
+        lessonPanel.getStyleClass().addAll("route-lesson", nodeStyleClass);
+        lessonPanel.setAnimated(false);
+        lessonPanel.setExpanded(expandedLessons.getOrDefault(lesson, lesson == nextLesson()));
+        lessonPanel.expandedProperty().addListener((observable, old, expanded) -> expandedLessons.put(lesson, expanded));
+        lessonPanel.setMaxWidth(Double.MAX_VALUE);
+        lessonPanel.setMinWidth(0);
+        HBox.setHgrow(lessonPanel, Priority.ALWAYS);
+        Label marker = new Label(String.valueOf(orderNum));
+        marker.setGraphic(Theme.createIcon(iconKind, 14, iconHex));
+        marker.getStyleClass().add("route-marker");
+        marker.setAccessibleText("Lección " + orderNum + ", " + statusText);
+        Region connector = new Region();
+        connector.getStyleClass().add("route-connector");
+        VBox.setVgrow(connector, Priority.ALWAYS);
+        VBox rail = new VBox(6, marker, connector);
+        rail.setAlignment(Pos.TOP_CENTER);
+        row.setAlignment(Pos.TOP_LEFT);
+        row.getChildren().addAll(rail, lessonPanel);
+        return row;
+    }
+
+    private VBox buildComparatorWorkspaceView() {
+        VBox view = new VBox(14);
+
+        VBox topToolbar = new VBox(10);
+        topToolbar.getStyleClass().add("surface-card");
+
+        HBox titleRow = new HBox(12);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        Label lblTitle = new Label("Una idea, tres lenguajes");
+        lblTitle.setWrapText(true);
+        lblTitle.getStyleClass().add("page-title");
+        lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.CODE, 20, Theme.HEX_CYAN));
+        lblTitle.setGraphicTextGap(8);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label badgeTopics = Theme.createPillBadge("6 Tópicos Interactivos", "badge-cyan");
+        titleRow.getChildren().addAll(lblTitle, spacer, badgeTopics);
+
+        FlowPane topicsRow = new FlowPane(8, 8);
+        topicsRow.setAlignment(Pos.CENTER_LEFT);
+        comparatorTopicButtons.clear();
+
+        String[][] topics = {
+            {"POLYMORPHISM", "1. Polimorfismo POO"},
+            {"INTERFACES", "2. Contratos SOLID / Dunder"},
+            {"BINARY_SEARCH", "3. Búsqueda Binaria O(log n)"},
+            {"TWO_POINTERS", "4. Dos Punteros y Slicing"},
+            {"COLLECTIONS", "5. Colecciones Dinámicas"},
+            {"HASH_SETS", "6. Tablas Hash O(1)"}
+        };
+
+        for (final String[] topic : topics) {
+            Button btnTopic = new Button(topic[1]);
+            btnTopic.getStyleClass().add("btn-secondary");
+            btnTopic.setUserData(topic[0]);
+            btnTopic.setOnAction(e -> loadComparisonTopic(topic[0]));
+            comparatorTopicButtons.add(btnTopic);
+            topicsRow.getChildren().add(btnTopic);
+        }
+
+        topToolbar.getChildren().addAll(titleRow, topicsRow);
+
+        txtCompareJava = createComparisonTextArea();
+        txtComparePython = createComparisonTextArea();
+        txtCompareCpp = createComparisonTextArea();
+        txtCompareJava.setLanguage("JAVA");
+        txtComparePython.setLanguage("PYTHON");
+        txtCompareCpp.setLanguage("CPP");
+
+        TilePane threeColumns = new TilePane(14, 14);
+        threeColumns.setPrefColumns(3);
+        threeColumns.prefTileWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(270, Math.floor((threeColumns.getWidth() - 2 - (threeColumns.getWidth() >= 900 ? 28 : 0))
+                        / (threeColumns.getWidth() >= 900 ? 3 : 1))), threeColumns.widthProperty()));
+        threeColumns.setMinHeight(350);
+        VBox.setVgrow(threeColumns, Priority.ALWAYS);
+
+        VBox colJava = wrapCodeColumn("JAVA 21 LTS", "Tipado Estático · JVM", "lang-card-java", "badge-java", txtCompareJava);
+        VBox colPy = wrapCodeColumn("PYTHON 3.12", "Tipado Dinámico · ABC", "lang-card-python", "badge-python", txtComparePython);
+        VBox colCpp = wrapCodeColumn("ISO C++ 20", "Compilado Nativo · STL", "lang-card-cpp", "badge-cpp", txtCompareCpp);
+
+        colJava.setMaxWidth(Double.MAX_VALUE);
+        colPy.setMaxWidth(Double.MAX_VALUE);
+        colCpp.setMaxWidth(Double.MAX_VALUE);
+        threeColumns.getChildren().addAll(colJava, colPy, colCpp);
+
+        HBox bottomCallout = new HBox(12);
+        bottomCallout.getStyleClass().add("surface-card");
+        bottomCallout.setAlignment(Pos.CENTER_LEFT);
+
+        lblCompareSummary = new Label();
+        lblCompareSummary.getStyleClass().add("body-text");
+        lblCompareSummary.setWrapText(true);
+        lblCompareSummary.setGraphic(Theme.createIcon(Theme.IconKind.BOLT, 18, Theme.HEX_GREEN));
+        lblCompareSummary.setGraphicTextGap(10);
+        HBox.setHgrow(lblCompareSummary, Priority.ALWAYS);
+
+        Button btnPractice = new Button("Practicar este tema");
+        btnPractice.getStyleClass().add("btn-primary");
+        btnPractice.setOnAction(e -> {
+            List<Lesson> targetList = "PYTHON".equals(activeLanguageKey) ? pythonLessons
+                    : ("CPP".equals(activeLanguageKey) ? cppLessons : javaLessons);
+            Lesson l = DemoSeedCatalog.comparativeLesson(targetList, activeLanguageKey, activeComparatorLessonIndex);
+            Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
+                    ? l.getChallenges().get(0) : null;
+            openChallenge(ch);
+        });
+
+        bottomCallout.getChildren().addAll(lblCompareSummary, btnPractice);
+        comparisonExercise = new ComparisonExercisePane(() -> {
+            List<CodeEditor> editors = List.of(txtCompareJava, txtComparePython, txtCompareCpp);
+            List<String> terms = comparisonExercise.terms();
+            for (int i = 0; i < editors.size(); i++) {
+                int position = editors.get(i).getText().indexOf(terms.get(i));
+                if (position >= 0) editors.get(i).selectRange(position, position + terms.get(i).length());
+            }
+        });
+        view.getChildren().addAll(topToolbar, threeColumns, bottomCallout, comparisonExercise);
+        return view;
+    }
+
+    private CodeEditor createComparisonTextArea() {
+        CodeEditor area = new CodeEditor();
+        area.setEditable(false);
+        area.setWrapText(true);
+        VBox.setVgrow(area, Priority.ALWAYS);
+        return area;
+    }
+
+    private VBox wrapCodeColumn(String langName, String paradigmTag, String cardClass, String badgeClass, CodeEditor editor) {
+        VBox col = new VBox(10);
+        col.getStyleClass().add(cardClass);
+        col.setMinWidth(0);
+        col.setPrefWidth(280);
+
+        VBox head = new VBox(8);
+        head.setAlignment(Pos.CENTER_LEFT);
+        Label lblLang = new Label(langName);
+        lblLang.getStyleClass().add("card-title");
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+        Label badge = Theme.createPillBadge(paradigmTag, badgeClass);
+        badge.setWrapText(true);
+        head.getChildren().addAll(lblLang, badge);
+        Button copy = new Button("Copiar código");
+        copy.getStyleClass().add("btn-secondary");
+        copy.setOnAction(event -> {
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(editor.getText());
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        });
+        Slider font = new Slider(12, 24, 14);
+        font.setAccessibleText("Tamaño de letra de " + langName);
+        font.valueProperty().addListener((observable, old, value) ->
+                editor.setStyle("-fx-font-size: " + value.intValue() + "px;"));
+        head.getChildren().add(new FlowPane(8, 8, copy, font));
+
+        col.getChildren().addAll(head, editor);
+        return col;
+    }
+
+    private void loadComparisonTopic(String topicKey) {
+        for (Button btn : comparatorTopicButtons) {
+            boolean active = topicKey.equals(btn.getUserData());
+            btn.getStyleClass().setAll(active ? "btn-primary" : "btn-secondary");
+        }
+
+        int lessonIdx = 0;
+        if ("INTERFACES".equals(topicKey)) {
+            lessonIdx = 1;
+        } else if ("BINARY_SEARCH".equals(topicKey)) {
+            lessonIdx = 2;
+        } else if ("TWO_POINTERS".equals(topicKey)) {
+            lessonIdx = 3;
+        } else if ("COLLECTIONS".equals(topicKey)) {
+            lessonIdx = 4;
+        } else if ("HASH_SETS".equals(topicKey)) {
+            lessonIdx = 5;
+        }
+        this.activeComparatorLessonIndex = lessonIdx;
+        if (comparisonExercise != null) comparisonExercise.setTopic(lessonIdx);
+
+        Lesson sampleLesson = DemoSeedCatalog.comparativeLesson(javaLessons, "JAVA", lessonIdx);
+        String[] javaSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "JAVA");
+        String[] pySnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "PYTHON");
+        String[] cppSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "CPP");
+
+        txtCompareJava.setText(javaSnippet[0]);
+        txtComparePython.setText(pySnippet[0]);
+        txtCompareCpp.setText(cppSnippet[0]);
+        lblCompareSummary.setText(javaSnippet[1] + "\n" + pySnippet[1] + "\n" + cppSnippet[1]);
+        Theme.playFadeIn(txtCompareJava);
+        Theme.playFadeIn(txtComparePython);
+        Theme.playFadeIn(txtCompareCpp);
+    }
+
+    private VBox buildAchievementsWorkspaceView() {
+        VBox view = new VBox(14);
+
+        HBox topHeader = new HBox(12);
+        topHeader.getStyleClass().add("surface-card");
+        topHeader.setAlignment(Pos.CENTER_LEFT);
+
+        Label lblTitle = new Label("Celebra tu progreso");
+        lblTitle.getStyleClass().add("page-title");
+        lblTitle.setGraphic(Lupo.portrait(Lupo.Expression.CELEBRATING, 64));
+        lblTitle.setGraphicTextGap(8);
+        lblTitle.setWrapText(true);
+        lblTitle.setMinWidth(0);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        lblAchievementsSummary = new Label();
+        lblAchievementsSummary.getStyleClass().add("text-success");
+        lblAchievementsSummary.setWrapText(true);
+
+        topHeader.getChildren().addAll(lblTitle, spacer, lblAchievementsSummary);
+
+        achievementsGrid = new GridPane();
+        achievementsGrid.setHgap(14);
+        achievementsGrid.setVgap(14);
+
+        ColumnConstraints col1 = new ColumnConstraints();
+        col1.setPercentWidth(50);
+        col1.setHgrow(Priority.ALWAYS);
+        ColumnConstraints col2 = new ColumnConstraints();
+        col2.setPercentWidth(50);
+        col2.setHgrow(Priority.ALWAYS);
+        achievementsGrid.getColumnConstraints().addAll(col1, col2);
+
+        ScrollPane scroll = new ScrollPane(achievementsGrid);
+        scroll.setFitToWidth(true);
+        scroll.setMinHeight(420);
+        scroll.getStyleClass().add("scroll-pane-clean");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+
+        view.getChildren().addAll(topHeader, scroll);
+        achievementsGrid.widthProperty().addListener((obs, before, after) -> {
+            if ((before.doubleValue() >= 800) != (after.doubleValue() >= 800)) refreshAchievementsGrid();
+        });
+        return view;
+    }
+
+    private void refreshAchievementsGrid() {
+        if (achievementsGrid == null) {
+            return;
+        }
+        achievementsGrid.getChildren().clear();
+
+        Set<Integer> unlockedIds = unlockedAchievementIds;
+        int columns = achievementsGrid.getWidth() >= 800 ? 2 : 1;
+        achievementsGrid.getColumnConstraints().clear();
+        for (int c = 0; c < columns; c++) {
+            ColumnConstraints constraint = new ColumnConstraints();
+            constraint.setPercentWidth(100.0 / columns);
+            achievementsGrid.getColumnConstraints().add(constraint);
+        }
+
+        int unlockedCount = 0;
+        for (int i = 0; i < achievementsCatalog.size(); i++) {
+            Achievement ach = achievementsCatalog.get(i);
+            boolean unlocked = unlockedIds.contains(ach.getId());
+            if (unlocked) {
+                unlockedCount++;
+            }
+            int col = i % columns;
+            int row = i / columns;
+            achievementsGrid.add(createAchievementCard(ach, unlocked), col, row);
+        }
+
+        lblAchievementsSummary.setText("Desbloqueados: " + unlockedCount + " de " + achievementsCatalog.size() + " logros");
+    }
+
+    private HBox createAchievementCard(Achievement ach, boolean unlocked) {
+        HBox card = new HBox(14);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.getStyleClass().add(unlocked ? "achievement-card-unlocked" : "achievement-card-locked");
+
+        VBox body = new VBox(5);
+        HBox.setHgrow(body, Priority.ALWAYS);
+
+        HBox top = new HBox(8);
+        top.setAlignment(Pos.CENTER_LEFT);
+        Label lblName = new Label(ach.getName());
+        lblName.getStyleClass().add("card-title");
+
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+
+        Label statusBadge = Theme.createPillBadge(
+                unlocked ? "DESBLOQUEADO ✓" : "EN PROGRESO",
+                unlocked ? "badge-green" : "badge-neutral"
+        );
+        top.getChildren().addAll(lblName, sp, statusBadge);
+
+        Label lblDesc = new Label(ach.getDescription());
+        lblDesc.getStyleClass().add("body-text");
+        lblDesc.setWrapText(true);
+
+        String ruleText = "Meta del logro";
+        int currentValue = 0;
+        int targetValue = Math.max(1, ach.getTargetValue());
+        if (ach instanceof StreakAchievement) {
+            ruleText = "Practica " + ((StreakAchievement) ach).getRequiredDays() + " días consecutivos";
+            currentValue = currentUser.getCurrentStreak();
+        } else if (ach instanceof ExperienceAchievement) {
+            ruleText = "Consigue " + ((ExperienceAchievement) ach).getRequiredExp() + " XP";
+            currentValue = currentUser.getTotalExp();
+        } else if (ach instanceof ChallengeCountAchievement) {
+            ruleText = "Supera " + ((ChallengeCountAchievement) ach).getRequiredChallenges() + " retos";
+            currentValue = solvedChallengesCount;
+        }
+        Label lblRule = new Label(ruleText);
+        lblRule.getStyleClass().add(unlocked ? "text-success" : "muted-text");
+
+        int visibleProgress = Math.min(Math.max(0, currentValue), targetValue);
+        Label lblProgress = new Label(unlocked ? "Meta cumplida"
+                : visibleProgress + " de " + targetValue + " · faltan "
+                + (targetValue - visibleProgress));
+        lblProgress.getStyleClass().add(unlocked ? "text-success" : "muted-text");
+        ProgressBar achievementProgress = new ProgressBar(
+                Math.min(1.0, visibleProgress / (double) targetValue));
+        achievementProgress.setMaxWidth(Double.MAX_VALUE);
+        achievementProgress.setAccessibleText(lblProgress.getText());
+
+        body.getChildren().addAll(top, lblDesc, lblRule, achievementProgress, lblProgress);
+        card.getChildren().addAll(AchievementArt.badge(ach, unlocked, 72), body);
+        return card;
+    }
+
+    private void showNewAchievements(Set<Integer> ids) {
+        List<Achievement> unlocked = achievementsCatalog.stream().filter(item -> ids.contains(item.getId())).toList();
+        if (unlocked.isEmpty()) return;
+        VBox text = new VBox(4, WorkspaceUi.label("¡Nuevas insignias!", "card-title"),
+                WorkspaceUi.label(unlocked.stream().map(Achievement::getName).collect(java.util.stream.Collectors.joining(" · ")), "body-text"));
+        text.setMinWidth(0);
+        HBox.setHgrow(text, Priority.ALWAYS);
+        Button view = WorkspaceUi.button("Ver logros", "btn-secondary", null);
+        view.setOnAction(event -> { achievementNotice.setVisible(false); achievementNotice.setManaged(false); switchWorkspaceView("ACHIEVEMENTS"); });
+        Button dismiss = WorkspaceUi.button("Cerrar", "btn-ghost", null);
+        dismiss.setOnAction(event -> { achievementNotice.setVisible(false); achievementNotice.setManaged(false); });
+        achievementNotice.getChildren().setAll(AchievementArt.badge(unlocked.getFirst(), true, 56), text, view, dismiss);
+        achievementNotice.setVisible(true);
+        achievementNotice.setManaged(true);
+        Theme.playPulse(achievementNotice);
+    }
+
+    private VBox buildAdminCrudWorkspaceView() {
+        VBox view = new VBox(14);
+
+        HBox headerCard = new HBox(12);
+        headerCard.getStyleClass().add("surface-card");
+        headerCard.setAlignment(Pos.CENTER_LEFT);
+
+        Label lblTitle = new Label("Gestiona prácticas de código");
+        lblTitle.getStyleClass().add("page-title");
+        lblTitle.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 20, Theme.HEX_GREEN));
+        lblTitle.setGraphicTextGap(8);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Label badgeRole = Theme.createPillBadge("ROL ADMINISTRADOR VERIFICADO", "badge-green");
+        headerCard.getChildren().addAll(lblTitle, spacer, badgeRole);
+
+        VBox formCard = new VBox(12);
+        formCard.getStyleClass().add("surface-card");
+        VBox.setVgrow(formCard, Priority.ALWAYS);
+
+        cmbAdminChallenge = new ComboBox<>();
+        cmbAdminChallenge.getStyleClass().add("combo-box-modern");
+        cmbAdminChallenge.setMaxWidth(Double.MAX_VALUE);
+        rebuildAdminChallengeChoices(null);
+        VBox challengeSelector = wrapLabeledField(
+                "MODO · CREA UNO NUEVO O EDITA UN RETO EXISTENTE", cmbAdminChallenge);
+
+        HBox row1 = new HBox(14);
+        cmbAdminLesson = new ComboBox<>();
+        cmbAdminLesson.getStyleClass().add("combo-box-modern");
+        cmbAdminLesson.setMaxWidth(Double.MAX_VALUE);
+        for (Lesson l : allLessonsForAdmin) {
+            String langPrefix = (l.getModule() != null && l.getModule().getLanguage() != null)
+                    ? l.getModule().getLanguage().getName() + " · " : "";
+            cmbAdminLesson.getItems().add(langPrefix + "Lección #" + l.getOrderIndex() + ": " + l.getTitle());
+        }
+        if (!cmbAdminLesson.getItems().isEmpty()) {
+            cmbAdminLesson.getSelectionModel().selectFirst();
+        }
+
+        txtAdminTitle = new TextField("Reto Personalizado: Invertir Cadena");
+        txtAdminTitle.getStyleClass().add("input-field");
+
+        txtAdminReward = new TextField("90");
+        txtAdminReward.getStyleClass().add("input-field");
+        cmbAdminDifficulty = new ComboBox<>();
+        cmbAdminDifficulty.getItems().setAll(ChallengeDifficulty.values());
+        cmbAdminDifficulty.getSelectionModel().select(ChallengeDifficulty.MEDIO);
+        cmbAdminDifficulty.setMaxWidth(Double.MAX_VALUE);
+
+        VBox colLesson = wrapLabeledField("LECCIÓN", cmbAdminLesson);
+        VBox colTitle = wrapLabeledField("TÍTULO DEL RETO", txtAdminTitle);
+        VBox colReward = wrapLabeledField("RECOMPENSA XP", txtAdminReward);
+        VBox colDifficulty = wrapLabeledField("DIFICULTAD", cmbAdminDifficulty);
+        HBox.setHgrow(colLesson, Priority.ALWAYS);
+        HBox.setHgrow(colTitle, Priority.ALWAYS);
+        colReward.setPrefWidth(150);
+        colDifficulty.setPrefWidth(130);
+        row1.getChildren().addAll(colLesson, colTitle, colReward, colDifficulty);
+
+        HBox row2 = new HBox(14);
+        VBox.setVgrow(row2, Priority.ALWAYS);
+
+        txtAdminStatement = new TextArea(
+                "Implementa el método solve(String input) para que retorne la cadena invertida o procesada según los casos de prueba.");
+        txtAdminStatement.setWrapText(true);
+        txtAdminStatement.getStyleClass().add("code-editor");
+        VBox.setVgrow(txtAdminStatement, Priority.ALWAYS);
+
+        txtAdminTemplate = new TextArea(
+                "public class CustomSolver {\n"
+                + "    public static String solve(String input) {\n"
+                + "        if (\"Java\".equalsIgnoreCase(input)) return \"avaJ\";\n"
+                + "        if (\"UPC\".equalsIgnoreCase(input)) return \"CPU\";\n"
+                + "        return \"\";\n"
+                + "    }\n"
+                + "}");
+        txtAdminTemplate.getStyleClass().add("code-editor");
+        VBox.setVgrow(txtAdminTemplate, Priority.ALWAYS);
+
+        VBox colStatement = wrapLabeledField("ENUNCIADO DEL PROBLEMA", txtAdminStatement);
+        VBox colTemplate = wrapLabeledField("CÓDIGO INICIAL PARA EL ESTUDIANTE", txtAdminTemplate);
+        HBox.setHgrow(colStatement, Priority.ALWAYS);
+        HBox.setHgrow(colTemplate, Priority.ALWAYS);
+        VBox.setVgrow(colStatement, Priority.ALWAYS);
+        VBox.setVgrow(colTemplate, Priority.ALWAYS);
+        row2.getChildren().addAll(colStatement, colTemplate);
+
+        HBox casesRow = new HBox(12);
+        txtAdminCase1In = new TextField("Java");
+        txtAdminCase1In.getStyleClass().add("input-field");
+        txtAdminCase1Out = new TextField("avaJ");
+        txtAdminCase1Out.getStyleClass().add("input-field");
+        txtAdminCase2In = new TextField("UPC");
+        txtAdminCase2In.getStyleClass().add("input-field");
+        txtAdminCase2Out = new TextField("CPU");
+        txtAdminCase2Out.getStyleClass().add("input-field");
+
+        VBox c1In = wrapLabeledField("CASO #1 · ENTRADA", txtAdminCase1In);
+        VBox c1Out = wrapLabeledField("CASO #1 · SALIDA ESPERADA", txtAdminCase1Out);
+        VBox c2In = wrapLabeledField("CASO #2 · ENTRADA", txtAdminCase2In);
+        VBox c2Out = wrapLabeledField("CASO #2 · SALIDA ESPERADA", txtAdminCase2Out);
+        HBox.setHgrow(c1In, Priority.ALWAYS);
+        HBox.setHgrow(c1Out, Priority.ALWAYS);
+        HBox.setHgrow(c2In, Priority.ALWAYS);
+        HBox.setHgrow(c2Out, Priority.ALWAYS);
+        casesRow.getChildren().addAll(c1In, c1Out, c2In, c2Out);
+
+        HBox actionRow = new HBox(12);
+        actionRow.setAlignment(Pos.CENTER_LEFT);
+
+        lblAdminStatus = new Label("Completa el enunciado y los ejemplos antes de guardar.");
+        lblAdminStatus.setWrapText(true);
+        lblAdminStatus.getStyleClass().add("muted-text");
+
+        Region sp = new Region();
+        HBox.setHgrow(sp, Priority.ALWAYS);
+
+        btnAdminValidate = new Button("Validar reto");
+        btnAdminValidate.getStyleClass().add("btn-secondary");
+        btnAdminValidate.setOnAction(e -> handleValidateAdminChallenge());
+
+        Button btnCreateAndTest = new Button("Publicar reto");
+        btnAdminSave = btnCreateAndTest;
+        btnCreateAndTest.getStyleClass().add("btn-success");
+        btnCreateAndTest.setGraphic(Theme.createIcon(Theme.IconKind.PLAY, 14, Theme.HEX_WHITE));
+        btnCreateAndTest.setGraphicTextGap(8);
+        btnCreateAndTest.setDisable(true);
+        btnCreateAndTest.setOnAction(e -> handleCreateAdminChallenge());
+
+        Runnable invalidate = this::invalidateAdminValidation;
+        cmbAdminChallenge.valueProperty().addListener((obs, old, value) -> loadAdminChallengeSelection());
+        cmbAdminLesson.valueProperty().addListener((obs, old, value) -> invalidate.run());
+        cmbAdminDifficulty.valueProperty().addListener((obs, old, value) -> invalidate.run());
+        for (javafx.beans.value.ObservableValue<String> value : List.of(
+                txtAdminTitle.textProperty(), txtAdminReward.textProperty(),
+                txtAdminStatement.textProperty(), txtAdminTemplate.textProperty(),
+                txtAdminCase1In.textProperty(), txtAdminCase1Out.textProperty(),
+                txtAdminCase2In.textProperty(), txtAdminCase2Out.textProperty())) {
+            value.addListener((obs, old, current) -> invalidate.run());
+        }
+
+        actionRow.getChildren().addAll(lblAdminStatus, sp, btnAdminValidate, btnCreateAndTest);
+
+        formCard.getChildren().addAll(challengeSelector, row1, row2, casesRow, actionRow);
+        formCard.setMinHeight(580);
+        view.getChildren().addAll(headerCard, formCard);
+        return view;
+    }
+
+    private VBox wrapLabeledField(String caption, Node control) {
+        VBox box = new VBox(5);
+        Label lbl = new Label(caption);
+        lbl.setLabelFor(control);
+        lbl.setWrapText(true);
+        box.setMinWidth(0);
+        lbl.getStyleClass().add("section-caption");
+        box.getChildren().addAll(lbl, control);
+        return box;
+    }
+
+    private void handleCreateAdminChallenge() {
+        AdminChallengeDraft prepared = prepareAdminChallengeDraft();
+        if (prepared == null) return;
+        if (!prepared.fingerprint().equals(validatedAdminDraftFingerprint)) {
+            invalidateAdminValidation();
+            lblAdminStatus.getStyleClass().setAll("text-warning");
+            lblAdminStatus.setText("Valida esta versión del reto antes de publicarla.");
+            return;
+        }
+
+        Lesson targetLesson = prepared.lesson();
+        CodeChallenge newCh = prepared.challenge();
+        CodeChallenge previous = adminEditingChallenge;
+        boolean editing = newCh.getId() > 0;
+
+        btnAdminSave.setDisable(true);
+        btnAdminValidate.setDisable(true);
+        btnAdminSave.setText(editing ? "Guardando…" : "Publicando…");
+        lblAdminStatus.setText(editing
+                ? "Guardando los cambios validados. Espera un momento."
+                : "Publicando el reto validado. Espera un momento.");
+        Task<Challenge> save = new Task<>() {
+            @Override protected Challenge call() {
+                return editing
+                        ? controller.updateAdminChallenge(targetLesson, newCh)
+                        : controller.createAdminChallenge(targetLesson, newCh);
+            }
+        };
+        save.setOnSucceeded(e -> {
+            if (disposed) return;
+            Challenge saved = save.getValue();
+            btnAdminValidate.setDisable(false);
+            validatedAdminDraftFingerprint = null;
+            btnAdminSave.setDisable(true);
+            if (editing && previous != null && previous.getLesson() != null) {
+                previous.getLesson().getChallenges().removeIf(ch -> ch.getId() == previous.getId());
+            }
+            saved.setLesson(targetLesson);
+            if (targetLesson != null) {
+                targetLesson.addChallenge(saved);
+            }
+            adminEditingChallenge = saved instanceof CodeChallenge code ? code : null;
+            rebuildAdminChallengeChoices(saved);
+            btnAdminSave.setText(editing ? "Guardar cambios" : "Publicar reto");
+            lblAdminStatus.getStyleClass().setAll("text-success");
+            lblAdminStatus.setText(editing
+                    ? "¡Cambios guardados! Los estudiantes verán la versión actualizada."
+                    : oracleConnected && saved.getId() > 0
+                            ? "¡Reto publicado! Ya puedes probarlo."
+                            : "Reto validado y creado para esta sesión de prueba.");
+            populateLessonsForLanguage(activeLanguageKey);
+            ChallengeFrame.open(currentUser, saved, this::onChallengeOrLessonCompleted);
+        });
+        save.setOnFailed(e -> {
+            LOGGER.log(Level.SEVERE, "Error al crear reto desde el panel de administración", save.getException());
+            btnAdminValidate.setDisable(false);
+            btnAdminSave.setDisable(false);
+            btnAdminSave.setText(editing ? "Reintentar guardado" : "Reintentar publicación");
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText(editing
+                    ? "No pudimos guardar los cambios. Tus datos siguen aquí; revisa la conexión y vuelve a intentarlo."
+                    : "No pudimos publicar el reto. Tus datos y su validación siguen aquí; revisa la conexión y vuelve a intentarlo.");
+        });
+        startTask(save, "challenge-save");
+    }
+
+    private void handleValidateAdminChallenge() {
+        AdminChallengeDraft prepared = prepareAdminChallengeDraft();
+        if (prepared == null) return;
+        btnAdminValidate.setDisable(true);
+        btnAdminSave.setDisable(true);
+        lblAdminStatus.getStyleClass().setAll("muted-text");
+        lblAdminStatus.setText("Compilando y comprobando los casos del reto…");
+        Task<SimulatedCodeRunner.ExecutionSummary> validation = new Task<>() {
+            @Override protected SimulatedCodeRunner.ExecutionSummary call() {
+                return AppContext.getInstance().getCodeRunner()
+                        .runAndValidate(prepared.challenge(), prepared.challenge().getInitialTemplate());
+            }
+        };
+        validation.setOnSucceeded(event -> {
+            btnAdminValidate.setDisable(false);
+            SimulatedCodeRunner.ExecutionSummary result = validation.getValue();
+            if (result.isAllPassed()) {
+                validatedAdminDraftFingerprint = prepared.fingerprint();
+                btnAdminSave.setDisable(false);
+                lblAdminStatus.getStyleClass().setAll("text-success");
+                lblAdminStatus.setText(result.isSandboxedExecution()
+                        ? "Validación aprobada: todos los casos pasaron. Ya puedes publicar."
+                        : "Validación simulada aprobada. El reto se publicará en modo práctica sin XP.");
+            } else {
+                validatedAdminDraftFingerprint = null;
+                btnAdminSave.setDisable(true);
+                lblAdminStatus.getStyleClass().setAll("text-danger");
+                String firstFailure = result.getCaseOutcomes().stream()
+                        .filter(outcome -> !outcome.isPassed())
+                        .map(SimulatedCodeRunner.CaseOutcome::getMessage)
+                        .findFirst().orElse("Revisa el código y los resultados esperados.");
+                lblAdminStatus.setText("El reto todavía no puede publicarse: " + firstFailure);
+            }
+        });
+        validation.setOnFailed(event -> {
+            btnAdminValidate.setDisable(false);
+            validatedAdminDraftFingerprint = null;
+            btnAdminSave.setDisable(true);
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("No se pudo validar: " + validation.getException().getMessage());
+        });
+        startTask(validation, "challenge-validation");
+    }
+
+    private void invalidateAdminValidation() {
+        if (btnAdminSave == null) return;
+        validatedAdminDraftFingerprint = null;
+        btnAdminSave.setDisable(true);
+        btnAdminSave.setText(adminEditingChallenge == null ? "Publicar reto" : "Guardar cambios");
+    }
+
+    private AdminChallengeDraft prepareAdminChallengeDraft() {
+        if (currentUser == null || !currentUser.isAdministrator()) {
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("Acceso denegado: Se requiere rol de Administrador.");
+            return null;
+        }
+
+        int lessonIdx = cmbAdminLesson.getSelectionModel().getSelectedIndex();
+        Lesson targetLesson = (lessonIdx >= 0 && lessonIdx < allLessonsForAdmin.size())
+                ? allLessonsForAdmin.get(lessonIdx)
+                : (!javaLessons.isEmpty() ? javaLessons.get(0) : null);
+
+        String title = txtAdminTitle.getText() != null ? txtAdminTitle.getText().trim() : "";
+        String statement = txtAdminStatement.getText() != null ? txtAdminStatement.getText().trim() : "";
+        String template = txtAdminTemplate.getText() != null ? txtAdminTemplate.getText() : "";
+        int reward;
+        try {
+            reward = Integer.parseInt(txtAdminReward.getText().trim());
+        } catch (NumberFormatException ex) {
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("La recompensa XP debe ser un número entero válido.");
+            return null;
+        }
+
+        String case1In = txtAdminCase1In.getText().trim();
+        String case1Out = txtAdminCase1Out.getText().trim();
+        String case2In = txtAdminCase2In.getText().trim();
+        String case2Out = txtAdminCase2Out.getText().trim();
+        if (targetLesson == null || title.isBlank() || statement.isBlank() || template.isBlank()
+                || reward <= 0 || reward > 500 || case1In.isBlank() || case1Out.isBlank()
+                || case2In.isBlank() || case2Out.isBlank() || case1In.equals(case2In)) {
+            lblAdminStatus.getStyleClass().setAll("text-danger");
+            lblAdminStatus.setText("Completa todos los campos, usa dos entradas distintas y una recompensa entre 1 y 500 XP.");
+            if (title.isBlank()) txtAdminTitle.requestFocus();
+            else if (statement.isBlank()) txtAdminStatement.requestFocus();
+            else if (template.isBlank()) txtAdminTemplate.requestFocus();
+            else txtAdminReward.requestFocus();
+            return null;
+        }
+
+        CodeChallenge newCh = new CodeChallenge(
+                adminEditingChallenge == null ? 0 : adminEditingChallenge.getId(),
+                title,
+                statement,
+                targetLesson,
+                reward,
+                template,
+                2
+        );
+        newCh.setDifficulty(cmbAdminDifficulty.getValue());
+        boolean firstHidden = adminEditingChallenge != null
+                && !adminEditingChallenge.getTestCases().isEmpty()
+                && adminEditingChallenge.getTestCases().get(0).isHidden();
+        boolean secondHidden = adminEditingChallenge != null
+                && adminEditingChallenge.getTestCases().size() > 1
+                && adminEditingChallenge.getTestCases().get(1).isHidden();
+        newCh.addTestCase(new TestCase(0, newCh, case1In, case1Out, firstHidden));
+        newCh.addTestCase(new TestCase(0, newCh, case2In, case2Out, secondHidden));
+        if (adminEditingChallenge != null) {
+            for (int i = 2; i < adminEditingChallenge.getTestCases().size(); i++) {
+                TestCase existing = adminEditingChallenge.getTestCases().get(i);
+                newCh.addTestCase(new TestCase(0, newCh, existing.getInput(),
+                        existing.getExpectedOutput(), existing.isHidden()));
+            }
+        }
+        String fingerprint = targetLesson.getId() + "\n" + cmbAdminDifficulty.getValue() + "\n" + title + "\n" + statement + "\n"
+                + template + "\n" + reward + "\n" + case1In + "\n" + case1Out
+                + "\n" + case2In + "\n" + case2Out;
+        return new AdminChallengeDraft(targetLesson, newCh, fingerprint);
+    }
+
+    private record AdminChallengeDraft(Lesson lesson, CodeChallenge challenge, String fingerprint) { }
+
+    private void rebuildAdminChallengeChoices(Challenge selected) {
+        if (cmbAdminChallenge == null) return;
+        adminEditableChallenges.clear();
+        cmbAdminChallenge.getItems().setAll("Crear un reto nuevo");
+        int selectedIndex = 0;
+        for (Lesson lesson : allLessonsForAdmin) {
+            for (Challenge challenge : lesson.getChallenges()) {
+                if (!(challenge instanceof CodeChallenge code)) continue;
+                adminEditableChallenges.add(code);
+                String language = lesson.getModule() != null && lesson.getModule().getLanguage() != null
+                        ? lesson.getModule().getLanguage().getName() : "Curso";
+                cmbAdminChallenge.getItems().add("Editar · " + language + " · " + code.getTitle());
+                if (selected != null && selected.getId() == code.getId()) {
+                    selectedIndex = adminEditableChallenges.size();
+                }
+            }
+        }
+        cmbAdminChallenge.getSelectionModel().select(selectedIndex);
+    }
+
+    private void loadAdminChallengeSelection() {
+        if (txtAdminTitle == null) return;
+        int selectedIndex = cmbAdminChallenge.getSelectionModel().getSelectedIndex();
+        if (selectedIndex <= 0 || selectedIndex > adminEditableChallenges.size()) {
+            adminEditingChallenge = null;
+            cmbAdminLesson.setDisable(false);
+            txtAdminTitle.clear();
+            txtAdminReward.setText("90");
+            cmbAdminDifficulty.getSelectionModel().select(ChallengeDifficulty.MEDIO);
+            txtAdminStatement.clear();
+            txtAdminTemplate.clear();
+            txtAdminCase1In.clear();
+            txtAdminCase1Out.clear();
+            txtAdminCase2In.clear();
+            txtAdminCase2Out.clear();
+            lblAdminStatus.getStyleClass().setAll("muted-text");
+            lblAdminStatus.setText("Completa y valida el nuevo reto antes de publicarlo.");
+            invalidateAdminValidation();
+            return;
+        }
+
+        CodeChallenge challenge = adminEditableChallenges.get(selectedIndex - 1);
+        adminEditingChallenge = challenge;
+        cmbAdminLesson.setDisable(true);
+        int lessonIndex = -1;
+        for (int i = 0; i < allLessonsForAdmin.size(); i++) {
+            if (allLessonsForAdmin.get(i).getId() == challenge.getLesson().getId()) {
+                lessonIndex = i;
+                break;
+            }
+        }
+        if (lessonIndex >= 0) cmbAdminLesson.getSelectionModel().select(lessonIndex);
+        txtAdminTitle.setText(challenge.getTitle());
+        txtAdminReward.setText(Integer.toString(challenge.getExpReward()));
+        cmbAdminDifficulty.getSelectionModel().select(challenge.getDifficulty());
+        txtAdminStatement.setText(challenge.getDescription());
+        txtAdminTemplate.setText(challenge.getInitialTemplate());
+        List<TestCase> cases = challenge.getTestCases();
+        txtAdminCase1In.setText(cases.isEmpty() ? "" : cases.get(0).getInput());
+        txtAdminCase1Out.setText(cases.isEmpty() ? "" : cases.get(0).getExpectedOutput());
+        txtAdminCase2In.setText(cases.size() < 2 ? "" : cases.get(1).getInput());
+        txtAdminCase2Out.setText(cases.size() < 2 ? "" : cases.get(1).getExpectedOutput());
+        lblAdminStatus.getStyleClass().setAll("muted-text");
+        lblAdminStatus.setText("Editando “" + challenge.getTitle()
+                + "”. Valida los cambios antes de guardarlos.");
+        invalidateAdminValidation();
+    }
+
+    private void switchWorkspaceView(String cardKey) {
+        if (guidedPractice != null && !guidedPractice.canLeave()) return;
+        if (learningWorkspace != null && !learningWorkspace.clear()) return;
+        learningOrigin = null;
+        workspaceScroll.setFitToHeight(false);
+        if ("ADMIN".equals(cardKey) && (currentUser == null || !currentUser.isAdministrator())) {
+            return;
+        }
+
+        Node target = coursesView;
+        homeView.setVisible("HOME".equals(cardKey));
+        if ("HOME".equals(cardKey)) {
+            refreshHome();
+            loadHomeGoal();
+            target = homeView;
+        } else if ("COMPARATOR".equals(cardKey)) {
+            target = comparatorView;
+        } else if ("PROGRESS".equals(cardKey)) {
+            target = new LearningAnalyticsPane(currentUser.getId(), oracleConnected, this::openChallenge);
+        } else if ("GOALS".equals(cardKey)) {
+            target = new LearningGoalsPane(currentUser.getId(), oracleConnected);
+        } else if ("LAB".equals(cardKey)) {
+            if (codingLab == null) codingLab = new CodingLabPane(currentUser, oracleConnected);
+            target = codingLab;
+        } else if ("PROFILE".equals(cardKey)) {
+            if (profilePane == null) profilePane = new ProfilePane(currentUser, oracleConnected,
+                    () -> profileName.setText(currentUser.getUsername()));
+            target = profilePane;
+        } else if ("NOTEBOOK".equals(cardKey)) {
+            if (notebookPane==null) notebookPane = new NotebookPane(currentUser, oracleConnected,
+                    allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
+                    this::onChallengeOrLessonCompleted, this::openChallenge);
+            target = notebookPane;
+            if (oracleConnected) notebookPane.refreshFromAccount();
+        } else if ("SESSION".equals(cardKey) && guidedPractice != null) {
+            target = guidedPractice;
+        } else if ("PRACTICE".equals(cardKey)) {
+            renderPracticeCatalog();
+            target = practiceView;
+        } else if ("ACHIEVEMENTS".equals(cardKey)) {
+            target = achievementsView;
+        } else if ("ADMIN".equals(cardKey) && adminView != null) {
+            target = adminView;
+        }
+
+        workspaceContainer.getChildren().setAll(target);
+        workspaceScroll.setVvalue(0);
+        Theme.playFadeIn(target);
+
+        updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
+        updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
+        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey) || "SESSION".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
+        updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
+        updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
+        updateNavigation(navLabBtn, "LAB".equals(cardKey), Theme.IconKind.TERMINAL, Theme.HEX_INDIGO);
+        updateNavigation(navComparatorBtn, "COMPARATOR".equals(cardKey), Theme.IconKind.CODE, Theme.HEX_CYAN);
+        updateNavigation(navAchievementsBtn, "ACHIEVEMENTS".equals(cardKey), Theme.IconKind.TROPHY, Theme.HEX_AMBER);
+        if (navAdminBtn != null) {
+            updateNavigation(navAdminBtn, "ADMIN".equals(cardKey), Theme.IconKind.SHIELD, Theme.HEX_GREEN);
+        }
+    }
+
+    private void updateNavigation(Button button, boolean selected, Theme.IconKind icon, String color) {
+        button.getStyleClass().removeAll("nav-btn", "nav-btn-active");
+        button.getStyleClass().add(selected ? "nav-btn-active" : "nav-btn");
+        button.setGraphic(Theme.createIcon(icon, 16, selected ? Theme.HEX_WHITE : color));
+    }
+
+    private void onLessonStateChanged() {
+        this.lastKnownOfflineExp = currentUser.getTotalExp();
+        refreshAllDashboardState();
+    }
+
+    private void reloadCurriculum() {
+        if (disposed) return;
+        if (reloadingCurriculum || refreshing) { curriculumReloadPending = true; return; }
+        reloadingCurriculum = true;
+        Task<List<Language>> task = new Task<>() {
+            @Override protected List<Language> call() { return controller.loadLanguages(); }
+        };
+        task.setOnSucceeded(event -> {
+            reloadingCurriculum = false;
+            if (disposed) return;
+            applyCatalog(task.getValue());
+            challengeAuthoring.updateLessons(allLessonsForAdmin);
+            if (notebookPane != null) notebookPane.updateChallenges(allLessonsForAdmin.stream().flatMap(lesson -> lesson.getChallenges().stream()).toList());
+            populateLessonsForLanguage(activeLanguageKey);
+            renderPracticeCatalog();
+            refreshAllDashboardState();
+            if (curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
+        });
+        task.setOnFailed(event -> {
+            reloadingCurriculum = false;
+            LOGGER.log(Level.WARNING, "No se pudo actualizar el catálogo del curso", task.getException());
+            if (!disposed) {
+                syncStatus.setText("El contenido se guardó. Pulsa Actualizar cursos en Administración para volver a cargar la ruta.");
+            }
+        });
+        startTask(task, "curriculum-catalog-refresh");
+    }
+
+    private void recordPracticeOutcome(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome outcome) {
+        if (oracleConnected) return;
+        demoChallengeProgress.merge(outcome.challengeId(), outcome.correct() ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED,
+                (previous, next) -> previous == ChallengeProgress.SOLVED ? previous : next);
+        challengeProgress = Map.copyOf(demoChallengeProgress);
+        populateLessonsForLanguage(activeLanguageKey);
+        renderPracticeCatalog();
+    }
+
+    private void onChallengeOrLessonCompleted() {
+        if (!oracleConnected && currentUser.getTotalExp() > lastKnownOfflineExp) {
+            solvedChallengesCount++;
+        }
+        this.lastKnownOfflineExp = currentUser.getTotalExp();
+        refreshAllDashboardState();
+    }
+
+    private void refreshAllDashboardState() {
+        if (disposed) return;
+        if (refreshing || reloadingCurriculum) { refreshPending = true; return; }
+        refreshing = true;
+        syncStatus.setText("Actualizando tu progreso…");
+        int offlineSolved = solvedChallengesCount;
+        Task<DashboardState> refresh = new Task<>() {
+            @Override protected DashboardState call() {
+                return fetchDashboardState(offlineSolved, false);
+            }
+        };
+        refresh.setOnSucceeded(e -> {
+            refreshing = false;
+            if (disposed) return;
+            Set<Integer> newAchievements = new HashSet<>(refresh.getValue().achievements());
+            newAchievements.removeAll(unlockedAchievementIds);
+            applyDashboardState(refresh.getValue());
+            if (oracleConnected) showNewAchievements(newAchievements);
+            dataStale = false;
+            setConnectionState(true, "CONECTADO", "Tu progreso está actualizado.", false);
+            rebuildHeatmapCells();
+            refreshGamificationTelemetry();
+            populateLessonsForLanguage(activeLanguageKey);
+            refreshCourseProgressBars();
+            refreshAchievementsGrid();
+            renderPracticeCatalog();
+            if (homeView.isVisible()) loadHomeGoal();
+            if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
+            if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
+            if (curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
+        });
+        refresh.setOnFailed(e -> {
+            refreshing = false;
+            LOGGER.log(Level.WARNING, "Dashboard refresh failed", refresh.getException());
+            dataStale = true;
+            if (!disposed) setConnectionState(connectionAvailable,
+                    connectionAvailable ? "SIN SINCRONIZAR" : "SIN CONEXIÓN",
+                    "No pudimos actualizar el progreso. Conservamos la última información disponible.", true);
+            if (!disposed && curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
+        });
+        startTask(refresh, "dashboard-refresh");
+    }
+
+    private void startConnectionWatch() {
+        if (!oracleConnected || connectionWatch != null) return;
+        connectionWatch = new Timeline(new KeyFrame(Duration.seconds(30), event -> checkConnection()));
+        connectionWatch.setCycleCount(Timeline.INDEFINITE);
+        connectionWatch.play();
+    }
+
+    private void checkConnection() {
+        if (!oracleConnected || disposed || healthChecking) return;
+        healthChecking = true;
+        btnRetryConnection.setDisable(true);
+        Task<Boolean> check = new Task<>() {
+            @Override protected Boolean call() { return DatabaseConnection.isDatabaseReady(); }
+        };
+        check.setOnSucceeded(event -> {
+            healthChecking = false;
+            btnRetryConnection.setDisable(false);
+            if (disposed) return;
+            if (check.getValue()) {
+                boolean needsRefresh = !connectionAvailable || dataStale;
+                setConnectionState(true, needsRefresh ? "SINCRONIZANDO" : "CONECTADO",
+                        needsRefresh ? "Oracle responde. Actualizando tu progreso…"
+                                : "Tu progreso se guarda automáticamente.", false);
+                if (needsRefresh) refreshAllDashboardState();
+            } else {
+                setConnectionState(false, "SIN CONEXIÓN",
+                        "Oracle no responde. Mostramos la última información cargada; pulsa Reintentar.", true);
+            }
+        });
+        check.setOnFailed(event -> {
+            healthChecking = false;
+            btnRetryConnection.setDisable(false);
+            LOGGER.log(Level.WARNING, "Connection check failed", check.getException());
+            if (!disposed) setConnectionState(false, "SIN CONEXIÓN",
+                    "No pudimos comprobar Oracle. Pulsa Reintentar.", true);
+        });
+        startTask(check, "oracle-health-check");
+    }
+
+    private void setConnectionState(boolean available, String badgeText, String message, boolean showRetry) {
+        connectionAvailable = available;
+        AppContext.getInstance().setOracleAvailable(available);
+        if (badgeConn != null && oracleConnected) {
+            badgeConn.setText(badgeText);
+            badgeConn.getStyleClass().setAll("CONECTADO".equals(badgeText) ? "badge-green" : "badge-amber");
+        }
+        if (syncStatus != null) syncStatus.setText(message);
+        if (btnRetryConnection != null) {
+            btnRetryConnection.setVisible(showRetry);
+            btnRetryConnection.setManaged(showRetry);
+        }
+    }
+
+    private void recoverLives() {
+        if (currentUser.getLives() > 0 || btnRecoverLives.isDisable()) return;
+        if (!oracleConnected) {
+            currentUser.setLives(5);
+            refreshGamificationTelemetry();
+            syncStatus.setText("Vidas recuperadas en modo de prueba; los cambios duran esta sesión.");
+            return;
+        }
+        btnRecoverLives.setDisable(true);
+        syncStatus.setText("Comprobando si ya puedes recuperar tus vidas…");
+        Task<Integer> task = new Task<>() {
+            @Override protected Integer call() {
+                return AppContext.getInstance().getGamificationService().recoverLivesIfEligible(currentUser);
+            }
+        };
+        task.setOnSucceeded(event -> {
+            btnRecoverLives.setDisable(false);
+            refreshGamificationTelemetry();
+            syncStatus.setText(task.getValue() > 0
+                    ? "¡Vidas recuperadas! Ya puedes volver a enviar retos."
+                    : "Las vidas se recuperan al comenzar un nuevo día. Puedes practicar sin XP mientras tanto.");
+        });
+        task.setOnFailed(event -> {
+            btnRecoverLives.setDisable(false);
+            LOGGER.log(Level.WARNING, "No se pudieron recuperar las vidas", task.getException());
+            syncStatus.setText("No pudimos comprobar las vidas. Revisa la conexión e inténtalo de nuevo.");
+        });
+        startTask(task, "recover-lives");
+    }
+
+    private void refreshGamificationTelemetry() {
+        int exp = currentUser.getTotalExp();
+        int computedLevel = Math.max(currentUser.getLevel(), 1 + exp / 300);
+        currentUser.setLevel(computedLevel);
+
+        int expInCurrentBracket = exp % 300;
+        int remainingToNext = 300 - expInCurrentBracket;
+
+        lblLevelVal.setText("Nivel " + currentUser.getLevel());
+        lblLevelSub.setText("Faltan " + remainingToNext + " XP para Nivel " + (currentUser.getLevel() + 1));
+        levelProgressBar.setProgress(expInCurrentBracket / 300.0);
+
+        lblExpVal.setText(exp + " XP");
+        lblExpSub.setText(solvedChallengesCount > 0
+                ? solvedChallengesCount + " retos aprobados verificados"
+                : "Cada práctica te acerca a tu meta");
+
+        lblStreakVal.setText(currentUser.getCurrentStreak() + " Días");
+        badgeMaxStreak.setText("Máx: " + currentUser.getMaxStreak() + "d");
+
+        lblLivesVal.setText(currentUser.getLives() + " / 5");
+        lblLivesSub.setText(currentUser.getLives() > 0 ? "Energía lista"
+                : "Sin vidas · practica sin XP");
+        livesProgressBar.setProgress(currentUser.getLives() / 5.0);
+        btnRecoverLives.setVisible(currentUser.getLives() <= 0);
+        btnRecoverLives.setManaged(currentUser.getLives() <= 0);
+    }
+}
