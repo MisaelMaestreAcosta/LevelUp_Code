@@ -8,4 +8,5 @@ interface LearningNavigation {
     void openChallenge(Challenge challenge);
     void challengeChanged(Challenge challenge);
     void back();
+    default void evaluated(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome outcome) { }
 }

@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
 import com.mycompany.levelup_code.domain.enums.ChallengeDifficulty;
 import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
@@ -108,6 +109,8 @@ public class DashboardFrame {
     private Button navGoalsBtn;
     private Button navLabBtn;
     private CodingLabPane codingLab;
+    private GuidedPracticePane guidedPractice;
+    private boolean preparingPractice;
     private Label profileName;
     private ProfilePane profilePane;
     private NotebookPane notebookPane;
@@ -120,6 +123,7 @@ public class DashboardFrame {
     private ComboBox<String> practiceDifficulty;
     private ComboBox<String> practiceProgress;
     private Map<Integer, ChallengeProgress> challengeProgress = Map.of();
+    private final Map<Integer, ChallengeProgress> demoChallengeProgress = new java.util.concurrent.ConcurrentHashMap<>();
     private Button navComparatorBtn;
     private Button navAchievementsBtn;
     private Button navAdminBtn;
@@ -147,6 +151,10 @@ public class DashboardFrame {
     private VBox comparatorView;
     private VBox achievementsView;
     private VBox adminView;
+    private ChallengeAuthoringPane challengeAuthoring;
+    private CurriculumAuthoringPane curriculumAuthoring;
+    private boolean reloadingCurriculum;
+    private boolean curriculumReloadPending;
 
     // Telemetría reactiva
     private Label lblLevelVal;
@@ -268,10 +276,15 @@ public class DashboardFrame {
                     catch (Exception ex) { LOGGER.log(Level.WARNING, "No se pudieron cargar las preferencias", ex); }
                 }
                 EditorPreferences.remember(currentUser.getId(), preferences);
-                loadDomainDataFromOracleOrSeed();
-                loadEnrollmentsFromOracle();
-                loadAchievementsFromOracleOrSeed();
-                return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
+                try {
+                    loadDomainDataFromOracleOrSeed();
+                    loadEnrollmentsFromOracle();
+                    loadAchievementsFromOracleOrSeed();
+                    return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
+                } catch (RuntimeException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
             }
         };
         task.setOnSucceeded(e -> {
@@ -294,8 +307,9 @@ public class DashboardFrame {
         task.setOnFailed(e -> {
             LOGGER.log(Level.WARNING, "Unable to load dashboard", task.getException());
             indicator.setVisible(false);
-            message.setText("No pudimos cargar tus cursos. Comprueba la conexión e inténtalo de nuevo.");
+            message.setText("No pudimos cargar tus cursos. " + task.getMessage());
             message.setWrapText(true);
+            message.setMaxWidth(640);
             retry.setVisible(true);
             retry.setManaged(true);
         });
@@ -325,7 +339,7 @@ public class DashboardFrame {
                 controller.resolveUnlockedAchievementIds(achievementsCatalog, solved), livesRecovered,
                 oracleConnected && currentUser.getId() > 0
                         ? AppContext.getInstance().getChallengeService().getProgressByUser(currentUser.getId())
-                        : Map.of());
+                        : Map.copyOf(demoChallengeProgress));
     }
 
     private boolean recoverExhaustedLivesOnOpen() {
@@ -379,12 +393,16 @@ public class DashboardFrame {
     }
 
     private void loadDomainDataFromOracleOrSeed() {
+        applyCatalog(controller.loadLanguages());
+    }
+
+    private void applyCatalog(List<Language> languages) {
         javaLessons.clear();
         pythonLessons.clear();
         cppLessons.clear();
         allLessonsForAdmin.clear();
 
-        List<Language> languages = controller.loadLanguages();
+        javaLangModel = null; pythonLangModel = null; cppLangModel = null;
         for (Language lang : languages) {
             String name = lang.getName() != null ? lang.getName().toLowerCase(Locale.ROOT) : "";
             List<Lesson> targetList;
@@ -426,9 +444,8 @@ public class DashboardFrame {
         stage.setMinWidth(900);
         stage.setMinHeight(640);
         stage.setOnCloseRequest(event -> {
-            if (learningWorkspace != null && !learningWorkspace.clear()) { event.consume(); return; }
-            disposed = true;
-            if (connectionWatch != null) connectionWatch.stop();
+            event.consume();
+            requestExit(stage::hide);
         });
 
         BorderPane root = new BorderPane();
@@ -452,19 +469,29 @@ public class DashboardFrame {
         comparatorView = buildComparatorWorkspaceView();
         achievementsView = buildAchievementsWorkspaceView();
         if (currentUser != null && currentUser.isAdministrator()) {
-            adminView = oracleConnected ? new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
-                if (disposed) return;
-                Challenge challenge = saved.challenge();
-                for (Lesson lesson : allLessonsForAdmin) {
-                    lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
-                    if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
-                            && lesson.getId() == challenge.getLessonId()) {
-                        challenge.setLesson(lesson);
-                        lesson.addChallenge(challenge);
+            if (oracleConnected) {
+                challengeAuthoring = new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
+                    if (disposed) return;
+                    Challenge challenge = saved.challenge();
+                    for (Lesson lesson : allLessonsForAdmin) {
+                        lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
+                        if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
+                                && lesson.getId() == challenge.getLessonId()) {
+                            challenge.setLesson(lesson);
+                            lesson.addChallenge(challenge);
+                        }
                     }
-                }
-                refreshAllDashboardState();
-            }) : buildAdminCrudWorkspaceView();
+                    refreshAllDashboardState();
+                });
+                curriculumAuthoring = new CurriculumAuthoringPane(currentUser, this::reloadCurriculum);
+                javafx.scene.control.Tab challenges = new javafx.scene.control.Tab("Retos", challengeAuthoring);
+                javafx.scene.control.Tab curriculum = new javafx.scene.control.Tab("Módulos y lecciones", curriculumAuthoring);
+                challenges.setClosable(false); curriculum.setClosable(false);
+                javafx.scene.control.TabPane administration = new javafx.scene.control.TabPane(challenges, curriculum);
+                Button reloadCourses = WorkspaceUi.button("Actualizar cursos", "btn-secondary", Theme.IconKind.REFRESH);
+                reloadCourses.setOnAction(event -> reloadCurriculum());
+                adminView = new VBox(12, reloadCourses, administration);
+            } else adminView = buildAdminCrudWorkspaceView();
         }
 
         homeView = buildHomeWorkspace(topTelemetry);
@@ -493,7 +520,7 @@ public class DashboardFrame {
         ScrollPane centerScroll = new ScrollPane(centerShell);
         workspaceScroll = centerScroll;
         learningWorkspace = new LearningWorkspace(currentUser, this::onLessonStateChanged, this::onChallengeOrLessonCompleted,
-                this::returnFromLearning, this::setConcentration);
+                this::returnFromLearning, this::setConcentration, this::recordPracticeOutcome, false);
         centerScroll.setFitToWidth(true);
         centerScroll.getStyleClass().add("scroll-pane-clean");
         root.setCenter(centerScroll);
@@ -581,7 +608,9 @@ public class DashboardFrame {
                 openChallenge(recommendedChallenge);
             }
         });
-        VBox practice = new VBox(12, WorkspaceUi.label("Tu próximo reto", "card-title"), homeChallenge, homePractice);
+        Button guided = WorkspaceUi.button("Practicar una sesión de 5 retos", "btn-primary", Theme.IconKind.PLAY);
+        guided.setOnAction(event -> startGuidedPractice());
+        VBox practice = new VBox(12, WorkspaceUi.label("Tu próximo reto", "card-title"), homeChallenge, homePractice, guided);
         practice.getStyleClass().add("surface-card");
         homeGoal = new VBox(10);
         homeGoal.getStyleClass().add("surface-card");
@@ -721,7 +750,7 @@ public class DashboardFrame {
         navAchievementsBtn.setMaxWidth(Double.MAX_VALUE);
 
         if (currentUser != null && currentUser.isAdministrator()) {
-            navAdminBtn = new Button("Administrar retos");
+            navAdminBtn = new Button("Administración");
             navAdminBtn.getStyleClass().add("nav-btn");
             navAdminBtn.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 16, Theme.HEX_GREEN));
             navAdminBtn.setGraphicTextGap(10);
@@ -795,18 +824,45 @@ public class DashboardFrame {
         btnLogout.setGraphicTextGap(8);
         btnLogout.setMaxWidth(Double.MAX_VALUE);
         btnLogout.setOnAction(e -> {
-            if (!learningWorkspace.clear()) return;
-            disposed = true;
-            if (connectionWatch != null) connectionWatch.stop();
-            SessionWindowRegistry.closeAll();
-            LoginFrame loginFrame = new LoginFrame(stage);
-            loginFrame.show();
+            requestExit(() -> {
+                SessionWindowRegistry.closeAll();
+                LoginFrame loginFrame = new LoginFrame(stage);
+                loginFrame.show();
+            });
         });
 
         userBox.getChildren().addAll(profileTop, badgeConn, btnLogout);
         sidebar.setBottom(userBox);
 
         return sidebar;
+    }
+
+    private void requestExit(Runnable continuation) {
+        if (disposed || (learningWorkspace != null && !learningWorkspace.canLeave())) return;
+        if (guidedPractice != null && !guidedPractice.canLeave()) return;
+        Runnable finish = () -> {
+            if (notebookPane != null && !notebookPane.removeRecovery()) return;
+            if (codingLab != null && !codingLab.removeRecovery()) return;
+            if (learningWorkspace != null && !learningWorkspace.clear()) return;
+            if (guidedPractice != null && !guidedPractice.dispose()) return;
+            disposed = true;
+            if (connectionWatch != null) connectionWatch.stop();
+            continuation.run();
+        };
+        Runnable checkAuthoring = () -> {
+            Runnable checkCurriculum = () -> {
+                if (curriculumAuthoring != null) curriculumAuthoring.requestLeave(stage, finish);
+                else finish.run();
+            };
+            if (challengeAuthoring != null) challengeAuthoring.requestLeave(stage, checkCurriculum);
+            else checkCurriculum.run();
+        };
+        Runnable checkLab = () -> {
+            if (codingLab != null) codingLab.requestLeave(stage, checkAuthoring);
+            else checkAuthoring.run();
+        };
+        if (notebookPane != null) notebookPane.requestLeave(stage, checkLab);
+        else checkLab.run();
     }
 
     private TilePane buildTopTelemetryBar() {
@@ -1047,6 +1103,9 @@ public class DashboardFrame {
 
     private VBox buildPracticeWorkspaceView() {
         VBox view = new VBox(14);
+        Button guided = WorkspaceUi.button("Iniciar o retomar una sesión de 5 retos", "btn-primary", Theme.IconKind.PLAY);
+        guided.setOnAction(event -> startGuidedPractice());
+        view.getChildren().add(guided);
         view.getChildren().add(Theme.createSectionHeader("Elige tu próximo reto", "Practica a tu ritmo", "badge-green"));
         view.getChildren().add(new LupoGuide(Lupo.Expression.THINKING, "Practica con Lupo",
                 "Empieza por un reto fácil o filtra los que quieras repasar."));
@@ -1096,6 +1155,46 @@ public class DashboardFrame {
         view.getChildren().addAll(filters, practiceCount, scroll);
         renderPracticeCatalog();
         return view;
+    }
+
+    private void startGuidedPractice() {
+        if (guidedPractice != null && !guidedPractice.finished()) { switchWorkspaceView("SESSION"); return; }
+        if (preparingPractice) return;
+        preparingPractice = true;
+        List<Challenge> catalog = selectedLessons().stream().flatMap(lesson -> lesson.getChallenges().stream()).toList();
+        Map<Integer, ChallengeProgress> progress = Map.copyOf(challengeProgress);
+        Node origin = workspaceContainer.getChildren().getFirst();
+        Task<com.mycompany.levelup_code.domain.model.PracticeSession> task = new Task<>() {
+            @Override protected com.mycompany.levelup_code.domain.model.PracticeSession call() throws Exception {
+                Map<Integer, LocalDate> last = oracleConnected
+                        ? new com.mycompany.levelup_code.data.oracle.OraclePracticeRepository().lastAttempts(currentUser.getId()) : Map.of();
+                return new com.mycompany.levelup_code.business.service.PracticePlanner().plan(catalog, progress, last, LocalDate.now(),
+                        challenge -> !(challenge instanceof CodeChallenge)
+                                || AppContext.getInstance().getCodeRunner().supportsRealIsolatedExecution(
+                                        challenge.getLesson().getModule().getLanguage().getName()));
+            }
+        };
+        task.setOnSucceeded(event -> {
+            preparingPractice = false;
+            if (disposed) return;
+            if (task.getValue().steps().isEmpty()) {
+                var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION,
+                        "Este curso todavía no tiene retos compatibles con una sesión guiada.");
+                alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
+                return;
+            }
+            guidedPractice = new GuidedPracticePane(currentUser, task.getValue(), this::onChallengeOrLessonCompleted, this::recordPracticeOutcome);
+            if (workspaceContainer.getChildren().contains(origin)) switchWorkspaceView("SESSION");
+        });
+        task.setOnFailed(event -> {
+            preparingPractice = false;
+            LOGGER.log(Level.WARNING, "No se pudo preparar la sesión de práctica", task.getException());
+            if (disposed) return;
+            var alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                    "No pudimos preparar la sesión. Comprueba la conexión y vuelve a iniciar la práctica.");
+            alert.initOwner(stage); Theme.applyCss(alert.getDialogPane().getScene()); alert.show();
+        });
+        startTask(task, "practice-session-plan");
     }
 
     private void renderPracticeCatalog() {
@@ -1320,7 +1419,7 @@ public class DashboardFrame {
         Lesson next = nextLesson();
         boolean courseCompleted = !selectedList.isEmpty() && next == null;
         continueSummary.setText(selectedList.isEmpty() ? "Este curso aún no tiene lecciones."
-                : courseCompleted ? "¡Curso completado! Puedes repasar cualquier lección cuando quieras."
+                : courseCompleted ? "Lecturas completadas. Pon a prueba lo aprendido con los retos finales de cada módulo."
                 : "Tu siguiente paso: " + next.getTitle());
         continueButton.setText(courseCompleted ? "Repasar desde el inicio" : "Continuar aprendiendo");
         continueButton.setDisable(selectedList.isEmpty());
@@ -1362,6 +1461,23 @@ public class DashboardFrame {
             progress.setMaxWidth(Double.MAX_VALUE);
             progress.setAccessibleText(readings + " de " + allModuleLessons.size() + " lecturas completadas");
             heading.getChildren().add(progress);
+            challenges.stream().filter(Challenge::isModuleFinal).findFirst().ifPresent(finalChallenge -> {
+                VBox summary = new VBox(10, WorkspaceUi.label("Lo que has practicado", "card-title"));
+                summary.getStyleClass().add("surface-card");
+                for (Lesson item : allModuleLessons) {
+                    List<Challenge> exercises = item.getChallenges().stream().filter(challenge -> !challenge.isModuleFinal()).toList();
+                    long completed = exercises.stream().filter(challenge -> challengeProgress.get(challenge.getId()) == ChallengeProgress.SOLVED).count();
+                    summary.getChildren().add(WorkspaceUi.label(item.getTitle() + " · " + completed + "/" + exercises.size() + " retos superados", "body-text"));
+                }
+                boolean passed = challengeProgress.get(finalChallenge.getId()) == ChallengeProgress.SOLVED;
+                summary.getChildren().add(WorkspaceUi.label(passed
+                        ? oracleConnected ? "Reto final superado y guardado" : "Reto final resuelto durante esta sesión de prueba"
+                        : "Resuelve el caso práctico para cerrar el módulo.", "body-text"));
+                Button openFinal = WorkspaceUi.button(passed ? "Repasar reto final" : "Resolver reto final", "btn-primary", Theme.IconKind.TROPHY);
+                openFinal.setOnAction(event -> openChallenge(finalChallenge));
+                summary.getChildren().add(openFinal);
+                route.getChildren().add(summary);
+            });
             TitledPane panel = new TitledPane("", route);
             panel.setMinWidth(0);
             panel.setGraphic(heading);
@@ -1591,9 +1707,7 @@ public class DashboardFrame {
         btnPractice.setOnAction(e -> {
             List<Lesson> targetList = "PYTHON".equals(activeLanguageKey) ? pythonLessons
                     : ("CPP".equals(activeLanguageKey) ? cppLessons : javaLessons);
-            Lesson l = (!targetList.isEmpty())
-                    ? targetList.get(Math.min(activeComparatorLessonIndex, targetList.size() - 1))
-                    : null;
+            Lesson l = DemoSeedCatalog.comparativeLesson(targetList, activeLanguageKey, activeComparatorLessonIndex);
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
             openChallenge(ch);
@@ -1673,9 +1787,7 @@ public class DashboardFrame {
         this.activeComparatorLessonIndex = lessonIdx;
         if (comparisonExercise != null) comparisonExercise.setTopic(lessonIdx);
 
-        Lesson sampleLesson = (!javaLessons.isEmpty() && lessonIdx < javaLessons.size())
-                ? javaLessons.get(lessonIdx)
-                : null;
+        Lesson sampleLesson = DemoSeedCatalog.comparativeLesson(javaLessons, "JAVA", lessonIdx);
         String[] javaSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "JAVA");
         String[] pySnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "PYTHON");
         String[] cppSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "CPP");
@@ -2263,6 +2375,7 @@ public class DashboardFrame {
     }
 
     private void switchWorkspaceView(String cardKey) {
+        if (guidedPractice != null && !guidedPractice.canLeave()) return;
         if (learningWorkspace != null && !learningWorkspace.clear()) return;
         learningOrigin = null;
         workspaceScroll.setFitToHeight(false);
@@ -2294,6 +2407,9 @@ public class DashboardFrame {
                     allLessonsForAdmin.stream().flatMap(l -> l.getChallenges().stream()).toList(),
                     this::onChallengeOrLessonCompleted, this::openChallenge);
             target = notebookPane;
+            if (oracleConnected) notebookPane.refreshFromAccount();
+        } else if ("SESSION".equals(cardKey) && guidedPractice != null) {
+            target = guidedPractice;
         } else if ("PRACTICE".equals(cardKey)) {
             renderPracticeCatalog();
             target = practiceView;
@@ -2309,7 +2425,7 @@ public class DashboardFrame {
 
         updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
         updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
-        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey) || "SESSION".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
         updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
         updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
         updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
@@ -2332,6 +2448,43 @@ public class DashboardFrame {
         refreshAllDashboardState();
     }
 
+    private void reloadCurriculum() {
+        if (disposed) return;
+        if (reloadingCurriculum || refreshing) { curriculumReloadPending = true; return; }
+        reloadingCurriculum = true;
+        Task<List<Language>> task = new Task<>() {
+            @Override protected List<Language> call() { return controller.loadLanguages(); }
+        };
+        task.setOnSucceeded(event -> {
+            reloadingCurriculum = false;
+            if (disposed) return;
+            applyCatalog(task.getValue());
+            challengeAuthoring.updateLessons(allLessonsForAdmin);
+            if (notebookPane != null) notebookPane.updateChallenges(allLessonsForAdmin.stream().flatMap(lesson -> lesson.getChallenges().stream()).toList());
+            populateLessonsForLanguage(activeLanguageKey);
+            renderPracticeCatalog();
+            refreshAllDashboardState();
+            if (curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
+        });
+        task.setOnFailed(event -> {
+            reloadingCurriculum = false;
+            LOGGER.log(Level.WARNING, "No se pudo actualizar el catálogo del curso", task.getException());
+            if (!disposed) {
+                syncStatus.setText("El contenido se guardó. Pulsa Actualizar cursos en Administración para volver a cargar la ruta.");
+            }
+        });
+        startTask(task, "curriculum-catalog-refresh");
+    }
+
+    private void recordPracticeOutcome(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome outcome) {
+        if (oracleConnected) return;
+        demoChallengeProgress.merge(outcome.challengeId(), outcome.correct() ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED,
+                (previous, next) -> previous == ChallengeProgress.SOLVED ? previous : next);
+        challengeProgress = Map.copyOf(demoChallengeProgress);
+        populateLessonsForLanguage(activeLanguageKey);
+        renderPracticeCatalog();
+    }
+
     private void onChallengeOrLessonCompleted() {
         if (!oracleConnected && currentUser.getTotalExp() > lastKnownOfflineExp) {
             solvedChallengesCount++;
@@ -2342,7 +2495,7 @@ public class DashboardFrame {
 
     private void refreshAllDashboardState() {
         if (disposed) return;
-        if (refreshing) { refreshPending = true; return; }
+        if (refreshing || reloadingCurriculum) { refreshPending = true; return; }
         refreshing = true;
         syncStatus.setText("Actualizando tu progreso…");
         int offlineSolved = solvedChallengesCount;
@@ -2369,6 +2522,7 @@ public class DashboardFrame {
             if (homeView.isVisible()) loadHomeGoal();
             if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
             if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
+            if (curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
         });
         refresh.setOnFailed(e -> {
             refreshing = false;
@@ -2377,6 +2531,7 @@ public class DashboardFrame {
             if (!disposed) setConnectionState(connectionAvailable,
                     connectionAvailable ? "SIN SINCRONIZAR" : "SIN CONEXIÓN",
                     "No pudimos actualizar el progreso. Conservamos la última información disponible.", true);
+            if (!disposed && curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
         });
         startTask(refresh, "dashboard-refresh");
     }

@@ -18,7 +18,7 @@ import javafx.util.StringConverter;
 /** Editing fields are captured on the FX thread before any database or compilation work. */
 public final class ChallengeAuthoringPane extends VBox {
     private record CaseFields(TextArea input, TextArea output, CheckBox hidden, VBox row) { }
-    private record OptionFields(TextField text, RadioButton correct, HBox row) { }
+    private record OptionFields(TextField text, RadioButton correct, TextArea feedback, VBox row) { }
     private final User administrator;
     private final List<Lesson> lessons;
     private final Consumer<AuthoredChallenge> savedCallback;
@@ -39,6 +39,8 @@ public final class ChallengeAuthoringPane extends VBox {
     private final TextArea predictionSnippet = area(6);
     private final TextArea fragments = area(7);
     private final TextField correctOrder = new TextField();
+    private final List<TextArea> hints = List.of(area(2), area(2), area(2));
+    private final TextArea explanation = area(3);
     private final VBox orderingPanel = new VBox(10);
     private final VBox predictionPanel;
     private final Spinner<Integer> reward = new Spinner<>(0, 10000, 80);
@@ -49,11 +51,12 @@ public final class ChallengeAuthoringPane extends VBox {
     private final Label status = new Label();
     private int editingId;
     private int revision;
+    private List<String> savedFields = List.of();
 
     public ChallengeAuthoringPane(User administrator, List<Lesson> lessons, Consumer<AuthoredChallenge> savedCallback) {
         super(12);
         this.administrator = administrator;
-        this.lessons = List.copyOf(lessons);
+        this.lessons = new ArrayList<>(lessons);
         this.savedCallback = savedCallback;
         Label heading = new Label("Administrar retos");
         heading.getStyleClass().add("page-title");
@@ -113,13 +116,26 @@ public final class ChallengeAuthoringPane extends VBox {
                 ChallengeFrame.open(administrator, challenge, null, true);
             } catch (RuntimeException ex) { status.setText(ex.getMessage()); }
         });
+        VBox guidanceFields = new VBox(10);
+        for (int i = 0; i < hints.size(); i++) guidanceFields.getChildren().add(field("Pista " + (i + 1), hints.get(i)));
+        guidanceFields.getChildren().add(field("Explicación al resolver el reto", explanation));
+        TitledPane guidance = new TitledPane("Pistas y explicaciones de Lupo", guidanceFields);
+        guidance.setExpanded(false);
         form.getChildren().addAll(entries, new FlowPane(8, 8, load, fresh, duplicate, refresh),
                 field("Lección", lesson), field("Tipo", kind), field("Título", title), field("Enunciado", statement),
                 new FlowPane(12, 8, field("Dificultad", difficulty), field("XP", reward), field("Límite en segundos", timeout)),
-                codePanel, quizPanel, orderingPanel, new FlowPane(8, 8, draft, publish, archive, preview, versions));
+                codePanel, quizPanel, orderingPanel, guidance, new FlowPane(8, 8, draft, publish, archive, preview, versions));
         getChildren().addAll(heading, status, form);
         reset();
         refresh();
+    }
+
+    void updateLessons(List<Lesson> updated) {
+        int selectedId = lesson.getValue() == null ? 0 : lesson.getValue().getId();
+        lessons.clear(); lessons.addAll(updated);
+        lesson.getItems().setAll(updated);
+        lesson.setValue(updated.stream().filter(value -> value.getId() == selectedId).findFirst()
+                .orElse(updated.isEmpty() ? null : updated.getFirst()));
     }
 
     private static TextArea area(int rows) {
@@ -186,18 +202,25 @@ public final class ChallengeAuthoringPane extends VBox {
         }
         challenge.setDifficulty(difficulty.getValue());
         challenge.setRevision(revision);
+        challenge.setGuidance(new ChallengeGuidance(hints.stream().map(TextArea::getText).toList(), explanation.getText(),
+                challenge instanceof QuizChallenge ? optionFields.stream().map(value -> value.feedback().getText()).toList() : List.of()));
         AuthoredChallenge authored = new AuthoredChallenge(challenge, reference.getText(), state, revision);
         AuthoringService.validate(authored);
         return authored;
     }
 
     private void save(PublicationState state) {
+        save(state, () -> { });
+    }
+
+    private void save(PublicationState state, Runnable continuation) {
         try {
             AuthoredChallenge captured = capture(state);
             run(() -> new AuthoringService().save(administrator.getId(), captured), saved -> {
                 show(saved);
                 savedCallback.accept(saved);
                 status.setText("Guardado como " + saved.state() + ". Actualiza la lista para consultar los cambios.");
+                continuation.run();
             });
         } catch (RuntimeException ex) { status.setText(ex.getMessage()); }
     }
@@ -214,7 +237,9 @@ public final class ChallengeAuthoringPane extends VBox {
         statement.setText(challenge.getDescription());
         difficulty.setValue(challenge.getDifficulty());
         reward.getValueFactory().setValue(challenge.getExpReward());
-        reference.setText(authored.referenceSolution());
+        reference.setText(java.util.Objects.requireNonNullElse(authored.referenceSolution(), ""));
+        for (int i = 0; i < hints.size(); i++) hints.get(i).setText(i < challenge.getGuidance().hints().size() ? challenge.getGuidance().hints().get(i) : "");
+        explanation.setText(challenge.getGuidance().explanation());
         cases.getChildren().clear();
         caseFields.clear();
         options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
@@ -224,6 +249,8 @@ public final class ChallengeAuthoringPane extends VBox {
             for (TestCase test : code.getTestCases()) addCase(test.getInput(), test.getExpectedOutput(), test.isHidden());
         } else if (challenge instanceof QuizChallenge quiz) {
             for (String option : quiz.getOptions()) addOption(option, option.equals(quiz.getCorrectAnswer()));
+            for (int i = 0; i < optionFields.size(); i++) optionFields.get(i).feedback().setText(
+                    i < challenge.getGuidance().optionFeedback().size() ? challenge.getGuidance().optionFeedback().get(i) : "");
             if (quiz instanceof OutputPredictionChallenge prediction) predictionSnippet.setText(prediction.getCodeSnippet());
         } else if (challenge instanceof CodeOrderingChallenge ordering) {
             fragments.setText(String.join("\n", ordering.getFragments()));
@@ -231,6 +258,7 @@ public final class ChallengeAuthoringPane extends VBox {
         }
         updateKind();
         status.setText("Editando " + authored.state() + " · revisión " + revision);
+        savedFields = currentFields();
     }
 
     private void reset() {
@@ -241,12 +269,42 @@ public final class ChallengeAuthoringPane extends VBox {
         kind.setValue("Código");
         title.clear(); statement.clear(); template.clear(); reference.clear();
         predictionSnippet.clear(); fragments.clear(); correctOrder.clear();
+        hints.forEach(TextArea::clear);
+        explanation.clear();
         cases.getChildren().clear(); caseFields.clear();
         addCase("", "", false);
         options.getChildren().clear(); optionFields.clear(); correctOption.getToggles().clear();
         addOption("", true); addOption("", false);
         updateKind();
         status.setText("Completa la plantilla y la solución de referencia en sus campos respectivos.");
+        savedFields = currentFields();
+    }
+
+    private List<String> currentFields() {
+        List<String> fields = new ArrayList<>(List.of(Integer.toString(editingId),
+                Integer.toString(lesson.getValue() == null ? 0 : lesson.getValue().getId()), kind.getValue(),
+                title.getText(), statement.getText(), template.getText(), reference.getText(), predictionSnippet.getText(),
+                fragments.getText(), correctOrder.getText(), difficulty.getValue().name(),
+                reward.getValue().toString(), timeout.getValue().toString()));
+        for (CaseFields value : caseFields) {
+            fields.add(value.input().getText()); fields.add(value.output().getText());
+            fields.add(Boolean.toString(value.hidden().isSelected()));
+        }
+        for (OptionFields value : optionFields) {
+            fields.add(value.text().getText()); fields.add(Boolean.toString(value.correct().isSelected()));
+            fields.add(value.feedback().getText());
+        }
+        hints.forEach(hint -> fields.add(hint.getText()));
+        fields.add(explanation.getText());
+        return List.copyOf(fields);
+    }
+
+    void requestLeave(javafx.stage.Window owner, Runnable continuation) {
+        if (form.isDisabled()) { UnsavedChangesDialog.showBusy(owner); return; }
+        if (currentFields().equals(savedFields)) { continuation.run(); return; }
+        ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar los cambios del reto como borrador?");
+        if (choice == UnsavedChangesDialog.SAVE) save(PublicationState.BORRADOR, continuation);
+        else if (choice == UnsavedChangesDialog.DISCARD) continuation.run();
     }
 
     private boolean confirmReplacement() {
@@ -275,14 +333,16 @@ public final class ChallengeAuthoringPane extends VBox {
         RadioButton correct = new RadioButton("Correcta");
         correct.setToggleGroup(correctOption);
         correct.setSelected(selected);
-        HBox row = new HBox(8);
-        OptionFields fields = new OptionFields(value, correct, row);
+        TextArea feedback = area(2);
+        feedback.setPromptText("Explica por qué esta opción es correcta o qué concepto confunde.");
+        VBox row = new VBox(6);
+        OptionFields fields = new OptionFields(value, correct, feedback, row);
         Button remove = button("Quitar", () -> {
             correctOption.getToggles().remove(correct);
             optionFields.remove(fields);
             options.getChildren().remove(row);
         });
-        row.getChildren().addAll(value, correct, remove);
+        row.getChildren().addAll(new HBox(8, value, correct, remove), field("Explicación de esta opción", feedback));
         optionFields.add(fields); options.getChildren().add(row);
     }
 

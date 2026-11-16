@@ -7,6 +7,7 @@
 BEGIN
     FOR t IN (
         SELECT table_name FROM user_tables WHERE table_name IN (
+            'FINAL_MODULO',
             'VERSION_CASO_PRUEBA',
             'VERSION_RETO',
             'SOLUCION_REFERENCIA',

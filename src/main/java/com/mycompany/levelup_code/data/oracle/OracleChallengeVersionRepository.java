@@ -22,6 +22,15 @@ public final class OracleChallengeVersionRepository {
             statement.setInt(2, challengeId);
             statement.executeUpdate();
         }
+        if (OracleGuidanceRepository.installed(connection)) {
+            try (PreparedStatement statement = connection.prepareStatement("UPDATE Version_Reto v SET "
+                    + "guia_didactica=(SELECT guia_didactica FROM Retos WHERE id_reto=v.id_reto) "
+                    + "WHERE v.id_reto=? AND v.revision=(SELECT revision FROM Retos WHERE id_reto=?)")) {
+                statement.setInt(1, challengeId);
+                statement.setInt(2, challengeId);
+                statement.executeUpdate();
+            }
+        }
         try (PreparedStatement statement = connection.prepareStatement("UPDATE Version_Reto v SET "
                 + "codigo_inicial=(SELECT codigo_ejemplo FROM Reto_Prediccion WHERE id_reto=v.id_reto) "
                 + "WHERE v.id_reto=? AND v.revision=(SELECT revision FROM Retos WHERE id_reto=?) AND tipo_reto='PREDICCION'")) {
@@ -47,6 +56,7 @@ public final class OracleChallengeVersionRepository {
         try (Connection connection = DatabaseConnection.getConnection()) {
             OracleAuthoringRepository.requireAdministrator(connection, administratorId);
             List<Version> versions = new ArrayList<>();
+            boolean guidanceInstalled = OracleGuidanceRepository.installed(connection);
             try (PreparedStatement statement = connection.prepareStatement(
                     "SELECT * FROM Version_Reto WHERE id_reto=? ORDER BY revision DESC")) {
                 statement.setInt(1, challengeId);
@@ -57,6 +67,12 @@ public final class OracleChallengeVersionRepository {
                                 .append("\n\n").append(result.getString("enunciado"))
                                 .append("\n\nPlantilla\n").append(result.getString("codigo_inicial"))
                                 .append("\n\nReferencia\n").append(result.getString("solucion_referencia"));
+                        if (guidanceInstalled) {
+                            var guidance = ChallengeGuidanceCodec.decode(result.getString("guia_didactica"));
+                            for (int i = 0; i < guidance.hints().size(); i++) details.append("\n\nPista ").append(i + 1).append("\n").append(guidance.hints().get(i));
+                            details.append("\n\nExplicación\n").append(guidance.explanation());
+                            for (int i = 0; i < guidance.optionFeedback().size(); i++) details.append("\n\nExplicación de opción ").append(i + 1).append("\n").append(guidance.optionFeedback().get(i));
+                        }
                         String options = result.getString("opciones");
                         if (options != null) details.append("\n\nOpciones\n").append(String.join("\n", QuizOptionCodec.decode(options)))
                                 .append("\nRespuesta\n").append(result.getString("respuesta_correcta"));

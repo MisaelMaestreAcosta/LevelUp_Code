@@ -2,8 +2,13 @@ package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.app.AppContext;
 import com.mycompany.levelup_code.data.local.LabDraftStore;
+import com.mycompany.levelup_code.data.local.LabLibraryStore;
 import com.mycompany.levelup_code.domain.model.EditorPreferences;
 import com.mycompany.levelup_code.domain.model.User;
+import java.nio.file.Path;
+import java.util.Optional;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import javafx.concurrent.Task;
@@ -29,10 +34,20 @@ public final class CodingLabPane extends VBox {
     private boolean loading;
     private boolean busy;
     private boolean wide;
+    private final LabLibraryStore library = new LabLibraryStore();
+    private final ComboBox<LabLibraryStore.Entry> experiments = new ComboBox<>();
+    private final TextField experimentName = new TextField();
+    private String experimentId = "";
+    private final LabDraftStore recovery = new LabDraftStore(
+            Path.of(System.getProperty("user.home"), ".levelup-code", "laboratory-recovery"));
+    private final PauseTransition draftDelay = new PauseTransition(Duration.millis(900));
+    private final Object draftLock = new Object();
+    private volatile long draftRevision;
 
     public CodingLabPane(User user, boolean oracle) {
         getStyleClass().add("learning-workspace");
         identity = (oracle ? "oracle:" : "demo:") + user.getEmail();
+        draftDelay.setOnFinished(event -> saveRecovery());
         EditorPreferences preferences = EditorPreferences.forUser(user.getId());
         activeLanguage = switch (preferences.language()) {
             case "PYTHON" -> "Python";
@@ -74,16 +89,39 @@ public final class CodingLabPane extends VBox {
         output.getStyleClass().add("console-output");
         code.textProperty().addListener((observable, old, value) -> { if (!loading) setDirty(true); });
         input.textProperty().addListener((observable, old, value) -> { if (!loading) setDirty(true); });
+        experimentName.setPromptText("Nombre del experimento");
+        experimentName.setTextFormatter(new TextFormatter<String>(change -> change.getControlNewText().length() <= 100 ? change : null));
+        experimentName.textProperty().addListener((observable, old, value) -> { if (!loading) setDirty(true); });
+        experiments.setPromptText("Mis experimentos guardados");
+        experiments.setPrefWidth(260);
+        experiments.setAccessibleText("Experimentos guardados del lenguaje seleccionado");
+        Button open = WorkspaceUi.button("Abrir", "btn-secondary", null);
+        open.setOnAction(event -> openExperiment());
+        Button fresh = WorkspaceUi.button("Nuevo", "btn-secondary", null);
+        fresh.setOnAction(event -> requestLeave(() -> {
+            if (!removeRecovery()) return;
+            replaceExperiment(new LabDraftStore.Experiment(template(), ""));
+            experiments.setValue(null);
+            setDirty(true);
+        }));
+        Button delete = WorkspaceUi.button("Eliminar", "btn-danger", null);
+        delete.disableProperty().bind(experiments.valueProperty().isNull());
+        delete.setOnAction(event -> deleteExperiment());
+        Button export = WorkspaceUi.button("Exportar código", "btn-secondary", null);
+        export.setOnAction(event -> exportCode());
         language.valueProperty().addListener((observable, old, value) -> {
             if (loading || value == null || value.equals(activeLanguage)) return;
-            if (busy || !confirmReplacement()) {
+            loading = true;
+            language.setValue(activeLanguage);
+            loading = false;
+            requestLeave(() -> {
+                if (!removeRecovery()) return;
+                activeLanguage = value;
                 loading = true;
-                language.setValue(activeLanguage);
+                language.setValue(value);
                 loading = false;
-                return;
-            }
-            activeLanguage = value;
-            restore();
+                restore();
+            });
         });
 
         Button run = WorkspaceUi.button("Ejecutar", "btn-primary", Theme.IconKind.PLAY);
@@ -94,11 +132,12 @@ public final class CodingLabPane extends VBox {
         save.setOnAction(event -> save());
         Button template = WorkspaceUi.button("Restablecer plantilla", "btn-secondary", null);
         template.setOnAction(event -> {
-            if (confirmReplacement()) {
+            requestLeave(() -> {
+                if (!removeRecovery()) return;
                 replace(template(), "");
                 setDirty(true);
                 WorkspaceUi.status(status, "Plantilla restablecida. Guarda para conservarla en este equipo.", "");
-            }
+            });
         });
         FlowPane toolbar = new FlowPane(10, 10, language, run, save, template);
         toolbar.getStyleClass().add("workspace-toolbar");
@@ -107,7 +146,8 @@ public final class CodingLabPane extends VBox {
         HBox editorHeader = new HBox(10, Theme.createIcon(Theme.IconKind.TERMINAL, 18, Theme.HEX_INDIGO),
                 WorkspaceUi.label("Editor", "editor-heading"), spacer, savedState);
         editorHeader.setAlignment(Pos.CENTER_LEFT);
-        VBox editor = new VBox(12, toolbar, editorHeader, code, executionMode,
+        FlowPane libraryBar = new FlowPane(10, 10, experiments, open, fresh, delete, export);
+        VBox editor = new VBox(12, libraryBar, WorkspaceUi.field("Nombre", experimentName), toolbar, editorHeader, code, executionMode,
                 WorkspaceUi.label("Ctrl+Enter para ejecutar · Ctrl+S para guardar", "muted-text"));
         editor.getStyleClass().add("surface-card");
 
@@ -148,19 +188,35 @@ public final class CodingLabPane extends VBox {
 
     private void setDirty(boolean value) {
         dirty = value;
+        draftRevision++;
+        if (value) draftDelay.playFromStart();
+        else draftDelay.stop();
         savedState.setText(value ? "Cambios sin guardar" : "Sin cambios pendientes");
     }
 
-    private void save() {
+    private void save() { save(() -> { }); }
+
+    private void save(Runnable continuation) {
         if (busy) return;
         String selected = activeLanguage;
-        LabDraftStore.Experiment experiment = new LabDraftStore.Experiment(code.getText(), input.getText());
+        if (experimentName.getText().isBlank()) {
+            WorkspaceUi.status(status, "Ponle un nombre al experimento para guardarlo.", "status-error");
+            experimentName.requestFocus();
+            return;
+        }
+        if (experimentId.isEmpty()) experimentId = java.util.UUID.randomUUID().toString();
+        LabDraftStore.Experiment experiment = captureExperiment();
         background(() -> {
+            library.save(identity, selected, experiment);
             store.save(identity, selected, experiment);
-            return true;
-        }, ignored -> {
+            return library.list(identity, selected);
+        }, entries -> {
+            experiments.getItems().setAll(entries);
+            selectExperiment(experimentId);
             setDirty(false);
+            if (!removeRecovery()) return;
             WorkspaceUi.status(status, "Experimento guardado en este equipo.", "status-success");
+            continuation.run();
         });
     }
 
@@ -170,13 +226,94 @@ public final class CodingLabPane extends VBox {
         executionMode.setText("Java".equals(selected)
                 ? "Java · Ejecución local · Método solve(String input) · Límite de 3 segundos"
                 : selected + " · Ejecución simulada de demostración");
-        background(() -> store.load(identity, selected), saved -> {
-            replace(saved.map(LabDraftStore.Experiment::code).orElseGet(this::template),
-                    saved.map(LabDraftStore.Experiment::input).orElse(""));
-            WorkspaceUi.status(status, saved.isPresent()
-                    ? "Experimento recuperado de este equipo."
-                    : "Tu experimento se conservará cuando pulses Guardar.", "");
+        background(() -> new RestoredExperiment(store.load(identity, selected), recovery.load(identity, selected), library.list(identity, selected)), restored -> {
+            Optional<LabDraftStore.Experiment> saved = restored.recovery().or(() -> restored.saved());
+            replaceExperiment(saved.orElseGet(() -> new LabDraftStore.Experiment(template(), "")));
+            experiments.getItems().setAll(restored.entries());
+            selectExperiment(experimentId);
+            if (restored.recovery().isPresent()) {
+                setDirty(true);
+                WorkspaceUi.status(status, "Recuperamos tus cambios pendientes. Guarda cuando quieras conservar esta versión.", "");
+            } else {
+                WorkspaceUi.status(status, saved.isPresent()
+                        ? "Experimento recuperado de este equipo."
+                        : "Tu experimento se conservará cuando pulses Guardar.", "");
+            }
         });
+    }
+
+    private record RestoredExperiment(Optional<LabDraftStore.Experiment> saved,
+            Optional<LabDraftStore.Experiment> recovery, java.util.List<LabLibraryStore.Entry> entries) { }
+
+    private LabDraftStore.Experiment captureExperiment() {
+        return new LabDraftStore.Experiment(code.getText(), input.getText(), experimentId, experimentName.getText());
+    }
+
+    private void replaceExperiment(LabDraftStore.Experiment experiment) {
+        replace(experiment.code(), experiment.input());
+        loading = true;
+        experimentId = experiment.libraryId();
+        experimentName.setText(experiment.name());
+        loading = false;
+    }
+
+    private void selectExperiment(String id) {
+        experiments.setValue(experiments.getItems().stream().filter(entry -> entry.id().equals(id)).findFirst().orElse(null));
+    }
+
+    private void openExperiment() {
+        var selected = experiments.getValue();
+        if (selected == null) return;
+        requestLeave(() -> {
+            String selectedLanguage = activeLanguage;
+            background(() -> {
+                var experiment = library.load(identity, selectedLanguage, selected.id());
+                store.save(identity, selectedLanguage, experiment);
+                return experiment;
+            }, experiment -> {
+                if (removeRecovery()) {
+                    replaceExperiment(experiment);
+                    WorkspaceUi.status(status, "Experimento abierto. Puedes editarlo y guardar los cambios.", "");
+                }
+            });
+        });
+    }
+
+    private void deleteExperiment() {
+        var selected = experiments.getValue();
+        if (selected == null) return;
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "¿Eliminar «" + selected.name() + "» de este equipo?", ButtonType.OK, ButtonType.CANCEL);
+        confirm.initOwner(getScene().getWindow());
+        Theme.applyCss(confirm.getDialogPane().getScene());
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        String selectedLanguage = activeLanguage;
+        boolean deletingCurrent = selected.id().equals(experimentId);
+        background(() -> {
+            library.delete(identity, selectedLanguage, selected.id());
+            if (deletingCurrent) store.remove(identity, selectedLanguage);
+            return library.list(identity, selectedLanguage);
+        }, entries -> {
+            experiments.getItems().setAll(entries);
+            if (deletingCurrent) { experimentId = ""; setDirty(true); }
+            WorkspaceUi.status(status, "Experimento eliminado. Puedes guardar el código abierto como un nuevo trabajo.", "status-success");
+        });
+    }
+
+    private void exportCode() {
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        String extension = switch (activeLanguage) { case "Python" -> "py"; case "C++" -> "cpp"; default -> "java"; };
+        String filename = experimentName.getText().replaceAll("[^\\p{L}\\p{N}_-]", "_");
+        if ("Java".equals(activeLanguage)) {
+            var match = java.util.regex.Pattern.compile("public\\s+class\\s+([A-Za-z_][A-Za-z0-9_]*)").matcher(code.getText());
+            if (match.find()) filename = match.group(1);
+        }
+        chooser.setInitialFileName((filename.isBlank() ? "Experimento" : filename) + "." + extension);
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Código " + activeLanguage, "*." + extension));
+        java.io.File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) return;
+        String source = code.getText();
+        background(() -> java.nio.file.Files.writeString(file.toPath(), source, java.nio.charset.StandardCharsets.UTF_8),
+                ignored -> WorkspaceUi.status(status, "Código exportado a «" + file.getName() + "».", "status-success"));
     }
 
     private void replace(String source, String data) {
@@ -188,13 +325,49 @@ public final class CodingLabPane extends VBox {
         setDirty(false);
     }
 
-    private boolean confirmReplacement() {
-        if (!dirty) return true;
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                "Hay cambios sin guardar. ¿Reemplazar el experimento?", ButtonType.OK, ButtonType.CANCEL);
-        confirm.initOwner(getScene().getWindow());
-        Theme.applyCss(confirm.getDialogPane().getScene());
-        return confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+    private void requestLeave(Runnable continuation) { requestLeave(getScene().getWindow(), continuation); }
+
+    void requestLeave(javafx.stage.Window owner, Runnable continuation) {
+        if (busy) {
+            UnsavedChangesDialog.showBusy(owner);
+            return;
+        }
+        if (!dirty) { continuation.run(); return; }
+        ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar el experimento de " + activeLanguage + " en este equipo?");
+        if (choice == UnsavedChangesDialog.SAVE) save(continuation);
+        else if (choice == UnsavedChangesDialog.DISCARD) continuation.run();
+    }
+
+    private void saveRecovery() {
+        if (!dirty) return;
+        String selected = activeLanguage;
+        var experiment = captureExperiment();
+        long revision = draftRevision;
+        Thread writer = new Thread(() -> {
+            try {
+                synchronized (draftLock) {
+                    if (revision != draftRevision) return;
+                    recovery.save(identity, selected, experiment);
+                }
+            } catch (java.io.IOException ex) {
+                javafx.application.Platform.runLater(() -> WorkspaceUi.status(status,
+                        "No se pudo guardar la copia de recuperación. Guarda tu experimento.", "status-error"));
+            }
+        }, "laboratory-recovery");
+        writer.setDaemon(true);
+        writer.start();
+    }
+
+    boolean removeRecovery() {
+        draftDelay.stop();
+        draftRevision++;
+        try {
+            synchronized (draftLock) { recovery.remove(identity, activeLanguage); }
+            return true;
+        } catch (java.io.IOException ex) {
+            WorkspaceUi.status(status, "No se pudo borrar la copia de recuperación. Vuelve a intentarlo.", "status-error");
+            return false;
+        }
     }
 
     private String template() {

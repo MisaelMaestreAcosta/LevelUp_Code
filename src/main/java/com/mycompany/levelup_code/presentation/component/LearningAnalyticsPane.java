@@ -1,6 +1,7 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.data.oracle.OracleLearningAnalyticsRepository;
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
 import com.mycompany.levelup_code.domain.model.LearningAnalytics;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.app.AppContext;
@@ -236,7 +237,12 @@ public final class LearningAnalyticsPane extends VBox {
         WorkspaceUi.status(status, "Consultando tu actividad…", "");
         Task<LearningAnalytics> task = new Task<>() {
             @Override protected LearningAnalytics call() throws Exception {
-                return new OracleLearningAnalyticsRepository().load(userId);
+                try {
+                    return new OracleLearningAnalyticsRepository().load(userId);
+                } catch (java.sql.SQLException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
             }
         };
         task.setOnSucceeded(event -> {
@@ -245,7 +251,7 @@ public final class LearningAnalyticsPane extends VBox {
         });
         task.setOnFailed(event -> {
             refresh.setDisable(false);
-            WorkspaceUi.status(status, "No se pudo actualizar el progreso. Comprueba la conexión y pulsa Actualizar.", "status-error");
+            WorkspaceUi.status(status, "No se pudo actualizar el progreso. " + task.getMessage(), "status-error");
         });
         Thread thread = new Thread(task, "learning-analytics");
         thread.setDaemon(true);

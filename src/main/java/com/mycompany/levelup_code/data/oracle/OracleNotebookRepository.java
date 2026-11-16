@@ -34,7 +34,7 @@ public final class OracleNotebookRepository {
         return new Notebook(notes, favorites);
     }
 
-    public void save(int userId, Note note) throws SQLException {
+    public Note save(int userId, Note note) throws SQLException {
         if (note.title() == null || note.title().isBlank() || note.title().length()>100
                 || note.content() == null || note.content().isBlank()) {
             throw new IllegalArgumentException("Escribe un título de hasta 100 caracteres y el contenido de la nota.");
@@ -43,11 +43,25 @@ public final class OracleNotebookRepository {
         String sql = updating
                 ? "UPDATE Nota_Estudio SET id_reto=?,titulo=?,contenido=?,fecha_edicion=SYSTIMESTAMP WHERE id_usuario=? AND id_nota=?"
                 : "INSERT INTO Nota_Estudio(id_reto,titulo,contenido,id_usuario) VALUES(?,?,?,?)";
-        try (Connection conn = DatabaseConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-            if (note.challengeId()==null) stmt.setNull(1, Types.NUMERIC); else stmt.setInt(1,note.challengeId());
-            stmt.setString(2,note.title().strip()); stmt.setString(3,note.content()); stmt.setInt(4,userId);
-            if (updating) stmt.setInt(5,note.id());
-            if (stmt.executeUpdate()!=1) throw new SQLException("La nota ya no existe.");
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql, new String[] { "ID_NOTA" })) {
+                if (note.challengeId()==null) stmt.setNull(1, Types.NUMERIC); else stmt.setInt(1,note.challengeId());
+                stmt.setString(2,note.title().strip()); stmt.setString(3,note.content()); stmt.setInt(4,userId);
+                if (updating) stmt.setInt(5,note.id());
+                if (stmt.executeUpdate()!=1) throw new SQLException("La nota ya no existe.");
+                int id = note.id();
+                if (!updating) {
+                    try (ResultSet keys = stmt.getGeneratedKeys()) {
+                        if (!keys.next()) throw new SQLException("No se pudo identificar la nota guardada.");
+                        id = keys.getInt(1);
+                    }
+                }
+                conn.commit();
+                return new Note(id, note.challengeId(), note.title().strip(), note.content());
+            } finally {
+                conn.rollback();
+            }
         }
     }
 
@@ -66,6 +80,15 @@ public final class OracleNotebookRepository {
                 : "DELETE FROM Reto_Favorito WHERE id_usuario=? AND id_reto=?";
         try (Connection conn = DatabaseConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1,userId); stmt.setInt(2,challengeId); stmt.executeUpdate();
+        }
+    }
+
+    public boolean isFavorite(int userId, int challengeId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM Reto_Favorito WHERE id_usuario=? AND id_reto=?")) {
+            statement.setInt(1, userId);
+            statement.setInt(2, challengeId);
+            try (ResultSet result = statement.executeQuery()) { return result.next(); }
         }
     }
 }

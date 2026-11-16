@@ -139,6 +139,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
     private Button btnNextChallenge;
     private Button btnSubmit;
     private Button btnHint;
+    private ChallengeNotebookActions notebookActions;
 
     // Editor de código y numeración de líneas
     private CodeEditor txtEditor;
@@ -187,6 +188,10 @@ public class ChallengeFrame extends Stage implements LearningPage {
     private final boolean preview;
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview) {
+        this(user, challenge, onSolvedCallback, preview, false);
+    }
+
+    ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview, boolean singleChallenge) {
         this.preview = preview;
         this.currentUser = user;
         editorFontSize = EditorPreferences.forUser(user == null ? 0 : user.getId()).fontSize();
@@ -194,7 +199,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
         this.onSolvedCallback = onSolvedCallback;
         this.availableChallenges = new ArrayList<>();
         if (challenge != null) {
-            if (challenge.getLesson() != null && challenge.getLesson().getChallenges() != null
+            if (singleChallenge) {
+                this.availableChallenges.add(challenge);
+            } else if (challenge.getLesson() != null && challenge.getLesson().getChallenges() != null
                     && !challenge.getLesson().getChallenges().isEmpty()) {
                 this.availableChallenges.addAll(challenge.getLesson().getChallenges().stream()
                         .filter(value -> !(value instanceof CodeOrderingChallenge)).toList());
@@ -384,6 +391,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
             topRow.getChildren().add(history);
         }
         headerCard.getChildren().addAll(lblChallengeTitle, topRow);
+        notebookActions = new ChallengeNotebookActions(currentUser, preview, () ->
+                activeChallenge instanceof CodeChallenge ? txtEditor.getText() : "");
+        headerCard.getChildren().add(notebookActions);
 
         switcherButtons.clear();
         if (availableChallenges.size() > 1) {
@@ -806,6 +816,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
         rememberDraft();
         viewLoaded = false;
         this.activeChallenge = challenge;
+        notebookActions.setChallenge(challenge);
         Draft draft = drafts.get(challenge);
         boolean outdatedDraftSkipped = false;
         if (draft == null && canPersistDraft(challenge)) {
@@ -1210,55 +1221,14 @@ public class ChallengeFrame extends Stage implements LearningPage {
     }
 
     private void showPedagogicalHint() {
-        if (busy) {
-            return;
-        }
-        String title = activeChallenge != null && activeChallenge.getTitle() != null
-                ? activeChallenge.getTitle().toLowerCase(Locale.ROOT)
-                : "";
+        if (busy || activeChallenge == null) return;
         int stage = Math.min(3, hintStages.getOrDefault(activeChallenge, 0) + 1);
         hintStages.put(activeChallenge, stage);
         btnHint.setText(stage >= 3 ? "Pistas completas" : "Ver pista " + (stage + 1) + " de 3");
-        String hint;
-        if (activeChallenge instanceof QuizChallenge) {
-            String lessonTheory = (activeChallenge.getLesson() != null && activeChallenge.getLesson().getTheory() != null)
-                    ? activeChallenge.getLesson().getTheory()
-                    : "Revisa el concepto clave de la lección antes de elegir una opción.";
-            hint = stage == 1
-                    ? "> [PISTA 1 · CONCEPTO]\n> Identifica la definición principal que pregunta el enunciado antes de mirar las opciones."
-                    : stage == 2
-                            ? "> [PISTA 2 · DESCARTE]\n> Compara cada opción con el contrato explicado en la lección y descarta las que usan afirmaciones absolutas o conceptos distintos."
-                            : "> [PISTA 3 · REPASO]\n" + lessonTheory;
-        } else if (title.contains("binaria")) {
-            hint = "> [PISTA DIDÁCTICA — BÚSQUEDA BINARIA]\n"
-                    + "> 1. Mantén dos límites: low = 0 y high = n - 1 mientras low <= high.\n"
-                    + "> 2. Calcula el punto medio evitando overflow: mid = low + (high - low) / 2 (o // 2 en Python).\n"
-                    + "> 3. Si arr[mid] == target retorna mid; si es menor incrementa low = mid + 1; si no, high = mid - 1.";
-        } else if (title.contains("palíndromo") || title.contains("palindromo") || title.contains("punteros") || title.contains("slicing")) {
-            hint = "> [PISTA DIDÁCTICA — PALÍNDROMOS Y SECUENCIAS]\n"
-                    + "> 1. Normaliza el texto a minúsculas antes de comparar.\n"
-                    + "> 2. Compara extremos simétricos (left y right) avanzando hacia el centro, o invierte la secuencia.";
-        } else if (title.contains("pares")) {
-            hint = "> [PISTA DIDÁCTICA — FILTRADO Y ACUMULACIÓN]\n"
-                    + "> 1. Inicializa un acumulador total = 0.\n"
-                    + "> 2. Recorre cada número n y verifica la condición de paridad (n % 2 == 0) antes de sumarlo.";
-        } else if (title.contains("duplicado") || title.contains("hash")) {
-            hint = "> [PISTA DIDÁCTICA — CONJUNTOS HASH EN O(n)]\n"
-                    + "> 1. Crea un conjunto hash vacío (HashSet / set / std::unordered_set).\n"
-                    + "> 2. Al recorrer la secuencia, si el elemento ya está en el conjunto, retórnalo inmediatamente; si termina el ciclo, retorna -1.";
-        } else {
-            hint = "> [PISTA DIDÁCTICA — POLIMORFISMO Y CONTRATOS]\n"
-                    + "> 1. Normaliza la cadena de entrada ignorando diferencias entre mayúsculas y minúsculas.\n"
-                    + "> 2. Retorna exactamente la cadena esperada por cada caso de prueba visible y oculto.";
-        }
-        if (!(activeChallenge instanceof QuizChallenge)) {
-            String[] lines = hint.split("\n");
-            int visibleLines = Math.min(lines.length, stage + 1);
-            hint = String.join("\n", Arrays.copyOf(lines, visibleLines));
-        }
-        txtConsoleOutput.setText(hint);
+        txtConsoleOutput.setText("Pista " + stage + " de Lupo\n\n"
+                + activeChallenge.getGuidance().hint(stage, activeChallenge));
         consolePane.setExpanded(true);
-        showFeedback("Revisa la pista de Lupo en la consola y prueba tu respuesta paso a paso.", "body-text");
+        showFeedback("Revisa la pista de Lupo y prueba tu respuesta paso a paso.", "body-text");
         Theme.playPulse(txtConsoleOutput);
     }
 
@@ -1918,6 +1888,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
                     summary.getPassedCount(),
                     summary.getTotalCount()));
 
+            if (summary.isAllPassed() && !activeChallenge.getGuidance().explanation().isBlank()) {
+                log.append("\nLupo\n").append(activeChallenge.getGuidance().explanation()).append("\n");
+            }
             handleEvaluationOutcome(summary.isAllPassed(), summary.isSandboxedExecution(), log.toString(),
                     result.persistence(), submission.practiceOnly(), submission.user() == null ? 1 : submission.user().level());
 
@@ -1938,9 +1911,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
                     : "> Respuesta incorrecta ✗\n> Opción elegida: \"" + chosenOption + "\"\n> Usa 'Ver Pista Conceptual' o revisa la teoría de la lección.";
 
             lblCaseInspectorTitle.setText(correct ? "Veredicto Conceptual: CORRECTO ✓" : "Veredicto Conceptual: INCORRECTO ✗");
-            lblCaseInspectorDetail.setText(correct
-                    ? "Has identificado correctamente el fundamento técnico evaluado en este reto."
-                    : "La opción seleccionada no corresponde al contrato esperado. Revisa la pista conceptual e inténtalo de nuevo.");
+            String explanation = activeChallenge.getGuidance().feedback(submission.quizIndex(), correct);
+            lblCaseInspectorDetail.setText(explanation);
+            msg += "\n\nLupo\n" + explanation;
 
             handleEvaluationOutcome(correct, true, msg + "\n", result.persistence(), submission.practiceOnly(),
                     submission.user() == null ? 1 : submission.user().level());
@@ -2038,6 +2011,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
             }
         }
         updateCoachAction();
+        if (navigator != null) navigator.evaluated(new com.mycompany.levelup_code.domain.model.PracticeSession.Outcome(
+                activeChallenge.getId(), effectiveSuccess, persistence.savedToOracle,
+                persistence.savedToOracle && persistence.attempt != null ? persistence.attempt.getEarnedExperience() : 0));
         if (onSolvedCallback != null) {
             try {
                 onSolvedCallback.run();

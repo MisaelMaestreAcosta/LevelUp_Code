@@ -1,6 +1,10 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.data.oracle.OracleNotebookRepository;
+import com.mycompany.levelup_code.data.connection.DatabaseDiagnostics;
+import com.mycompany.levelup_code.data.local.NotebookDraftStore;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
 import com.mycompany.levelup_code.data.oracle.OracleNotebookRepository.Note;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.User;
@@ -43,6 +47,11 @@ public final class NotebookPane extends VBox {
     private boolean changingSelection;
     private boolean loadingEditor;
     private boolean wide;
+    private final NotebookDraftStore draftStore = new NotebookDraftStore();
+    private final PauseTransition draftDelay = new PauseTransition(Duration.millis(900));
+    private final Object draftLock = new Object();
+    private volatile long draftRevision;
+    private final String draftIdentity;
 
     public NotebookPane(User user, boolean oracle, List<Challenge> challenges, Runnable callback) {
         this(user, oracle, challenges, callback, challenge -> ChallengeFrame.open(user, challenge, callback));
@@ -51,7 +60,9 @@ public final class NotebookPane extends VBox {
     NotebookPane(User user, boolean oracle, List<Challenge> challenges, Runnable callback, Consumer<Challenge> openChallenge) {
         this.user = user;
         this.userId = user.getId();
-        this.challenges = challenges;
+        this.draftIdentity = (oracle ? "oracle:" : "demo:") + user.getEmail();
+        draftDelay.setOnFinished(event -> saveRecovery());
+        this.challenges = new ArrayList<>(challenges);
         this.callback = callback;
         this.openChallenge = openChallenge;
         getStyleClass().add("learning-workspace");
@@ -100,20 +111,23 @@ public final class NotebookPane extends VBox {
         });
         notes.getSelectionModel().selectedItemProperty().addListener((observable, old, note) -> {
             if (changingSelection || note == null) return;
-            if (!confirmReplacement()) {
+            changingSelection = true;
+            notes.getSelectionModel().select(old);
+            changingSelection = false;
+            requestLeave(() -> {
+                if (!removeRecovery()) return;
                 changingSelection = true;
-                notes.getSelectionModel().select(old);
+                notes.getSelectionModel().select(note);
                 changingSelection = false;
-                return;
-            }
-            edit(note);
+                edit(note);
+            });
         });
         search.setPromptText("Buscar en tus notas");
         search.setAccessibleText("Buscar notas por título o contenido");
         search.textProperty().addListener((observable, old, value) -> filterNotes());
 
         Button create = WorkspaceUi.button("Nueva nota", "btn-secondary", Theme.IconKind.NOTE);
-        create.setOnAction(event -> { if (confirmReplacement()) clear(); });
+        create.setOnAction(event -> requestLeave(() -> { if (removeRecovery()) clear(); }));
         HBox libraryHeader = new HBox(10, noteCount, create);
         libraryHeader.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(noteCount, Priority.ALWAYS);
@@ -188,6 +202,7 @@ public final class NotebookPane extends VBox {
                 "Conserva tus apuntes y vuelve a los retos que quieres practicar.", refresh),
                 status, WorkspaceUi.scroll(controls));
         if (oracle) {
+            restoreRecovery();
             run(() -> repository.load(userId), this::show);
         } else {
             controls.setDisable(true);
@@ -197,16 +212,82 @@ public final class NotebookPane extends VBox {
     }
 
     private void markDirty() {
-        if (!loadingEditor) dirty = true;
+        if (!loadingEditor) {
+            dirty = true;
+            draftRevision++;
+            draftDelay.playFromStart();
+        }
     }
 
-    private boolean confirmReplacement() {
-        if (!dirty) return true;
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                "Tienes cambios sin guardar. ¿Descartarlos y abrir otra nota?", ButtonType.OK, ButtonType.CANCEL);
-        confirm.initOwner(getScene().getWindow());
-        Theme.applyCss(confirm.getDialogPane().getScene());
-        return confirm.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+    void refreshFromAccount() {
+        if (controls.isDisabled() || busy) return;
+        run(() -> repository.load(userId), this::show);
+    }
+
+    void updateChallenges(List<Challenge> updated) {
+        Integer relatedId = related.getValue() == null ? null : related.getValue().getId();
+        challenges.clear(); challenges.addAll(updated);
+        loadingEditor = true;
+        related.getItems().setAll(updated);
+        related.setValue(updated.stream().filter(challenge -> Objects.equals(challenge.getId(), relatedId)).findFirst().orElse(null));
+        loadingEditor = false;
+    }
+
+    private void requestLeave(Runnable continuation) { requestLeave(getScene().getWindow(), continuation); }
+
+    void requestLeave(javafx.stage.Window owner, Runnable continuation) {
+        if (busy) {
+            UnsavedChangesDialog.showBusy(owner);
+            return;
+        }
+        if (!dirty) { continuation.run(); return; }
+        ButtonType choice = UnsavedChangesDialog.choose(owner, "¿Guardar los cambios de tu nota en la cuenta?");
+        if (choice == UnsavedChangesDialog.SAVE) save(continuation);
+        else if (choice == UnsavedChangesDialog.DISCARD) continuation.run();
+    }
+
+    private Note captureNote() {
+        return new Note(editingNote == null ? 0 : editingNote.id(),
+                related.getValue() == null ? null : related.getValue().getId(), title.getText(), content.getText());
+    }
+
+    private void saveRecovery() {
+        if (!dirty) return;
+        Note note = captureNote();
+        long revision = draftRevision;
+        Thread writer = new Thread(() -> {
+            try {
+                synchronized (draftLock) {
+                    if (revision != draftRevision) return;
+                    draftStore.save(draftIdentity, note);
+                }
+            } catch (java.io.IOException ex) {
+                javafx.application.Platform.runLater(() -> WorkspaceUi.status(status,
+                        "No se pudo guardar la copia de recuperación. Guarda la nota en tu cuenta.", "status-error"));
+            }
+        }, "notebook-recovery");
+        writer.setDaemon(true);
+        writer.start();
+    }
+
+    private void restoreRecovery() {
+        try {
+            draftStore.load(draftIdentity).ifPresent(note -> { edit(note); dirty = true; });
+        } catch (java.io.IOException ex) {
+            WorkspaceUi.status(status, "No pudimos recuperar el borrador del cuaderno.", "status-error");
+        }
+    }
+
+    boolean removeRecovery() {
+        draftDelay.stop();
+        draftRevision++;
+        try {
+            synchronized (draftLock) { draftStore.remove(draftIdentity); }
+            return true;
+        } catch (java.io.IOException ex) {
+            WorkspaceUi.status(status, "No se pudo borrar la copia de recuperación. Vuelve a intentarlo.", "status-error");
+            return false;
+        }
     }
 
     private void edit(Note note) {
@@ -238,16 +319,19 @@ public final class NotebookPane extends VBox {
         title.requestFocus();
     }
 
-    private void save() {
-        Note note = new Note(editingNote == null ? 0 : editingNote.id(),
-                related.getValue() == null ? null : related.getValue().getId(), title.getText(), content.getText());
-        run(() -> {
-            repository.save(userId, note);
-            return repository.load(userId);
-        }, data -> {
-            show(data);
-            clear();
+    private void save() { save(() -> { }); }
+
+    private void save(Runnable continuation) {
+        Note note = captureNote();
+        run(() -> repository.save(userId, note), saved -> {
+            savedNotes.removeIf(existing -> existing.id() == saved.id());
+            savedNotes.addFirst(saved);
+            edit(saved);
+            noteCount.setText("Tus notas · " + savedNotes.size());
+            filterNotes();
+            if (!removeRecovery()) return;
             WorkspaceUi.status(status, "Nota guardada en tu cuenta.", "status-success");
+            continuation.run();
         });
     }
 
@@ -265,6 +349,7 @@ public final class NotebookPane extends VBox {
             }, data -> {
                 show(data);
                 clear();
+                removeRecovery();
                 WorkspaceUi.status(status, "Nota eliminada.", "status-success");
             });
         }
@@ -309,7 +394,7 @@ public final class NotebookPane extends VBox {
         if (favorites.getChildren().isEmpty()) {
             favorites.getChildren().add(WorkspaceUi.label("Asocia un reto a tu nota y añádelo a favoritos para encontrarlo aquí.", "muted-text"));
         }
-        WorkspaceUi.status(status, "", "");
+        WorkspaceUi.status(status, dirty ? "Borrador pendiente de guardar en tu cuenta. Puedes continuar editándolo." : "", "");
     }
 
     private <T> void run(Callable<T> action, Consumer<T> success) {
@@ -319,7 +404,13 @@ public final class NotebookPane extends VBox {
         refresh.setDisable(true);
         WorkspaceUi.status(status, "Actualizando tu cuaderno…", "");
         Task<T> task = new Task<>() {
-            @Override protected T call() throws Exception { return action.call(); }
+            @Override protected T call() throws Exception {
+                try { return action.call(); }
+                catch (java.sql.SQLException ex) {
+                    updateMessage(DatabaseDiagnostics.inspect().message());
+                    throw ex;
+                }
+            }
         };
         task.setOnSucceeded(event -> {
             busy = false;
@@ -333,7 +424,7 @@ public final class NotebookPane extends VBox {
             refresh.setDisable(false);
             String message = task.getException() instanceof IllegalArgumentException
                     ? task.getException().getMessage()
-                    : "No pudimos acceder al cuaderno. Comprueba la conexión y pulsa Actualizar. Tus campos se conservan. Si continúa, contacta con el administrador.";
+                    : "No pudimos acceder al cuaderno. " + task.getMessage();
             WorkspaceUi.status(status, message, "status-error");
         });
         Thread thread = new Thread(task, "student-notebook");

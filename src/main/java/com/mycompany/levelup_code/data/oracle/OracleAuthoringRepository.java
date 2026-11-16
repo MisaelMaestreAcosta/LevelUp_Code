@@ -132,6 +132,7 @@ public final class OracleAuthoringRepository {
                         }
                     }
                 }
+                OracleGuidanceRepository.save(connection, challenge);
                 OracleChallengeVersionRepository.snapshot(connection, challenge.getId(), administratorId);
                 connection.commit();
                 challenge.setRevision(revision);

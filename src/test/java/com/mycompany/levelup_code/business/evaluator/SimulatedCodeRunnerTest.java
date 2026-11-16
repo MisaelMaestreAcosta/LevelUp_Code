@@ -8,6 +8,7 @@ import com.mycompany.levelup_code.domain.model.Lesson;
 import com.mycompany.levelup_code.domain.model.QuizChallenge;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.presentation.controller.DemoSeedCatalog;
+import com.mycompany.levelup_code.presentation.controller.SeedChallengeContent;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -152,8 +153,12 @@ class SimulatedCodeRunnerTest {
                             assertEquals(3, cc.getTestCases().size(),
                                     "Cada reto de código debe tener 3 casos de prueba: " + cc.getTitle());
                             totalTestCases += cc.getTestCases().size();
+                            var content = SeedChallengeContent.forId(cc.getId());
+                            assertEquals(content.starter(), cc.getInitialTemplate());
+                            assertFalse(runner.runAndValidate(cc, content.starter()).isAllPassed(),
+                                    "La plantilla debe requerir trabajo del estudiante: " + cc.getTitle());
                             SimulatedCodeRunner.ExecutionSummary summary =
-                                    runner.runAndValidate(cc, cc.getInitialTemplate());
+                                    runner.runAndValidate(cc, content.reference());
                             assertTrue(summary.isAllPassed(),
                                     "El reto #" + cc.getId() + " (" + cc.getTitle() + ") falló validación: "
                                     + summary.getCaseOutcomes().stream()

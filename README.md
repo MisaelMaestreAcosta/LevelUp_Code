@@ -80,17 +80,29 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/01_schema.sql`](database/01_schema.sql) (crea las 18 tablas normalizadas)
    - [`database/02_seed.sql`](database/02_seed.sql) (catálogo limpio de despliegue: roles, lenguajes, módulos, lecciones, retos y logros)
    - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
-   - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
    - [`database/05_student_notebook.sql`](database/05_student_notebook.sql) (crea notas y retos favoritos por usuario)
    - [`database/06_learning_goals.sql`](database/06_learning_goals.sql) (crea metas personales)
    - [`database/07_user_preferences.sql`](database/07_user_preferences.sql) (crea preferencias del editor)
    - [`database/08_content_publication.sql`](database/08_content_publication.sql) (añade estados de publicación y soluciones de referencia)
    - [`database/09_content_versions.sql`](database/09_content_versions.sql) (conserva versiones del contenido y vincula intentos)
    - [`database/10_challenge_types.sql`](database/10_challenge_types.sql) (añade predicción, depuración y ordenamiento)
+   - [`database/12_seed_starter_templates.sql`](database/12_seed_starter_templates.sql) (separa las plantillas de las soluciones y conserva el historial)
+   - [`database/13_challenge_guidance.sql`](database/13_challenge_guidance.sql) (guarda pistas y explicaciones por versión del reto)
+   - [`database/14_module_finals.sql`](database/14_module_finals.sql) (añade un reto final de análisis de código por módulo)
+   - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
    En una base existente, aplica una vez los scripts 05–10 que falten y recompila
    `database/03_plsql_gamificacion.sql` para actualizar la gamificación y los reintentos idempotentes.
    Comprueba las tablas instaladas antes de ejecutar cada script de creación.
+
+   Para actualizar las plantillas de una instalación existente con los scripts 01–10
+   completos, ejecuta `database/12_seed_starter_templates.sql`. La migración conserva
+   los intentos y crea nuevas versiones de los retos originales que siguen intactos.
+   Se puede repetir y omite los retos editados. El script maestro ya la incluye.
+
+   Después de la migración 12, aplica en orden `13_challenge_guidance.sql` y
+   `14_module_finals.sql` para habilitar las guías editables y los retos finales.
+   Ambas se pueden repetir y conservan el historial. El script maestro las incluye.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:

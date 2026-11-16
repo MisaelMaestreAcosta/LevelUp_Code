@@ -65,7 +65,7 @@ public final class OracleLearningAnalyticsRepository {
 
     private java.util.List<LearningAnalytics.ReviewChallenge> loadReviewChallenges(Connection connection, int userId) throws SQLException {
         var challenges = new ArrayList<LearningAnalytics.ReviewChallenge>();
-        String sql = "SELECT r.id_reto,r.titulo,lg.nombre FROM "
+        String sql = "SELECT r.id_reto,r.titulo_reto,lg.nombre FROM "
                 + "(SELECT i.*,ROW_NUMBER() OVER (PARTITION BY i.id_reto ORDER BY i.fecha_intento DESC,i.id_intento DESC) posicion "
                 + "FROM Intentos i WHERE i.id_usuario=?) ultimo "
                 + "JOIN Retos r ON r.id_reto=ultimo.id_reto JOIN Lecciones le ON le.id_leccion=r.id_leccion "

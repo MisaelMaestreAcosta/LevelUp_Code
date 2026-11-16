@@ -9,7 +9,9 @@ import java.util.*;
 
 /** One experiment per account, mode and language, saved atomically on this computer. */
 public final class LabDraftStore {
-    public record Experiment(String code, String input) { }
+    public record Experiment(String code, String input, String libraryId, String name) {
+        public Experiment(String code, String input) { this(code, input, "", ""); }
+    }
     private final Path directory;
 
     public LabDraftStore() {
@@ -24,7 +26,8 @@ public final class LabDraftStore {
         if (Files.size(file) > 4_194_304) throw new IOException("Experimento demasiado grande.");
         Properties properties = new Properties();
         try (var input = Files.newInputStream(file)) { properties.load(input); }
-        return Optional.of(new Experiment(properties.getProperty("code", ""), properties.getProperty("input", "")));
+        return Optional.of(new Experiment(properties.getProperty("code", ""), properties.getProperty("input", ""),
+                properties.getProperty("libraryId", ""), properties.getProperty("name", "")));
     }
 
     public void save(String identity, String language, Experiment experiment) throws IOException {
@@ -38,6 +41,8 @@ public final class LabDraftStore {
             Properties properties = new Properties();
             properties.setProperty("code", experiment.code());
             properties.setProperty("input", experiment.input());
+            properties.setProperty("libraryId", experiment.libraryId());
+            properties.setProperty("name", experiment.name());
             try (var output = Files.newOutputStream(temporary)) { properties.store(output, "LevelUp laboratory"); }
             try {
                 Files.move(temporary, file(identity, language), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -45,6 +50,10 @@ public final class LabDraftStore {
                 Files.move(temporary, file(identity, language), StandardCopyOption.REPLACE_EXISTING);
             }
         } finally { Files.deleteIfExists(temporary); }
+    }
+
+    public void remove(String identity, String language) throws IOException {
+        Files.deleteIfExists(file(identity, language));
     }
 
     private Path file(String identity, String language) {
