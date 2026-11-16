@@ -151,6 +151,10 @@ public class DashboardFrame {
     private VBox comparatorView;
     private VBox achievementsView;
     private VBox adminView;
+    private ChallengeAuthoringPane challengeAuthoring;
+    private CurriculumAuthoringPane curriculumAuthoring;
+    private boolean reloadingCurriculum;
+    private boolean curriculumReloadPending;
 
     // Telemetría reactiva
     private Label lblLevelVal;
@@ -389,12 +393,16 @@ public class DashboardFrame {
     }
 
     private void loadDomainDataFromOracleOrSeed() {
+        applyCatalog(controller.loadLanguages());
+    }
+
+    private void applyCatalog(List<Language> languages) {
         javaLessons.clear();
         pythonLessons.clear();
         cppLessons.clear();
         allLessonsForAdmin.clear();
 
-        List<Language> languages = controller.loadLanguages();
+        javaLangModel = null; pythonLangModel = null; cppLangModel = null;
         for (Language lang : languages) {
             String name = lang.getName() != null ? lang.getName().toLowerCase(Locale.ROOT) : "";
             List<Lesson> targetList;
@@ -461,19 +469,29 @@ public class DashboardFrame {
         comparatorView = buildComparatorWorkspaceView();
         achievementsView = buildAchievementsWorkspaceView();
         if (currentUser != null && currentUser.isAdministrator()) {
-            adminView = oracleConnected ? new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
-                if (disposed) return;
-                Challenge challenge = saved.challenge();
-                for (Lesson lesson : allLessonsForAdmin) {
-                    lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
-                    if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
-                            && lesson.getId() == challenge.getLessonId()) {
-                        challenge.setLesson(lesson);
-                        lesson.addChallenge(challenge);
+            if (oracleConnected) {
+                challengeAuthoring = new ChallengeAuthoringPane(currentUser, allLessonsForAdmin, saved -> {
+                    if (disposed) return;
+                    Challenge challenge = saved.challenge();
+                    for (Lesson lesson : allLessonsForAdmin) {
+                        lesson.getChallenges().removeIf(existing -> existing.getId() == challenge.getId());
+                        if (saved.state() == com.mycompany.levelup_code.domain.enums.PublicationState.PUBLICADO
+                                && lesson.getId() == challenge.getLessonId()) {
+                            challenge.setLesson(lesson);
+                            lesson.addChallenge(challenge);
+                        }
                     }
-                }
-                refreshAllDashboardState();
-            }) : buildAdminCrudWorkspaceView();
+                    refreshAllDashboardState();
+                });
+                curriculumAuthoring = new CurriculumAuthoringPane(currentUser, this::reloadCurriculum);
+                javafx.scene.control.Tab challenges = new javafx.scene.control.Tab("Retos", challengeAuthoring);
+                javafx.scene.control.Tab curriculum = new javafx.scene.control.Tab("Módulos y lecciones", curriculumAuthoring);
+                challenges.setClosable(false); curriculum.setClosable(false);
+                javafx.scene.control.TabPane administration = new javafx.scene.control.TabPane(challenges, curriculum);
+                Button reloadCourses = WorkspaceUi.button("Actualizar cursos", "btn-secondary", Theme.IconKind.REFRESH);
+                reloadCourses.setOnAction(event -> reloadCurriculum());
+                adminView = new VBox(12, reloadCourses, administration);
+            } else adminView = buildAdminCrudWorkspaceView();
         }
 
         homeView = buildHomeWorkspace(topTelemetry);
@@ -732,7 +750,7 @@ public class DashboardFrame {
         navAchievementsBtn.setMaxWidth(Double.MAX_VALUE);
 
         if (currentUser != null && currentUser.isAdministrator()) {
-            navAdminBtn = new Button("Administrar retos");
+            navAdminBtn = new Button("Administración");
             navAdminBtn.getStyleClass().add("nav-btn");
             navAdminBtn.setGraphic(Theme.createIcon(Theme.IconKind.SHIELD, 16, Theme.HEX_GREEN));
             navAdminBtn.setGraphicTextGap(10);
@@ -832,8 +850,12 @@ public class DashboardFrame {
             continuation.run();
         };
         Runnable checkAuthoring = () -> {
-            if (adminView instanceof ChallengeAuthoringPane authoring) authoring.requestLeave(stage, finish);
-            else finish.run();
+            Runnable checkCurriculum = () -> {
+                if (curriculumAuthoring != null) curriculumAuthoring.requestLeave(stage, finish);
+                else finish.run();
+            };
+            if (challengeAuthoring != null) challengeAuthoring.requestLeave(stage, checkCurriculum);
+            else checkCurriculum.run();
         };
         Runnable checkLab = () -> {
             if (codingLab != null) codingLab.requestLeave(stage, checkAuthoring);
@@ -1685,9 +1707,7 @@ public class DashboardFrame {
         btnPractice.setOnAction(e -> {
             List<Lesson> targetList = "PYTHON".equals(activeLanguageKey) ? pythonLessons
                     : ("CPP".equals(activeLanguageKey) ? cppLessons : javaLessons);
-            Lesson l = (!targetList.isEmpty())
-                    ? targetList.get(Math.min(activeComparatorLessonIndex, targetList.size() - 1))
-                    : null;
+            Lesson l = DemoSeedCatalog.comparativeLesson(targetList, activeLanguageKey, activeComparatorLessonIndex);
             Challenge ch = (l != null && l.getChallenges() != null && !l.getChallenges().isEmpty())
                     ? l.getChallenges().get(0) : null;
             openChallenge(ch);
@@ -1767,9 +1787,7 @@ public class DashboardFrame {
         this.activeComparatorLessonIndex = lessonIdx;
         if (comparisonExercise != null) comparisonExercise.setTopic(lessonIdx);
 
-        Lesson sampleLesson = (!javaLessons.isEmpty() && lessonIdx < javaLessons.size())
-                ? javaLessons.get(lessonIdx)
-                : null;
+        Lesson sampleLesson = DemoSeedCatalog.comparativeLesson(javaLessons, "JAVA", lessonIdx);
         String[] javaSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "JAVA");
         String[] pySnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "PYTHON");
         String[] cppSnippet = DemoSeedCatalog.resolveComparativeSnippet(sampleLesson, "CPP");
@@ -2430,6 +2448,34 @@ public class DashboardFrame {
         refreshAllDashboardState();
     }
 
+    private void reloadCurriculum() {
+        if (disposed) return;
+        if (reloadingCurriculum || refreshing) { curriculumReloadPending = true; return; }
+        reloadingCurriculum = true;
+        Task<List<Language>> task = new Task<>() {
+            @Override protected List<Language> call() { return controller.loadLanguages(); }
+        };
+        task.setOnSucceeded(event -> {
+            reloadingCurriculum = false;
+            if (disposed) return;
+            applyCatalog(task.getValue());
+            challengeAuthoring.updateLessons(allLessonsForAdmin);
+            if (notebookPane != null) notebookPane.updateChallenges(allLessonsForAdmin.stream().flatMap(lesson -> lesson.getChallenges().stream()).toList());
+            populateLessonsForLanguage(activeLanguageKey);
+            renderPracticeCatalog();
+            refreshAllDashboardState();
+            if (curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
+        });
+        task.setOnFailed(event -> {
+            reloadingCurriculum = false;
+            LOGGER.log(Level.WARNING, "No se pudo actualizar el catálogo del curso", task.getException());
+            if (!disposed) {
+                syncStatus.setText("El contenido se guardó. Pulsa Actualizar cursos en Administración para volver a cargar la ruta.");
+            }
+        });
+        startTask(task, "curriculum-catalog-refresh");
+    }
+
     private void recordPracticeOutcome(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome outcome) {
         if (oracleConnected) return;
         demoChallengeProgress.merge(outcome.challengeId(), outcome.correct() ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED,
@@ -2449,7 +2495,7 @@ public class DashboardFrame {
 
     private void refreshAllDashboardState() {
         if (disposed) return;
-        if (refreshing) { refreshPending = true; return; }
+        if (refreshing || reloadingCurriculum) { refreshPending = true; return; }
         refreshing = true;
         syncStatus.setText("Actualizando tu progreso…");
         int offlineSolved = solvedChallengesCount;
@@ -2476,6 +2522,7 @@ public class DashboardFrame {
             if (homeView.isVisible()) loadHomeGoal();
             if (!oracleConnected) syncStatus.setText("Modo de prueba · Los cambios duran esta sesión.");
             if (refreshPending) { refreshPending = false; refreshAllDashboardState(); }
+            if (curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
         });
         refresh.setOnFailed(e -> {
             refreshing = false;
@@ -2484,6 +2531,7 @@ public class DashboardFrame {
             if (!disposed) setConnectionState(connectionAvailable,
                     connectionAvailable ? "SIN SINCRONIZAR" : "SIN CONEXIÓN",
                     "No pudimos actualizar el progreso. Conservamos la última información disponible.", true);
+            if (!disposed && curriculumReloadPending) { curriculumReloadPending = false; reloadCurriculum(); }
         });
         startTask(refresh, "dashboard-refresh");
     }

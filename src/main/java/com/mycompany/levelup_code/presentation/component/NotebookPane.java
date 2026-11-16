@@ -62,7 +62,7 @@ public final class NotebookPane extends VBox {
         this.userId = user.getId();
         this.draftIdentity = (oracle ? "oracle:" : "demo:") + user.getEmail();
         draftDelay.setOnFinished(event -> saveRecovery());
-        this.challenges = challenges;
+        this.challenges = new ArrayList<>(challenges);
         this.callback = callback;
         this.openChallenge = openChallenge;
         getStyleClass().add("learning-workspace");
@@ -222,6 +222,15 @@ public final class NotebookPane extends VBox {
     void refreshFromAccount() {
         if (controls.isDisabled() || busy) return;
         run(() -> repository.load(userId), this::show);
+    }
+
+    void updateChallenges(List<Challenge> updated) {
+        Integer relatedId = related.getValue() == null ? null : related.getValue().getId();
+        challenges.clear(); challenges.addAll(updated);
+        loadingEditor = true;
+        related.getItems().setAll(updated);
+        related.setValue(updated.stream().filter(challenge -> Objects.equals(challenge.getId(), relatedId)).findFirst().orElse(null));
+        loadingEditor = false;
     }
 
     private void requestLeave(Runnable continuation) { requestLeave(getScene().getWindow(), continuation); }

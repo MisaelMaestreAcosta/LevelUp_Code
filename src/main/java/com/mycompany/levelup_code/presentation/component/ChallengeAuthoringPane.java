@@ -56,7 +56,7 @@ public final class ChallengeAuthoringPane extends VBox {
     public ChallengeAuthoringPane(User administrator, List<Lesson> lessons, Consumer<AuthoredChallenge> savedCallback) {
         super(12);
         this.administrator = administrator;
-        this.lessons = List.copyOf(lessons);
+        this.lessons = new ArrayList<>(lessons);
         this.savedCallback = savedCallback;
         Label heading = new Label("Administrar retos");
         heading.getStyleClass().add("page-title");
@@ -128,6 +128,14 @@ public final class ChallengeAuthoringPane extends VBox {
         getChildren().addAll(heading, status, form);
         reset();
         refresh();
+    }
+
+    void updateLessons(List<Lesson> updated) {
+        int selectedId = lesson.getValue() == null ? 0 : lesson.getValue().getId();
+        lessons.clear(); lessons.addAll(updated);
+        lesson.getItems().setAll(updated);
+        lesson.setValue(updated.stream().filter(value -> value.getId() == selectedId).findFirst()
+                .orElse(updated.isEmpty() ? null : updated.getFirst()));
     }
 
     private static TextArea area(int rows) {

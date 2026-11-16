@@ -583,12 +583,33 @@ public final class DemoSeedCatalog {
     }
 
     /**
-     * Devuelve el fragmento comparativo y la nota técnica para una lección y lenguaje dados.
+     * Localiza una lección del catálogo comparativo conservando su identidad al reordenarla.
      */
+    public static Lesson comparativeLesson(List<Lesson> lessons, String language, int topic) {
+        List<Integer> ids = switch (language) {
+            case "PYTHON" -> List.of(4, 13, 5, 14, 6, 15);
+            case "CPP" -> List.of(7, 16, 8, 17, 9, 18);
+            default -> List.of(1, 10, 2, 11, 3, 12);
+        };
+        if (topic < 0 || topic >= ids.size()) return null;
+        return lessons.stream().filter(lesson -> lesson.getId() == ids.get(topic)).findFirst().orElse(null);
+    }
+
     public static String[] resolveComparativeSnippet(Lesson lesson, String langKey) {
         String title = lesson != null && lesson.getTitle() != null
                 ? lesson.getTitle().toLowerCase(Locale.ROOT)
                 : "";
+        if (lesson != null) {
+            title = switch (lesson.getId()) {
+                case 1, 4, 7 -> "polimorfismo";
+                case 10, 13, 16 -> "interfaces contratos";
+                case 2, 5, 8 -> "binaria";
+                case 11, 14, 17 -> "punteros slicing";
+                case 3, 6, 9 -> "colecciones listas vector";
+                case 12, 15, 18 -> "hash conjuntos";
+                default -> title;
+            };
+        }
         String lang = langKey != null ? langKey.toUpperCase(Locale.ROOT) : "JAVA";
 
         // Tema 1: Búsqueda Binaria
