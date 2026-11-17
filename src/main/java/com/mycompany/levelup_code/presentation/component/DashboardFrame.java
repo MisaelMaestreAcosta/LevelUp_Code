@@ -2421,7 +2421,8 @@ public class DashboardFrame {
             target = practiceView;
         } else if ("MISSIONS".equals(cardKey)) {
             if (missionsView == null) {
-                missionsView = new ProfessionalMissionsPane(AppContext.getInstance().getProfessionalMissionRepository());
+                missionsView = new ProfessionalMissionsPane(AppContext.getInstance().getProfessionalMissionRepository(),
+                        mission -> openLearning(() -> learningWorkspace.openMission(mission)));
             }
             target = missionsView;
         } else if ("ACHIEVEMENTS".equals(cardKey)) {

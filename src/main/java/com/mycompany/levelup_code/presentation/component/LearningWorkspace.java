@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.ProfessionalMission;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -85,6 +86,11 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
         present(page, path(challenge.getLesson()) + " › " + challenge.getTitle());
     }
 
+    void openMission(ProfessionalMission mission) {
+        if (!canLeave()) return;
+        present(new MissionBriefPane(mission), "Misiones › " + mission.title());
+    }
+
     @Override public void evaluated(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome result) {
         if (outcome != null) outcome.accept(result);
     }
@@ -106,9 +112,10 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     }
 
     private void present(LearningPage page, String title) {
-        Stage window = (Stage) page;
-        SessionWindowRegistry.untrack(window);
-        window.getScene().setRoot(new Group());
+        if (page instanceof Stage window) {
+            SessionWindowRegistry.untrack(window);
+            window.getScene().setRoot(new Group());
+        }
         page.content().setMinSize(0, 0);
         page.setNavigator(this);
         pages.push(new Entry(page, title));

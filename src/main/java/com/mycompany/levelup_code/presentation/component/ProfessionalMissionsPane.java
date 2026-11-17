@@ -3,6 +3,7 @@ package com.mycompany.levelup_code.presentation.component;
 import com.mycompany.levelup_code.data.dao.ProfessionalMissionRepository;
 import com.mycompany.levelup_code.domain.model.ProfessionalMission;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.concurrent.Task;
@@ -16,13 +17,15 @@ final class ProfessionalMissionsPane extends VBox {
     private static final Logger LOGGER = Logger.getLogger(ProfessionalMissionsPane.class.getName());
 
     private final ProfessionalMissionRepository repository;
+    private final Consumer<ProfessionalMission> openBrief;
     private final VBox catalog = new VBox(12);
     private final Label status = new Label();
     private final ProgressIndicator loading = new ProgressIndicator();
     private final Button refresh = WorkspaceUi.button("Actualizar", "btn-secondary", Theme.IconKind.REFRESH);
 
-    ProfessionalMissionsPane(ProfessionalMissionRepository repository) {
+    ProfessionalMissionsPane(ProfessionalMissionRepository repository, Consumer<ProfessionalMission> openBrief) {
         this.repository = repository;
+        this.openBrief = openBrief;
         getStyleClass().add("learning-workspace");
         setMinWidth(0);
 
@@ -82,7 +85,10 @@ final class ProfessionalMissionsPane extends VBox {
             Label client = WorkspaceUi.label(mission.client(), "muted-text");
             title.setGraphic(Theme.createIcon(Theme.IconKind.TARGET, 19, Theme.HEX_INDIGO));
             title.setGraphicTextGap(10);
-            VBox card = new VBox(8, title, client);
+            Button details = WorkspaceUi.button("Ver encargo", "btn-primary", Theme.IconKind.BOOK);
+            details.setAccessibleText("Ver encargo · " + mission.title());
+            details.setOnAction(event -> openBrief.accept(mission));
+            VBox card = new VBox(8, title, client, details);
             card.getStyleClass().addAll("surface-card", "mission-card");
             catalog.getChildren().add(card);
         }
