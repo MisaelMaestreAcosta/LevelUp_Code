@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.presentation.controller;
 
+import com.mycompany.levelup_code.data.local.DemoProfessionalMissionRepository;
 import com.mycompany.levelup_code.domain.model.Achievement;
 import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
@@ -87,6 +88,8 @@ public final class DemoSeedCatalog {
                 practiceLesson, 30, List.of("System.out.println(doble);", "int numero = 3;", "int doble = numero * 2;"), List.of(2, 3, 1));
         practiceLesson.addChallenge(ordering);
         SeedModuleFinals.addTo(languages);
+        Lesson discountLesson = javaLang.getModules().getFirst().getLessons().getLast();
+        discountLesson.addChallenge(DemoProfessionalMissionRepository.discountChallenge(discountLesson));
         return languages;
     }
 

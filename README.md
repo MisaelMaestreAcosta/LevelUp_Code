@@ -90,6 +90,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/13_challenge_guidance.sql`](database/13_challenge_guidance.sql) (guarda pistas y explicaciones por versión del reto)
    - [`database/14_module_finals.sql`](database/14_module_finals.sql) (añade un reto final de análisis de código por módulo)
    - [`database/15_professional_missions.sql`](database/15_professional_missions.sql) (crea misiones y requisitos vinculados a los casos de prueba)
+   - [`database/16_seed_discount_mission.sql`](database/16_seed_discount_mission.sql) (instala el reto de Java de Tienda Horizonte)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
    En una base existente, aplica una vez los scripts 05–10 que falten y recompila
@@ -104,6 +105,10 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    Después de la migración 12, aplica en orden `13_challenge_guidance.sql` y
    `14_module_finals.sql` para habilitar las guías editables y los retos finales.
    Ambas se pueden repetir y conservan el historial. El script maestro las incluye.
+
+   Para instalar la primera misión en una base existente, aplica los scripts 15 y 16
+   en ese orden después del 14. Ambos forman parte del script maestro y pueden
+   volver a ejecutarse sin duplicar la misión ni sobrescribir intentos.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:

@@ -1,7 +1,13 @@
 package com.mycompany.levelup_code.presentation.controller;
 
+import com.mycompany.levelup_code.business.evaluator.SimulatedCodeRunner;
+import com.mycompany.levelup_code.data.local.DemoProfessionalMissionRepository;
+import com.mycompany.levelup_code.domain.model.DebuggingChallenge;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,7 +46,60 @@ class SeedContentConsistencyTest {
         assertTrue(master.contains(migration.strip()));
         assertTrue(master.contains(read("13_challenge_guidance.sql").strip()));
         assertTrue(master.contains(read("14_module_finals.sql").strip()));
+        assertTrue(master.contains(read("15_professional_missions.sql").strip()));
+        assertTrue(master.contains(read("16_seed_discount_mission.sql").strip()));
         assertTrue(master.contains(read("00_drop.sql").strip()));
+    }
+
+    @Test
+    void discountMissionMatchesOracleSeedAndValidatesRealJavaCode() throws Exception {
+        var mission = new DemoProfessionalMissionRepository().findPublishedByKey("descuentos-tienda").orElseThrow();
+        var challenge = DemoSeedCatalog.createSeedLanguages().stream()
+                .flatMap(language -> language.getModules().stream())
+                .flatMap(module -> module.getLessons().stream())
+                .flatMap(lesson -> lesson.getChallenges().stream())
+                .filter(candidate -> candidate.getId() == mission.challengeId())
+                .map(DebuggingChallenge.class::cast)
+                .findFirst().orElseThrow();
+        String seed = read("16_seed_discount_mission.sql");
+        var content = Pattern.compile("v_starter CLOB :=(.*?);\\s*v_reference CLOB :=(.*?);"
+                + "\\s*v_guidance CLOB :=(.*?);\\s*v_lesson", Pattern.DOTALL).matcher(seed);
+        assertTrue(content.find());
+        assertEquals(challenge.getInitialTemplate(), decode(content.group(1)));
+        String[] guidance = decode(content.group(3)).split("\\n");
+        assertEquals("LEVELUP_OPTIONS_V2", guidance[0]);
+        assertEquals(5, guidance.length);
+        for (int i = 0; i < 3; i++) {
+            assertEquals(challenge.getGuidance().hints().get(i), decodeGuidanceLine(guidance[i + 1]));
+        }
+        assertEquals(challenge.getGuidance().explanation(), decodeGuidanceLine(guidance[4]));
+
+        var sqlCases = Pattern.compile("add_case\\((\\d+),'([^']*)','([^']*)',(\\d)\\);").matcher(seed);
+        var demoCases = challenge.getTestCases();
+        assertEquals(9, demoCases.size());
+        for (var testCase : demoCases) {
+            assertTrue(sqlCases.find());
+            var requirement = mission.requirements().get(Integer.parseInt(sqlCases.group(1)) - 1);
+            assertTrue(requirement.testCaseIds().contains(testCase.getId()));
+            assertEquals(testCase.getInput(), sqlCases.group(2));
+            assertEquals(testCase.getExpectedOutput(), sqlCases.group(3));
+            assertEquals(testCase.isHidden(), sqlCases.group(4).equals("1"));
+        }
+        assertFalse(sqlCases.find());
+        assertEquals(List.of(4, 2, 3, 0),
+                mission.requirements().stream().map(r -> r.testCaseIds().size()).toList());
+
+        var runner = new SimulatedCodeRunner();
+        var starter = runner.runAndValidate(challenge, challenge.getInitialTemplate());
+        assertTrue(starter.isSandboxedExecution());
+        assertFalse(starter.isAllPassed());
+        var solved = runner.runAndValidate(challenge, decode(content.group(2)));
+        assertTrue(solved.isSandboxedExecution());
+        assertTrue(solved.isAllPassed());
+    }
+
+    private String decodeGuidanceLine(String line) {
+        return new String(Base64.getDecoder().decode(line), StandardCharsets.UTF_8);
     }
 
     private String read(String filename) throws Exception {
