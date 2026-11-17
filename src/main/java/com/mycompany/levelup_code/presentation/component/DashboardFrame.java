@@ -368,6 +368,7 @@ public class DashboardFrame {
         lessonStatuses = state.progress();
         unlockedAchievementIds = state.achievements();
         challengeProgress = state.challengeProgress();
+        if (missionsView != null) missionsView.updateProgress(challengeProgress);
         lastKnownOfflineExp = currentUser.getTotalExp();
     }
 
@@ -2441,6 +2442,7 @@ public class DashboardFrame {
             if (missionsView == null) {
                 missionsView = new ProfessionalMissionsPane(
                         AppContext.getInstance().getProfessionalMissionRepository(), this::openMission);
+                missionsView.updateProgress(challengeProgress);
             }
             target = missionsView;
         } else if ("ACHIEVEMENTS".equals(cardKey)) {
@@ -2512,6 +2514,7 @@ public class DashboardFrame {
         demoChallengeProgress.merge(outcome.challengeId(), outcome.correct() ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED,
                 (previous, next) -> previous == ChallengeProgress.SOLVED ? previous : next);
         challengeProgress = Map.copyOf(demoChallengeProgress);
+        if (missionsView != null) missionsView.updateProgress(challengeProgress);
         populateLessonsForLanguage(activeLanguageKey);
         renderPracticeCatalog();
     }

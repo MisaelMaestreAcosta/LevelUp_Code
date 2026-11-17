@@ -1,8 +1,11 @@
 package com.mycompany.levelup_code.presentation.component;
 
 import com.mycompany.levelup_code.data.dao.ProfessionalMissionRepository;
+import com.mycompany.levelup_code.domain.enums.ChallengeProgress;
 import com.mycompany.levelup_code.domain.model.ProfessionalMission;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -10,6 +13,7 @@ import javafx.concurrent.Task;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 
 /** The student-facing catalog of published client missions. */
@@ -19,6 +23,8 @@ final class ProfessionalMissionsPane extends VBox {
     private final ProfessionalMissionRepository repository;
     private final Consumer<ProfessionalMission> openBrief;
     private final VBox catalog = new VBox(12);
+    private final Map<Integer, Label> progressLabels = new HashMap<>();
+    private Map<Integer, ChallengeProgress> progress = Map.of();
     private final Label status = new Label();
     private final ProgressIndicator loading = new ProgressIndicator();
     private final Button refresh = WorkspaceUi.button("Actualizar", "btn-secondary", Theme.IconKind.REFRESH);
@@ -75,6 +81,7 @@ final class ProfessionalMissionsPane extends VBox {
 
     private void showMissions(List<ProfessionalMission> missions) {
         catalog.getChildren().clear();
+        progressLabels.clear();
         if (missions.isEmpty()) {
             catalog.getChildren().add(WorkspaceUi.empty(Theme.IconKind.TARGET, "Aún no hay misiones",
                     "Los encargos publicados aparecerán aquí."));
@@ -83,14 +90,42 @@ final class ProfessionalMissionsPane extends VBox {
         for (ProfessionalMission mission : missions) {
             Label title = WorkspaceUi.label(mission.title(), "card-title");
             Label client = WorkspaceUi.label(mission.client(), "muted-text");
+            Label progressLabel = Theme.createPillBadge("", "badge-neutral");
+            progressLabels.put(mission.challengeId(), progressLabel);
+            updateProgressLabel(mission.challengeId(), progressLabel);
+            FlowPane metadata = new FlowPane(10, 6, client, progressLabel);
+            metadata.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             title.setGraphic(Theme.createIcon(Theme.IconKind.TARGET, 19, Theme.HEX_INDIGO));
             title.setGraphicTextGap(10);
             Button details = WorkspaceUi.button("Ver encargo", "btn-primary", Theme.IconKind.BOOK);
             details.setAccessibleText("Ver encargo · " + mission.title());
             details.setOnAction(event -> openBrief.accept(mission));
-            VBox card = new VBox(8, title, client, details);
+            VBox card = new VBox(8, title, metadata, details);
             card.getStyleClass().addAll("surface-card", "mission-card");
             catalog.getChildren().add(card);
+        }
+    }
+
+    void updateProgress(Map<Integer, ChallengeProgress> progress) {
+        this.progress = progress;
+        progressLabels.forEach(this::updateProgressLabel);
+    }
+
+    private void updateProgressLabel(int challengeId, Label badge) {
+        ChallengeProgress state = progress.getOrDefault(challengeId, ChallengeProgress.PENDING);
+        switch (state) {
+            case PENDING -> {
+                badge.setText("Por empezar");
+                badge.getStyleClass().setAll("badge-neutral");
+            }
+            case ATTEMPTED -> {
+                badge.setText("En curso");
+                badge.getStyleClass().setAll("badge-amber");
+            }
+            case SOLVED -> {
+                badge.setText("Superada");
+                badge.getStyleClass().setAll("badge-green");
+            }
         }
     }
 }

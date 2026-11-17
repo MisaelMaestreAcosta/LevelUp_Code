@@ -989,6 +989,7 @@
 .learning-workspace .notes-list .list-cell:selected .card-title { -fx-text-fill: #1D4ED8; }
 .learning-workspace .badge-indigo { -fx-text-fill: #1D4ED8; }
 .learning-workspace .badge-green { -fx-text-fill: #15803D; }
+.learning-workspace .badge-amber { -fx-text-fill: #B45309; }
 .learning-workspace .badge-neutral { -fx-text-fill: #475569; }
 .learning-workspace .separator .line {
     -fx-border-color: #E2E8F0;
