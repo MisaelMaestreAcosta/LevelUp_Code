@@ -1,8 +1,16 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.MissionRequirement;
 import com.mycompany.levelup_code.domain.model.ProfessionalMission;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javafx.concurrent.Task;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
@@ -12,9 +20,14 @@ import javafx.scene.layout.VBox;
 
 /** The client request and acceptance criteria, read before opening the editor. */
 final class MissionBriefPane implements LearningPage {
-    private final ScrollPane scroll;
+    private static final Logger LOGGER = Logger.getLogger(MissionBriefPane.class.getName());
 
-    MissionBriefPane(ProfessionalMission mission) {
+    private final ScrollPane scroll;
+    private final Button start = WorkspaceUi.button("Abrir reto", "btn-primary", Theme.IconKind.PLAY);
+    private final Label status = new Label();
+    private Task<Optional<Challenge>> loading;
+
+    MissionBriefPane(ProfessionalMission mission, Supplier<Optional<Challenge>> lookup, Consumer<Challenge> open) {
         Label client = WorkspaceUi.label("Cliente · " + mission.client(), "section-caption");
         Label title = WorkspaceUi.label(mission.title(), "page-title");
         Label description = WorkspaceUi.label(mission.brief(), "body-text");
@@ -30,10 +43,45 @@ final class MissionBriefPane implements LearningPage {
             }
             body.getChildren().add(requirements);
         }
+        WorkspaceUi.status(status, "", "");
+        body.getChildren().addAll(start, status);
         VBox page = new VBox(body);
         page.getStyleClass().add("learning-workspace");
         page.setMinWidth(0);
         scroll = WorkspaceUi.scroll(page);
+        start.setOnAction(event -> loadChallenge(lookup, open));
+    }
+
+    private void loadChallenge(Supplier<Optional<Challenge>> lookup, Consumer<Challenge> open) {
+        start.setDisable(true);
+        WorkspaceUi.status(status, "Abriendo el reto…", "");
+        Task<Optional<Challenge>> task = new Task<>() {
+            @Override protected Optional<Challenge> call() { return lookup.get(); }
+        };
+        loading = task;
+        task.setOnSucceeded(event -> {
+            finishLoading();
+            if (scroll.getScene() == null) return;
+            task.getValue().ifPresentOrElse(challenge -> {
+                WorkspaceUi.status(status, "", "");
+                open.accept(challenge);
+            }, () -> WorkspaceUi.status(status,
+                    "El reto ya no está disponible. Vuelve a Misiones y actualiza el catálogo.", "status-error"));
+        });
+        task.setOnFailed(event -> {
+            finishLoading();
+            LOGGER.log(Level.WARNING, "Could not open the mission challenge", task.getException());
+            WorkspaceUi.status(status, "No pudimos abrir el reto. Comprueba la conexión y vuelve a intentarlo.",
+                    "status-error");
+        });
+        Thread worker = new Thread(task, "mission-challenge");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void finishLoading() {
+        loading = null;
+        start.setDisable(false);
     }
 
     private static HBox requirementRow(MissionRequirement requirement) {
@@ -53,6 +101,8 @@ final class MissionBriefPane implements LearningPage {
 
     @Override public Region content() { return scroll; }
     @Override public boolean canLeave() { return true; }
-    @Override public void disposePage() { }
+    @Override public void disposePage() {
+        if (loading != null) loading.cancel();
+    }
     @Override public void setNavigator(LearningNavigation navigator) { }
 }

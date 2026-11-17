@@ -16,6 +16,7 @@ import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.ExperienceAchievement;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.ProfessionalMission;
 import com.mycompany.levelup_code.domain.model.StreakAchievement;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
@@ -33,7 +34,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.geometry.Insets;
@@ -544,6 +547,21 @@ public class DashboardFrame {
 
     private void openLesson(Lesson lesson) { openLearning(() -> learningWorkspace.openLesson(lesson)); }
     private void openChallenge(Challenge challenge) { openLearning(() -> learningWorkspace.openChallenge(challenge)); }
+
+    private void openMission(ProfessionalMission mission) {
+        int challengeId = mission.challengeId();
+        Supplier<Optional<Challenge>> lookup;
+        if (oracleConnected) {
+            lookup = () -> AppContext.getInstance().getChallengeRepository().findById(challengeId);
+        } else {
+            Optional<Challenge> demoChallenge = allLessonsForAdmin.stream()
+                    .flatMap(lesson -> lesson.getChallenges().stream())
+                    .filter(challenge -> challenge.getId() == challengeId)
+                    .findFirst();
+            lookup = () -> demoChallenge;
+        }
+        openLearning(() -> learningWorkspace.openMission(mission, lookup));
+    }
 
     private void openLearning(Runnable open) {
         if (!learningWorkspace.hasPages()) {
@@ -2421,8 +2439,8 @@ public class DashboardFrame {
             target = practiceView;
         } else if ("MISSIONS".equals(cardKey)) {
             if (missionsView == null) {
-                missionsView = new ProfessionalMissionsPane(AppContext.getInstance().getProfessionalMissionRepository(),
-                        mission -> openLearning(() -> learningWorkspace.openMission(mission)));
+                missionsView = new ProfessionalMissionsPane(
+                        AppContext.getInstance().getProfessionalMissionRepository(), this::openMission);
             }
             target = missionsView;
         } else if ("ACHIEVEMENTS".equals(cardKey)) {

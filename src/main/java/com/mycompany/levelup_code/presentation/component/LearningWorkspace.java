@@ -7,7 +7,9 @@ import com.mycompany.levelup_code.domain.model.ProfessionalMission;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javafx.scene.Group;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
@@ -79,16 +81,23 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     }
 
     @Override public void openChallenge(Challenge challenge) {
-        if (challenge == null || !canLeave()) return;
-        LearningPage page = challenge instanceof CodeOrderingChallenge ordering
-                ? new CodeOrderingFrame(user, ordering, challengeRefresh, false)
-                : new ChallengeFrame(user, challenge, challengeRefresh, false, singleChallenge);
-        present(page, path(challenge.getLesson()) + " › " + challenge.getTitle());
+        if (challenge == null) return;
+        openChallenge(challenge, path(challenge.getLesson()) + " › " + challenge.getTitle(), singleChallenge);
     }
 
-    void openMission(ProfessionalMission mission) {
+    private void openChallenge(Challenge challenge, String title, boolean onlyThisChallenge) {
         if (!canLeave()) return;
-        present(new MissionBriefPane(mission), "Misiones › " + mission.title());
+        LearningPage page = challenge instanceof CodeOrderingChallenge ordering
+                ? new CodeOrderingFrame(user, ordering, challengeRefresh, false)
+                : new ChallengeFrame(user, challenge, challengeRefresh, false, onlyThisChallenge);
+        present(page, title);
+    }
+
+    void openMission(ProfessionalMission mission, Supplier<Optional<Challenge>> lookup) {
+        if (!canLeave()) return;
+        String title = "Misiones › " + mission.title();
+        present(new MissionBriefPane(mission, lookup,
+                challenge -> openChallenge(challenge, title + " › Reto", true)), title);
     }
 
     @Override public void evaluated(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome result) {
