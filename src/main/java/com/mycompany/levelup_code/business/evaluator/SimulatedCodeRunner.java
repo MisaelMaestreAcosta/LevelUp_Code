@@ -369,6 +369,16 @@ public class SimulatedCodeRunner implements CodeRunner {
 
         String normalizedInput = input != null ? input.trim() : "";
 
+        String balancedOutput = evaluateBalancedDelimiters(cleanCode, normalizedInput);
+        if (balancedOutput != null) {
+            return balancedOutput;
+        }
+
+        String graphOutput = evaluateGraphReachability(cleanCode, normalizedInput);
+        if (graphOutput != null) {
+            return graphOutput;
+        }
+
         Matcher arrMatcher = ARRAY_PATTERN.matcher(normalizedInput);
         Matcher targetMatcher = TARGET_PATTERN.matcher(normalizedInput);
         if (arrMatcher.find()) {
@@ -577,7 +587,99 @@ public class SimulatedCodeRunner implements CodeRunner {
             return String.valueOf(sum);
         }
 
+        boolean looksLikeMergeSort = cleanCode.contains("std::merge")
+                || ((cleanCode.contains("mergeSort") || cleanCode.contains("def ordenar"))
+                    && (cleanCode.contains("while") || cleanCode.contains("System.arraycopy")));
+        if (looksLikeMergeSort) {
+            list.sort(Integer::compareTo);
+            return list.toString();
+        }
+
+        boolean looksLikeQueueWait = (cleanCode.contains("esperaTotal") || cleanCode.contains("espera_total"))
+                && (cleanCode.contains("for") || cleanCode.contains("while")) && cleanCode.contains("+=");
+        if (looksLikeQueueWait) {
+            int elapsed = 0;
+            int total = 0;
+            for (int duration : list) {
+                total += elapsed;
+                elapsed += duration;
+            }
+            return String.valueOf(total);
+        }
+
+        boolean looksLikeTreeHeight = cleanCode.contains("altura") && (cleanCode.contains("insert(")
+                || cleanCode.contains("def insert")) && (cleanCode.contains("height(") || cleanCode.contains("def height"));
+        if (looksLikeTreeHeight) {
+            TreeNode root = null;
+            for (int value : list) root = insertTree(root, value);
+            return String.valueOf(treeHeight(root));
+        }
+
         return null;
+    }
+
+    private String evaluateBalancedDelimiters(String cleanCode, String input) {
+        boolean usesStack = cleanCode.contains("Deque<") || cleanCode.contains("std::stack")
+                || (cleanCode.contains("stack") && cleanCode.contains("append"));
+        if (!usesStack || !(cleanCode.contains("for") || cleanCode.contains("while"))) return null;
+        java.util.ArrayDeque<Character> stack = new java.util.ArrayDeque<>();
+        for (char c : input.toCharArray()) {
+            if (c == '(' || c == '[' || c == '{') stack.push(c);
+            else if (c == ')' || c == ']' || c == '}') {
+                if (stack.isEmpty()) return "false";
+                char open = stack.pop();
+                if ((c == ')' && open != '(') || (c == ']' && open != '[') || (c == '}' && open != '{')) return "false";
+            }
+        }
+        return stack.isEmpty() ? "true" : "false";
+    }
+
+    private String evaluateGraphReachability(String cleanCode, String input) {
+        boolean looksLikeBfs = (cleanCode.contains("Queue<") || cleanCode.contains("std::queue")
+                || cleanCode.contains("deque(")) && cleanCode.toLowerCase(Locale.ROOT).contains("visited");
+        if (!looksLikeBfs || !input.contains(";")) return null;
+        String[] sections = input.split(";", -1);
+        int start = Integer.parseInt(sections[1].trim());
+        java.util.Map<Integer, List<Integer>> graph = new java.util.HashMap<>();
+        if (!sections[0].isBlank()) {
+            for (String edge : sections[0].split(",")) {
+                String[] vertices = edge.split("-");
+                int from = Integer.parseInt(vertices[0].trim());
+                int to = Integer.parseInt(vertices[1].trim());
+                graph.computeIfAbsent(from, key -> new ArrayList<>()).add(to);
+                graph.computeIfAbsent(to, key -> new ArrayList<>()).add(from);
+            }
+        }
+        java.util.Set<Integer> visited = new java.util.HashSet<>();
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        visited.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            int vertex = queue.remove();
+            for (int neighbor : graph.getOrDefault(vertex, List.of())) {
+                if (visited.add(neighbor)) queue.add(neighbor);
+            }
+        }
+        return String.valueOf(visited.size());
+    }
+
+    private TreeNode insertTree(TreeNode node, int value) {
+        if (node == null) return new TreeNode(value);
+        if (value < node.value) node.left = insertTree(node.left, value);
+        else if (value > node.value) node.right = insertTree(node.right, value);
+        return node;
+    }
+
+    private int treeHeight(TreeNode node) {
+        return node == null ? 0 : 1 + Math.max(treeHeight(node.left), treeHeight(node.right));
+    }
+
+    private static final class TreeNode {
+        private final int value;
+        private TreeNode left;
+        private TreeNode right;
+
+        private TreeNode(int value) { this.value = value; }
     }
 
     private String evaluatePalindromeLogic(String cleanCode, String input) {
