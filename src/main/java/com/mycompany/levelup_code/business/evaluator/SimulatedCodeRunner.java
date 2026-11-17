@@ -434,17 +434,20 @@ public class SimulatedCodeRunner implements CodeRunner {
                     passed++;
                     String detail = tc.isHidden() ? label + " -> Salida correcta"
                             : label + " -> Salida correcta (\"" + actual + "\")";
-                    outcomes.add(new CaseOutcome(true, detail, null, tc.isHidden() ? null : actual));
+                    outcomes.add(new CaseOutcome(tc.getId(), true, detail, null, tc.isHidden() ? null : actual));
                 } else {
                     String detail = tc.isHidden()
                             ? label + " -> Salida incorrecta en prueba oculta"
                             : label + " -> Se obtuvo \"" + actual + "\", se esperaba \"" + tc.getExpectedOutput() + "\"";
-                    outcomes.add(new CaseOutcome(false, detail, AttemptResult.INCORRECT, tc.isHidden() ? null : actual));
+                    outcomes.add(new CaseOutcome(tc.getId(), false, detail, AttemptResult.INCORRECT,
+                            tc.isHidden() ? null : actual));
                 }
             } catch (TimeoutException ex) {
-                outcomes.add(new CaseOutcome(false, label + " -> TIMEOUT: " + ex.getMessage(), AttemptResult.TIMEOUT));
+                outcomes.add(new CaseOutcome(tc.getId(), false, label + " -> TIMEOUT: " + ex.getMessage(),
+                        AttemptResult.TIMEOUT, null));
             } catch (Exception ex) {
-                outcomes.add(new CaseOutcome(false, label + " -> ERROR: " + ex.getMessage(), AttemptResult.ERROR));
+                outcomes.add(new CaseOutcome(tc.getId(), false, label + " -> ERROR: " + ex.getMessage(),
+                        AttemptResult.ERROR, null));
             }
         }
 
@@ -699,6 +702,7 @@ public class SimulatedCodeRunner implements CodeRunner {
     /** Resultado individual de un caso de prueba. */
     public static final class CaseOutcome {
 
+        private final int testCaseId;
         private final boolean passed;
         private final String message;
         private final AttemptResult failureResult;
@@ -709,15 +713,18 @@ public class SimulatedCodeRunner implements CodeRunner {
         }
 
         public CaseOutcome(boolean passed, String message, AttemptResult failureResult) {
-            this(passed, message, failureResult, null);
+            this(0, passed, message, failureResult, null);
         }
 
-        private CaseOutcome(boolean passed, String message, AttemptResult failureResult, String actualOutput) {
+        CaseOutcome(int testCaseId, boolean passed, String message, AttemptResult failureResult, String actualOutput) {
+            this.testCaseId = testCaseId;
             this.passed = passed;
             this.message = message;
             this.failureResult = failureResult;
             this.actualOutput = actualOutput;
         }
+
+        public int getTestCaseId() { return testCaseId; }
 
         public boolean isPassed() {
             return passed;
