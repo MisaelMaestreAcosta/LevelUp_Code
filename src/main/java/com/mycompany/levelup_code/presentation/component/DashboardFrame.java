@@ -571,17 +571,28 @@ public class DashboardFrame {
     private FlowPane buildCompactTelemetry() {
         FlowPane bar = new FlowPane(18, 8);
         bar.getStyleClass().add("compact-telemetry");
-        for (Label source : List.of(lblLevelVal, lblExpVal, lblStreakVal, lblLivesVal)) {
-            Label value = WorkspaceUi.label("", "body-text");
-            value.textProperty().bind(source.textProperty());
-            bar.getChildren().add(value);
-        }
-        Label lives = (Label) bar.getChildren().getLast();
-        lives.textProperty().unbind();
-        lives.textProperty().bind(lblLivesVal.textProperty().concat(" vidas"));
+        bar.getChildren().addAll(
+                compactTelemetryItem(lblLevelVal, "", Theme.IconKind.STAR, Theme.HEX_INDIGO, "Nivel actual"),
+                compactTelemetryItem(lblExpVal, "", Theme.IconKind.BOLT, Theme.HEX_AMBER, "Experiencia acumulada"),
+                compactTelemetryItem(lblStreakVal, "", Theme.IconKind.FLAME, Theme.HEX_GREEN, "Racha actual"),
+                compactTelemetryItem(lblLivesVal, " vidas", Theme.IconKind.HEART, Theme.HEX_ROSE, "Vidas disponibles")
+        );
         bar.visibleProperty().bind(homeView.visibleProperty().not());
         bar.managedProperty().bind(bar.visibleProperty());
         return bar;
+    }
+
+    private HBox compactTelemetryItem(Label source, String suffix, Theme.IconKind icon,
+                                      String color, String accessibleDescription) {
+        Label value = WorkspaceUi.label("", "compact-telemetry-value");
+        value.textProperty().bind(source.textProperty().concat(suffix));
+
+        HBox item = new HBox(7, Theme.createIcon(icon, 16, color), value);
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.getStyleClass().add("compact-telemetry-item");
+        item.setAccessibleText(accessibleDescription);
+        Tooltip.install(item, new Tooltip(accessibleDescription));
+        return item;
     }
 
     private VBox buildHomeWorkspace(TilePane telemetry) {
