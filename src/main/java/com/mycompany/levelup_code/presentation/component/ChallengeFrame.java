@@ -36,6 +36,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -85,6 +86,7 @@ import javafx.stage.WindowEvent;
 public class ChallengeFrame extends Stage implements LearningPage {
     private BorderPane view;
     private LearningNavigation navigator;
+    private Consumer<SimulatedCodeRunner.ExecutionSummary> reviewMission;
 
     @Override public Region content() { return view; }
     @Override public boolean canLeave() { return allowClose(); }
@@ -136,6 +138,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
     private StackPane centerCardPane;
     private VBox codeEditorCard;
     private VBox quizCard;
+    private Button btnBack;
     private Button btnNextChallenge;
     private Button btnSubmit;
     private Button btnHint;
@@ -186,6 +189,11 @@ public class ChallengeFrame extends Stage implements LearningPage {
     }
 
     private final boolean preview;
+
+    void enableMissionReview(Consumer<SimulatedCodeRunner.ExecutionSummary> review) {
+        reviewMission = review;
+        btnBack.setText("Volver al encargo");
+    }
 
     public ChallengeFrame(User user, Challenge challenge, Runnable onSolvedCallback, boolean preview) {
         this(user, challenge, onSolvedCallback, preview, false);
@@ -754,9 +762,9 @@ public class ChallengeFrame extends Stage implements LearningPage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button btnClose = new Button("Volver al Panel");
-        btnClose.getStyleClass().add("btn-secondary");
-        btnClose.setOnAction(e -> close());
+        btnBack = new Button("Volver al Panel");
+        btnBack.getStyleClass().add("btn-secondary");
+        btnBack.setOnAction(e -> close());
 
         btnNextChallenge = new Button("Siguiente Reto →");
         btnNextChallenge.getStyleClass().add("btn-ghost");
@@ -783,7 +791,7 @@ public class ChallengeFrame extends Stage implements LearningPage {
         lblDraftStatus = new Label("Guardado automático activo");
         lblDraftStatus.getStyleClass().add("muted-text");
         lblDraftStatus.setAccessibleText("Estado del borrador local");
-        FlowPane actions = new FlowPane(10, 8, btnClose, btnNextChallenge, btnSubmit,
+        FlowPane actions = new FlowPane(10, 8, btnBack, btnNextChallenge, btnSubmit,
                 new Label("Ctrl+Enter"), busyIndicator, lblBusy, lblDraftStatus);
         bottomBar.getChildren().addAll(lupoFeedback, actions);
         return bottomBar;
@@ -1638,7 +1646,12 @@ public class ChallengeFrame extends Stage implements LearningPage {
                 : "Envío en curso. Espera el resultado antes de cambiar de reto o cerrar.", "body-text");
         task.setOnSucceeded(event -> {
             try {
-                renderEvaluation(submission, task.getValue());
+                EvaluationOutcome outcome = task.getValue();
+                renderEvaluation(submission, outcome);
+                if (reviewMission != null) {
+                    reviewMission.accept(outcome.summary());
+                    btnBack.setText("Revisar encargo");
+                }
                 rememberDraft();
             } finally {
                 finishSubmission();

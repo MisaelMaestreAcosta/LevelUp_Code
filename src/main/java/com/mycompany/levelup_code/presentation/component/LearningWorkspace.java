@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.business.evaluator.MissionEvaluation;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
 import com.mycompany.levelup_code.domain.model.Lesson;
@@ -96,8 +97,13 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     void openMission(ProfessionalMission mission, Supplier<Optional<Challenge>> lookup) {
         if (!canLeave()) return;
         String title = "Misiones › " + mission.title();
-        present(new MissionBriefPane(mission, lookup,
-                challenge -> openChallenge(challenge, title + " › Reto", true)), title);
+        present(new MissionBriefPane(mission, lookup, (brief, challenge) -> {
+            var editor = new ChallengeFrame(user, challenge, challengeRefresh, false, true);
+            editor.enableMissionReview(summary -> brief.showReview(MissionEvaluation.from(mission, summary)));
+            Runnable openEditor = () -> present(editor, title + " › Reto");
+            brief.resumeWith(openEditor);
+            openEditor.run();
+        }), title);
     }
 
     @Override public void evaluated(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome result) {
