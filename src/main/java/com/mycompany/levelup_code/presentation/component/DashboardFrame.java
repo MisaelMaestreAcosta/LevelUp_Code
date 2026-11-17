@@ -104,6 +104,7 @@ public class DashboardFrame {
     private Button navHomeBtn;
     private Button navCoursesBtn;
     private Button navPracticeBtn;
+    private Button navMissionsBtn;
     private Button navProgressBtn;
     private Button navNotebookBtn;
     private Button navGoalsBtn;
@@ -115,6 +116,7 @@ public class DashboardFrame {
     private ProfilePane profilePane;
     private NotebookPane notebookPane;
     private VBox practiceView;
+    private ProfessionalMissionsPane missionsView;
     private VBox practiceResults;
     private Label practiceCount;
     private TextField practiceSearch;
@@ -712,6 +714,9 @@ public class DashboardFrame {
         navPracticeBtn.setGraphicTextGap(10);
         navPracticeBtn.setMaxWidth(Double.MAX_VALUE);
         navPracticeBtn.setOnAction(e -> switchWorkspaceView("PRACTICE"));
+        navMissionsBtn = WorkspaceUi.button("Misiones", "nav-btn", Theme.IconKind.TARGET);
+        navMissionsBtn.setMaxWidth(Double.MAX_VALUE);
+        navMissionsBtn.setOnAction(event -> switchWorkspaceView("MISSIONS"));
         navProgressBtn = new Button("Mi progreso");
         navProgressBtn.getStyleClass().add("nav-btn");
         navProgressBtn.setGraphic(Theme.createIcon(Theme.IconKind.CHART, 16, Theme.HEX_INDIGO));
@@ -775,7 +780,8 @@ public class DashboardFrame {
 
         navColumn.getChildren().addAll(
                 brand, lblNavSection,
-                navHomeBtn, navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
+                navHomeBtn, navCoursesBtn, navPracticeBtn, navMissionsBtn, navProgressBtn, navNotebookBtn,
+                navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
@@ -2413,6 +2419,11 @@ public class DashboardFrame {
         } else if ("PRACTICE".equals(cardKey)) {
             renderPracticeCatalog();
             target = practiceView;
+        } else if ("MISSIONS".equals(cardKey)) {
+            if (missionsView == null) {
+                missionsView = new ProfessionalMissionsPane(AppContext.getInstance().getProfessionalMissionRepository());
+            }
+            target = missionsView;
         } else if ("ACHIEVEMENTS".equals(cardKey)) {
             target = achievementsView;
         } else if ("ADMIN".equals(cardKey) && adminView != null) {
@@ -2426,6 +2437,7 @@ public class DashboardFrame {
         updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
         updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
         updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey) || "SESSION".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navMissionsBtn, "MISSIONS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_INDIGO);
         updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
         updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
         updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
