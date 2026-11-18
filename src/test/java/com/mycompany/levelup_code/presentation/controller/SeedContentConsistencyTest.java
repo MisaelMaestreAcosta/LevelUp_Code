@@ -46,6 +46,7 @@ class SeedContentConsistencyTest {
         assertTrue(master.contains(migration.strip()));
         assertTrue(master.contains(read("13_challenge_guidance.sql").strip()));
         assertTrue(master.contains(read("14_module_finals.sql").strip()));
+        assertTrue(master.contains("@@15_expanded_curriculum.sql"));
         assertTrue(master.contains(read("15_professional_missions.sql").strip()));
         assertTrue(master.contains(read("16_seed_discount_mission.sql").strip()));
         assertTrue(master.contains(read("00_drop.sql").strip()));
@@ -100,6 +101,15 @@ class SeedContentConsistencyTest {
 
     private String decodeGuidanceLine(String line) {
         return new String(Base64.getDecoder().decode(line), StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void expandedCurriculumMigrationAndOfflineAchievementsStayAvailable() throws Exception {
+        String migration = read("15_expanded_curriculum.sql");
+        assertTrue(migration.contains("FOR language_index IN 1..3 LOOP"));
+        assertTrue(migration.contains("FOR module_order IN 4..6 LOOP"));
+        assertEquals(9, Pattern.compile("ensure_achievement\\('").matcher(migration).results().count());
+        assertEquals(17, DemoSeedCatalog.createSeedAchievements().size());
     }
 
     private String read(String filename) throws Exception {

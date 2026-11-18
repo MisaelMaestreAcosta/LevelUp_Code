@@ -3634,10 +3634,17 @@ END;
 /
 
 -- =============================================================================
--- FASE 15 - MISIONES PROFESIONALES
+-- FASE 15 - AMPLIACIÓN DEL PLAN DE ESTUDIOS
+-- Fuente enlazada: database/15_expanded_curriculum.sql
+-- =============================================================================
+PROMPT FASE 15 - AMPLIACIÓN DEL PLAN DE ESTUDIOS
+@@15_expanded_curriculum.sql
+
+-- =============================================================================
+-- FASE 16 - MISIONES PROFESIONALES
 -- Fuente integrada: database/15_professional_missions.sql
 -- =============================================================================
-PROMPT FASE 15 - MISIONES PROFESIONALES
+PROMPT FASE 16 - MISIONES PROFESIONALES
 
 -- Apply after 14_module_finals.sql as the application schema owner.
 -- Adds mission briefs and requirements without changing existing attempts.
@@ -3696,10 +3703,10 @@ END;
 /
 
 -- =============================================================================
--- FASE 16 - MISION DE DESCUENTOS
+-- FASE 17 - MISIÓN DE DESCUENTOS
 -- Fuente integrada: database/16_seed_discount_mission.sql
 -- =============================================================================
-PROMPT FASE 16 - MISION DE DESCUENTOS
+PROMPT FASE 17 - MISIÓN DE DESCUENTOS
 
 -- Apply after 15_professional_missions.sql as the application schema owner.
 -- Adds the first mission and its challenge revision in one transaction.
@@ -3809,10 +3816,10 @@ END;
 /
 
 -- =============================================================================
--- FASE 17 - PRUEBAS PL/SQL
+-- FASE 18 - PRUEBAS PL/SQL
 -- Fuente integrada: database/04_test_plsql.sql
 -- =============================================================================
-PROMPT FASE 17 - PRUEBAS PL/SQL
+PROMPT FASE 18 - PRUEBAS PL/SQL
 
 -- =============================================================================
 -- LEVELUP CODE — BATERÍA DE PRUEBAS PL/SQL EN BLOQUE ANÓNIMO

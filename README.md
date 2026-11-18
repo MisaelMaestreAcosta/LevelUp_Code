@@ -89,6 +89,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/12_seed_starter_templates.sql`](database/12_seed_starter_templates.sql) (separa las plantillas de las soluciones y conserva el historial)
    - [`database/13_challenge_guidance.sql`](database/13_challenge_guidance.sql) (guarda pistas y explicaciones por versión del reto)
    - [`database/14_module_finals.sql`](database/14_module_finals.sql) (añade un reto final de análisis de código por módulo)
+   - [`database/15_expanded_curriculum.sql`](database/15_expanded_curriculum.sql) (añade 9 módulos, 18 lecciones, 36 retos base, 9 finales y 9 logros sin borrar progreso)
    - [`database/15_professional_missions.sql`](database/15_professional_missions.sql) (crea misiones y requisitos vinculados a los casos de prueba)
    - [`database/16_seed_discount_mission.sql`](database/16_seed_discount_mission.sql) (instala el reto de Java de Tienda Horizonte)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
@@ -102,13 +103,16 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    los intentos y crea nuevas versiones de los retos originales que siguen intactos.
    Se puede repetir y omite los retos editados. El script maestro ya la incluye.
 
-   Después de la migración 12, aplica en orden `13_challenge_guidance.sql` y
-   `14_module_finals.sql` para habilitar las guías editables y los retos finales.
-   Ambas se pueden repetir y conservan el historial. El script maestro las incluye.
+   Después de la migración 12, aplica en orden `13_challenge_guidance.sql`,
+   `14_module_finals.sql` y `15_expanded_curriculum.sql` para habilitar las guías,
+   los retos finales y los nuevos módulos. Las tres migraciones se pueden repetir y
+   conservan el historial. El script maestro enlaza `15_expanded_curriculum.sql`
+   mediante `@@`, por lo que ambos archivos deben permanecer en el mismo directorio.
 
-   Para instalar la primera misión en una base existente, aplica los scripts 15 y 16
-   en ese orden después del 14. Ambos forman parte del script maestro y pueden
-   volver a ejecutarse sin duplicar la misión ni sobrescribir intentos.
+   Después de `14_module_finals.sql`, también puedes instalar la primera misión con
+   `15_professional_missions.sql` y `16_seed_discount_mission.sql`, en ese orden.
+   El script maestro ejecuta ambos después de la ampliación del plan de estudios.
+   Puedes repetirlos sin duplicar la misión ni sobrescribir intentos.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:
