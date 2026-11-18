@@ -21,8 +21,8 @@ import java.util.Map;
 
 /**
  * Catálogo completo de datos semilla y fragmentos comparativos tri-lenguaje.
- * Espeja los 3 lenguajes, 9 módulos, 18 lecciones, 36 retos, 54 casos de prueba
- * y 8 logros de {@code database/02_seed.sql} para garantizar paridad total en modo local.
+ * Espeja el catálogo base y su expansión curricular para garantizar paridad en modo local:
+ * 3 lenguajes, 18 módulos, 36 lecciones, 72 retos base, 108 casos de prueba y 17 logros.
  */
 public final class DemoSeedCatalog {
 
@@ -54,6 +54,7 @@ public final class DemoSeedCatalog {
         buildCppCurriculum(cppLang);
 
         List<Language> languages = Arrays.asList(javaLang, pythonLang, cppLang);
+        ExpandedSeedCatalog.addTo(languages);
         for (Language language : languages) {
             for (com.mycompany.levelup_code.domain.model.CourseModule module : language.getModules()) {
                 for (Lesson lesson : module.getLessons()) {
@@ -566,6 +567,15 @@ public final class DemoSeedCatalog {
         list.add(new StreakAchievement(6, "Leyenda del Semestre", "Alcanza una racha histórica de 14 días consecutivos.", "SHIELD", 14));
         list.add(new ChallengeCountAchievement(7, "Maestro de Algoritmos", "Resuelve exitosamente 12 retos entre Java, Python y C++.", "STAR", 12));
         list.add(new ExperienceAchievement(8, "Sabio Tri-Lenguaje", "Acumula 2,500 XP dominando los tres lenguajes del currículo.", "SPARK", 2500));
+        list.add(new ChallengeCountAchievement(9, "Explorador de Estructuras", "Completa 25 retos de aprendizaje.", "CODE", 25));
+        list.add(new ChallengeCountAchievement(10, "Estratega Algorítmico", "Completa 40 retos de aprendizaje.", "STAR", 40));
+        list.add(new ChallengeCountAchievement(11, "Campeón del Código", "Completa 60 retos de aprendizaje.", "TROPHY", 60));
+        list.add(new ExperienceAchievement(12, "Experiencia Avanzada", "Alcanza 3,500 XP.", "BOLT", 3500));
+        list.add(new ExperienceAchievement(13, "Ingeniero del Código", "Alcanza 5,000 XP.", "SPARK", 5000));
+        list.add(new ExperienceAchievement(14, "Leyenda de LevelUp", "Alcanza 7,500 XP.", "TROPHY", 7500));
+        list.add(new StreakAchievement(15, "Disciplina Imparable", "Mantén una racha activa de 21 días.", "FLAME", 21));
+        list.add(new StreakAchievement(16, "Programador Constante", "Mantén una racha activa de 30 días.", "SHIELD", 30));
+        list.add(new StreakAchievement(17, "Maestro de la Constancia", "Mantén una racha activa de 60 días.", "STAR", 60));
         return list;
     }
 

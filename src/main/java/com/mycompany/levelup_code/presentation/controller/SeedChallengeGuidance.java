@@ -12,7 +12,13 @@ public final class SeedChallengeGuidance {
             Map.entry(2, 2), Map.entry(5, 2), Map.entry(8, 2),
             Map.entry(11, 3), Map.entry(14, 3), Map.entry(17, 3),
             Map.entry(3, 4), Map.entry(6, 4), Map.entry(9, 4),
-            Map.entry(12, 5), Map.entry(15, 5), Map.entry(18, 5));
+            Map.entry(12, 5), Map.entry(15, 5), Map.entry(18, 5),
+            Map.entry(19, 6), Map.entry(25, 6), Map.entry(31, 6),
+            Map.entry(20, 7), Map.entry(26, 7), Map.entry(32, 7),
+            Map.entry(21, 8), Map.entry(27, 8), Map.entry(33, 8),
+            Map.entry(22, 9), Map.entry(28, 9), Map.entry(34, 9),
+            Map.entry(23, 10), Map.entry(29, 10), Map.entry(35, 10),
+            Map.entry(24, 11), Map.entry(30, 11), Map.entry(36, 11));
 
     private static final List<List<String>> CODE_HINTS = List.of(
             List.of("Identifica qué sonido corresponde a cada especie.", "Compara los nombres ignorando las diferencias entre mayúsculas y minúsculas.", "Comprueba Perro y Gato antes de devolver el valor para una especie desconocida."),
@@ -20,7 +26,22 @@ public final class SeedChallengeGuidance {
             List.of("La secuencia está ordenada. Usa ese orden para descartar una parte de la búsqueda.", "Mantén los límites del intervalo y calcula su punto medio. En Python necesitas división entera.", "Si el valor central es menor que el objetivo, avanza el límite izquierdo. Si es mayor, retrocede el derecho. Comprueba también un valor ausente."),
             List.of("Un palíndromo conserva sus caracteres al leerlo en sentido contrario.", "Normaliza las mayúsculas y compara los dos extremos de la secuencia.", "Avanza hacia el centro mientras coincidan los caracteres. Una sola diferencia permite detener la comprobación."),
             List.of("Solo deben contribuir al resultado los números que cumplen la condición de paridad.", "Prepara un acumulador y recorre cada elemento de la colección.", "Comprueba el resto de la división entre dos antes de sumar. Una colección sin números pares debe conservar el acumulador inicial."),
-            List.of("Necesitas recordar los valores que ya aparecieron durante el recorrido.", "Un conjunto permite comprobar si un elemento ya se ha visitado.", "Comprueba la pertenencia antes de insertar cada valor. Devuelve el primer repetido encontrado durante el recorrido y contempla que no haya ninguno."));
+            List.of("Necesitas recordar los valores que ya aparecieron durante el recorrido.", "Un conjunto permite comprobar si un elemento ya se ha visitado.", "Comprueba la pertenencia antes de insertar cada valor. Devuelve el primer repetido encontrado durante el recorrido y contempla que no haya ninguno."),
+            List.of("Define primero el resultado para 0 y 1.", "Cada llamada debe trabajar con un valor menor que la anterior.", "Retorna n multiplicado por el factorial de n - 1 y deja que el caso base detenga la recursión."),
+            List.of("Divide la colección hasta obtener segmentos de un elemento.", "Ordena recursivamente las dos mitades.", "Combina las mitades comparando sus primeros elementos pendientes hasta producir una colección ordenada."),
+            List.of("Guarda cada delimitador de apertura en una pila.", "Ante un cierre, comprueba el elemento superior antes de retirarlo.", "La expresión es válida solo si todos los cierres coinciden y la pila queda vacía."),
+            List.of("El primer turno no espera; los siguientes esperan por los anteriores.", "Conserva un acumulador del tiempo transcurrido.", "Antes de añadir cada duración al tiempo transcurrido, suma ese tiempo al total de espera."),
+            List.of("Inserta cada valor comparándolo con el nodo actual.", "Los menores avanzan a la izquierda y los mayores a la derecha.", "La altura de un nodo es uno más que la mayor altura de sus dos subárboles."),
+            List.of("Construye una lista de vecinos para cada vértice.", "Inicia una cola con el origen y márcalo como visitado.", "Extrae un vértice, agrega sus vecinos no visitados y al final retorna el tamaño del conjunto de visitados."));
+
+    private static final List<String> EXPANDED_QUIZ_EXPLANATIONS = List.of(
+            "Un caso base alcanzable detiene la cadena de llamadas; sin él la recursión continúa hasta agotar la pila.",
+            "Merge Sort divide y combina en log n niveles, procesando n elementos por nivel, por eso su tiempo es O(n log n).",
+            "LIFO significa último en entrar, primero en salir, por lo que se retira el elemento insertado más recientemente.",
+            "FIFO conserva el orden de llegada: el primer elemento insertado es el primero que se atiende.",
+            "El recorrido inorden visita primero el subárbol izquierdo, luego la raíz y finalmente el subárbol derecho.",
+            "BFS utiliza una cola para explorar por niveles y un conjunto de visitados para no procesar vértices repetidos."
+    );
 
     private static final Map<Integer, String> QUIZ_EXPLANATIONS = Map.ofEntries(
             Map.entry(102, "El despacho dinámico selecciona en ejecución la implementación del objeto real. La sobrecarga se resuelve usando las firmas de los métodos."),
@@ -47,8 +68,11 @@ public final class SeedChallengeGuidance {
     public static ChallengeGuidance forChallenge(Challenge challenge) {
         Integer topic = TOPICS.get(challenge.getLessonId());
         if (topic == null) return ChallengeGuidance.EMPTY;
-        if (challenge instanceof QuizChallenge quiz && QUIZ_EXPLANATIONS.containsKey(challenge.getId())) {
-            String explanation = QUIZ_EXPLANATIONS.get(challenge.getId());
+        if (challenge instanceof QuizChallenge quiz) {
+            String storedExplanation = QUIZ_EXPLANATIONS.get(challenge.getId());
+            String explanation = storedExplanation != null ? storedExplanation
+                    : topic >= 6 ? EXPANDED_QUIZ_EXPLANATIONS.get(topic - 6) : null;
+            if (explanation == null) return ChallengeGuidance.EMPTY;
             List<String> feedback = quiz.getOptions().stream().map(option -> option.equals(quiz.getCorrectAnswer())
                     ? explanation : "La afirmación «" + option + "» no describe el concepto evaluado. " + explanation).toList();
             return new ChallengeGuidance(List.of("Identifica qué propiedad del lenguaje está evaluando la pregunta.",

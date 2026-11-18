@@ -385,6 +385,7 @@ public final class SeedChallengeContent {
 
     public static Exercise forId(int challengeId) {
         Exercise exercise = EXERCISES.get(challengeId);
+        if (exercise == null) exercise = ExpandedSeedCatalog.exerciseForId(challengeId);
         if (exercise == null) throw new IllegalArgumentException("El reto no pertenece al catálogo inicial.");
         return exercise;
     }

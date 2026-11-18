@@ -1012,6 +1012,13 @@
     -fx-border-radius: 10;
     -fx-padding: 10 16;
 }
+.compact-telemetry-item {
+    -fx-alignment: center-left;
+}
+.compact-telemetry-value {
+    -fx-font-size: 14;
+    -fx-text-fill: #0F172A;
+}
 .home-greeting {
     -fx-font-size: 24;
     -fx-font-weight: bold;

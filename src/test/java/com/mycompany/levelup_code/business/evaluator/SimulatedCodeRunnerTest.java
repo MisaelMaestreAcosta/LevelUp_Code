@@ -135,7 +135,7 @@ class SimulatedCodeRunnerTest {
         int totalTestCases = 0;
 
         for (Language lang : languages) {
-            assertEquals(3, lang.getModules().size(), "Cada lenguaje debe tener 3 módulos");
+            assertEquals(6, lang.getModules().size(), "Cada lenguaje debe tener 6 módulos");
             for (CourseModule mod : lang.getModules()) {
                 totalModules++;
                 assertEquals(2, mod.getLessons().size(), "Cada módulo debe tener 2 lecciones");
@@ -174,10 +174,10 @@ class SimulatedCodeRunnerTest {
             }
         }
 
-        assertEquals(9, totalModules);
-        assertEquals(18, totalLessons);
-        assertEquals(36, totalChallenges);
-        assertEquals(54, totalTestCases);
+        assertEquals(18, totalModules);
+        assertEquals(36, totalLessons);
+        assertEquals(72, totalChallenges);
+        assertEquals(108, totalTestCases);
     }
 }
 

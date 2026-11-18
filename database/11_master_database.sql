@@ -3632,6 +3632,10 @@ END;
 
 -- =============================================================================
 -- FASE 15 - PRUEBAS PL/SQL
+-- Fuente enlazada: database/15_expanded_curriculum.sql
+-- @@ resuelve la ruta con respecto a este script; conserva 15 como migración idempotente reutilizable.
+@@15_expanded_curriculum.sql
+
 -- Fuente integrada: database/04_test_plsql.sql
 -- =============================================================================
 PROMPT FASE 15 - PRUEBAS PL/SQL
