@@ -1,12 +1,16 @@
 package com.mycompany.levelup_code.presentation.component;
 
+import com.mycompany.levelup_code.business.evaluator.MissionEvaluation;
 import com.mycompany.levelup_code.domain.model.Challenge;
 import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.ProfessionalMission;
 import com.mycompany.levelup_code.domain.model.User;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javafx.scene.Group;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
@@ -78,11 +82,28 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     }
 
     @Override public void openChallenge(Challenge challenge) {
-        if (challenge == null || !canLeave()) return;
+        if (challenge == null) return;
+        openChallenge(challenge, path(challenge.getLesson()) + " › " + challenge.getTitle(), singleChallenge);
+    }
+
+    private void openChallenge(Challenge challenge, String title, boolean onlyThisChallenge) {
+        if (!canLeave()) return;
         LearningPage page = challenge instanceof CodeOrderingChallenge ordering
                 ? new CodeOrderingFrame(user, ordering, challengeRefresh, false)
-                : new ChallengeFrame(user, challenge, challengeRefresh, false, singleChallenge);
-        present(page, path(challenge.getLesson()) + " › " + challenge.getTitle());
+                : new ChallengeFrame(user, challenge, challengeRefresh, false, onlyThisChallenge);
+        present(page, title);
+    }
+
+    void openMission(ProfessionalMission mission, Supplier<Optional<Challenge>> lookup) {
+        if (!canLeave()) return;
+        String title = "Misiones › " + mission.title();
+        present(new MissionBriefPane(mission, lookup, (brief, challenge) -> {
+            var editor = new ChallengeFrame(user, challenge, challengeRefresh, false, true);
+            editor.enableMissionReview(summary -> brief.showReview(MissionEvaluation.from(mission, summary)));
+            Runnable openEditor = () -> present(editor, title + " › Reto");
+            brief.resumeWith(openEditor);
+            openEditor.run();
+        }), title);
     }
 
     @Override public void evaluated(com.mycompany.levelup_code.domain.model.PracticeSession.Outcome result) {
@@ -106,9 +127,10 @@ final class LearningWorkspace extends BorderPane implements LearningNavigation {
     }
 
     private void present(LearningPage page, String title) {
-        Stage window = (Stage) page;
-        SessionWindowRegistry.untrack(window);
-        window.getScene().setRoot(new Group());
+        if (page instanceof Stage window) {
+            SessionWindowRegistry.untrack(window);
+            window.getScene().setRoot(new Group());
+        }
         page.content().setMinSize(0, 0);
         page.setNavigator(this);
         pages.push(new Entry(page, title));

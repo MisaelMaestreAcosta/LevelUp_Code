@@ -20,14 +20,17 @@ import com.mycompany.levelup_code.data.dao.AttemptRepository;
 import com.mycompany.levelup_code.data.dao.ChallengeRepository;
 import com.mycompany.levelup_code.data.dao.ContentRepository;
 import com.mycompany.levelup_code.data.dao.EnrollmentRepository;
+import com.mycompany.levelup_code.data.dao.ProfessionalMissionRepository;
 import com.mycompany.levelup_code.data.dao.ProgressRepository;
 import com.mycompany.levelup_code.data.dao.UserRepository;
+import com.mycompany.levelup_code.data.local.DemoProfessionalMissionRepository;
 import com.mycompany.levelup_code.data.oracle.OracleAchievementRepository;
 import com.mycompany.levelup_code.data.oracle.OracleActivityRepository;
 import com.mycompany.levelup_code.data.oracle.OracleAttemptRepository;
 import com.mycompany.levelup_code.data.oracle.OracleChallengeRepository;
 import com.mycompany.levelup_code.data.oracle.OracleContentRepository;
 import com.mycompany.levelup_code.data.oracle.OracleEnrollmentRepository;
+import com.mycompany.levelup_code.data.oracle.OracleProfessionalMissionRepository;
 import com.mycompany.levelup_code.data.oracle.OracleProgressRepository;
 import com.mycompany.levelup_code.data.oracle.OracleUserRepository;
 import com.mycompany.levelup_code.domain.enums.ChallengeType;
@@ -45,6 +48,7 @@ public final class AppContext {
     private static AppContext instance;
 
     private final boolean oracleConnected;
+    private final ProfessionalMissionRepository professionalMissionRepository;
     private volatile boolean oracleAvailable;
     private final UserRepository userRepository;
     private final ContentRepository contentRepository;
@@ -70,6 +74,8 @@ public final class AppContext {
 
     private AppContext(boolean oracleConnected) {
         this.oracleConnected = oracleConnected;
+        this.professionalMissionRepository = oracleConnected
+                ? new OracleProfessionalMissionRepository() : new DemoProfessionalMissionRepository();
         this.oracleAvailable = oracleConnected;
         this.userRepository = new OracleUserRepository();
         this.contentRepository = new OracleContentRepository();
@@ -126,6 +132,10 @@ public final class AppContext {
 
     public boolean isOracleConnected() {
         return oracleConnected;
+    }
+
+    public ProfessionalMissionRepository getProfessionalMissionRepository() {
+        return professionalMissionRepository;
     }
 
     public boolean isOracleAvailable() {

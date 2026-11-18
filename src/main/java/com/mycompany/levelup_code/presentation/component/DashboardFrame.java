@@ -16,6 +16,7 @@ import com.mycompany.levelup_code.domain.model.CourseModule;
 import com.mycompany.levelup_code.domain.model.ExperienceAchievement;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
+import com.mycompany.levelup_code.domain.model.ProfessionalMission;
 import com.mycompany.levelup_code.domain.model.StreakAchievement;
 import com.mycompany.levelup_code.domain.model.TestCase;
 import com.mycompany.levelup_code.domain.model.User;
@@ -33,7 +34,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.geometry.Insets;
@@ -104,6 +107,7 @@ public class DashboardFrame {
     private Button navHomeBtn;
     private Button navCoursesBtn;
     private Button navPracticeBtn;
+    private Button navMissionsBtn;
     private Button navProgressBtn;
     private Button navNotebookBtn;
     private Button navGoalsBtn;
@@ -115,6 +119,7 @@ public class DashboardFrame {
     private ProfilePane profilePane;
     private NotebookPane notebookPane;
     private VBox practiceView;
+    private ProfessionalMissionsPane missionsView;
     private VBox practiceResults;
     private Label practiceCount;
     private TextField practiceSearch;
@@ -363,6 +368,7 @@ public class DashboardFrame {
         lessonStatuses = state.progress();
         unlockedAchievementIds = state.achievements();
         challengeProgress = state.challengeProgress();
+        if (missionsView != null) missionsView.updateProgress(challengeProgress);
         lastKnownOfflineExp = currentUser.getTotalExp();
     }
 
@@ -542,6 +548,21 @@ public class DashboardFrame {
 
     private void openLesson(Lesson lesson) { openLearning(() -> learningWorkspace.openLesson(lesson)); }
     private void openChallenge(Challenge challenge) { openLearning(() -> learningWorkspace.openChallenge(challenge)); }
+
+    private void openMission(ProfessionalMission mission) {
+        int challengeId = mission.challengeId();
+        Supplier<Optional<Challenge>> lookup;
+        if (oracleConnected) {
+            lookup = () -> AppContext.getInstance().getChallengeRepository().findById(challengeId);
+        } else {
+            Optional<Challenge> demoChallenge = allLessonsForAdmin.stream()
+                    .flatMap(lesson -> lesson.getChallenges().stream())
+                    .filter(challenge -> challenge.getId() == challengeId)
+                    .findFirst();
+            lookup = () -> demoChallenge;
+        }
+        openLearning(() -> learningWorkspace.openMission(mission, lookup));
+    }
 
     private void openLearning(Runnable open) {
         if (!learningWorkspace.hasPages()) {
@@ -723,6 +744,9 @@ public class DashboardFrame {
         navPracticeBtn.setGraphicTextGap(10);
         navPracticeBtn.setMaxWidth(Double.MAX_VALUE);
         navPracticeBtn.setOnAction(e -> switchWorkspaceView("PRACTICE"));
+        navMissionsBtn = WorkspaceUi.button("Misiones", "nav-btn", Theme.IconKind.TARGET);
+        navMissionsBtn.setMaxWidth(Double.MAX_VALUE);
+        navMissionsBtn.setOnAction(event -> switchWorkspaceView("MISSIONS"));
         navProgressBtn = new Button("Mi progreso");
         navProgressBtn.getStyleClass().add("nav-btn");
         navProgressBtn.setGraphic(Theme.createIcon(Theme.IconKind.CHART, 16, Theme.HEX_INDIGO));
@@ -786,7 +810,8 @@ public class DashboardFrame {
 
         navColumn.getChildren().addAll(
                 brand, lblNavSection,
-                navHomeBtn, navCoursesBtn, navPracticeBtn, navProgressBtn, navNotebookBtn, navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
+                navHomeBtn, navCoursesBtn, navPracticeBtn, navMissionsBtn, navProgressBtn, navNotebookBtn,
+                navGoalsBtn, navLabBtn, navComparatorBtn, navAchievementsBtn
         );
         if (navAdminBtn != null) {
             navColumn.getChildren().add(navAdminBtn);
@@ -2424,6 +2449,13 @@ public class DashboardFrame {
         } else if ("PRACTICE".equals(cardKey)) {
             renderPracticeCatalog();
             target = practiceView;
+        } else if ("MISSIONS".equals(cardKey)) {
+            if (missionsView == null) {
+                missionsView = new ProfessionalMissionsPane(
+                        AppContext.getInstance().getProfessionalMissionRepository(), this::openMission);
+                missionsView.updateProgress(challengeProgress);
+            }
+            target = missionsView;
         } else if ("ACHIEVEMENTS".equals(cardKey)) {
             target = achievementsView;
         } else if ("ADMIN".equals(cardKey) && adminView != null) {
@@ -2437,6 +2469,7 @@ public class DashboardFrame {
         updateNavigation(navHomeBtn, "HOME".equals(cardKey), Theme.IconKind.SPARK, Theme.HEX_INDIGO);
         updateNavigation(navCoursesBtn, "COURSES".equals(cardKey), Theme.IconKind.BOOK, Theme.HEX_INDIGO);
         updateNavigation(navPracticeBtn, "PRACTICE".equals(cardKey) || "SESSION".equals(cardKey), Theme.IconKind.PLAY, Theme.HEX_GREEN);
+        updateNavigation(navMissionsBtn, "MISSIONS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_INDIGO);
         updateNavigation(navProgressBtn, "PROGRESS".equals(cardKey), Theme.IconKind.CHART, Theme.HEX_INDIGO);
         updateNavigation(navNotebookBtn, "NOTEBOOK".equals(cardKey), Theme.IconKind.NOTE, Theme.HEX_INDIGO);
         updateNavigation(navGoalsBtn, "GOALS".equals(cardKey), Theme.IconKind.TARGET, Theme.HEX_GREEN);
@@ -2492,6 +2525,7 @@ public class DashboardFrame {
         demoChallengeProgress.merge(outcome.challengeId(), outcome.correct() ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED,
                 (previous, next) -> previous == ChallengeProgress.SOLVED ? previous : next);
         challengeProgress = Map.copyOf(demoChallengeProgress);
+        if (missionsView != null) missionsView.updateProgress(challengeProgress);
         populateLessonsForLanguage(activeLanguageKey);
         renderPracticeCatalog();
     }
