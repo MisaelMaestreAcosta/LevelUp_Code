@@ -1,10 +1,10 @@
 -- =============================================================================
--- LEVELUP CODE - SCRIPT MAESTRO AUTOCONTENIDO (ORACLE SQL)
+-- LEVELUP CODE - SCRIPT MAESTRO DE RECONSTRUCCIÓN (ORACLE SQL)
 -- Generado a partir de todos los scripts de la carpeta database.
 --
 -- OBJETIVO
 --   Reconstruir y validar por completo la base de datos académica de LevelUp Code
---   desde un único archivo, sin depender de llamadas @@ a otros archivos.
+--   ejecutando este archivo junto a 15_expanded_curriculum.sql en la misma carpeta.
 --
 -- EJECUCIÓN
 --   1. El usuario LEVELUP_ADMIN debe existir. Si todavía no existe, copia y
@@ -15,7 +15,7 @@
 --   4. Ejecuta el archivo completo con "Run Script" (F5) en SQL Developer.
 --
 -- ADVERTENCIAS
---   * La ejecución elimina todas las tablas y los datos actuales del esquema.
+--   * La ejecución elimina las tablas de LevelUp Code y los datos que contienen.
 --   * Incluye cuentas y actividad de demostración académica.
 --   * Al final ejecuta la batería de pruebas PL/SQL con DBMS_OUTPUT.
 --   * No contiene contraseñas reales. La contraseña de la FASE 0 es un ejemplo.
@@ -470,10 +470,24 @@ PROMPT FASE 3 - CATÁLOGO, CURSOS, RETOS Y LOGROS
 -- =============================================================================
 
 SET DEFINE OFF;
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK;
 
--- Limpieza idempotente del catálogo para permitir re-ejecución directa (F5)
-DELETE FROM Modulos;
-DELETE FROM Logros;
+-- La carga inicial requiere un catálogo vacío. Las instalaciones existentes usan migraciones.
+DECLARE
+    v_catalogo_existente NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_catalogo_existente
+    FROM dual
+    WHERE EXISTS (SELECT 1 FROM Roles)
+       OR EXISTS (SELECT 1 FROM Lenguajes)
+       OR EXISTS (SELECT 1 FROM Modulos)
+       OR EXISTS (SELECT 1 FROM Logros);
+
+    IF v_catalogo_existente > 0 THEN
+        RAISE_APPLICATION_ERROR(-20094, 'El catálogo ya existe. Aplica las migraciones que falten.');
+    END IF;
+END;
+/
 
 -- 1. ROLES
 MERGE INTO Roles dst

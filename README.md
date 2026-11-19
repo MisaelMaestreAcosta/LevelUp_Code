@@ -78,7 +78,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/00_setup_user.sql`](database/00_setup_user.sql) *(solicita la contraseña local mediante `&levelup_db_password`)*
 3. Crea una nueva conexión en SQL Developer con el usuario creado (`LEVELUP_ADMIN`) y ejecuta en orden:
    - [`database/01_schema.sql`](database/01_schema.sql) (crea las 18 tablas normalizadas)
-   - [`database/02_seed.sql`](database/02_seed.sql) (catálogo limpio de despliegue: roles, lenguajes, módulos, lecciones, retos y logros)
+   - [`database/02_seed.sql`](database/02_seed.sql) (carga inicial de roles, lenguajes, módulos, lecciones, retos y logros; requiere un catálogo vacío)
    - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
    - [`database/05_student_notebook.sql`](database/05_student_notebook.sql) (crea notas y retos favoritos por usuario)
    - [`database/06_learning_goals.sql`](database/06_learning_goals.sql) (crea metas personales)
