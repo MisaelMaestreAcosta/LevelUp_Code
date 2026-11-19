@@ -39,7 +39,8 @@ public class OracleAchievementRepository implements AchievementRepository {
 
     @Override
     public Optional<UserStats> findStatsByUserId(int userId) {
-        String sql = "SELECT u.racha_actual, u.racha_maxima, u.exp_total, "
+        String sql = "SELECT PKG_GAMIFICACION.FN_CALCULAR_RACHA_ACTIVA(u.id_usuario) AS racha_actual, "
+                + "u.racha_maxima, u.exp_total, "
                 + "(SELECT COUNT(DISTINCT i.id_reto) FROM Intentos i WHERE i.id_usuario = u.id_usuario AND i.es_correcto = 1) AS retos_aprobados "
                 + "FROM Usuarios u WHERE u.id_usuario = ?";
         try (Connection conn = DatabaseConnection.getConnection();

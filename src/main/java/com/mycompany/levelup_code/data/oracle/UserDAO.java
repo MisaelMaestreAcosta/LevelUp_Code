@@ -24,7 +24,8 @@ public class UserDAO implements GenericDAO<User, Integer> {
     private static final String SELECT_BASE =
             "SELECT u.id_usuario, u.id_rol, u.primer_nombre, u.segundo_nombre, "
             + "u.primer_apellido, u.segundo_apellido, u.correo_electronico, u.password_hash, "
-            + "u.exp_total, u.nivel, u.racha_actual, u.racha_maxima, u.vidas, "
+            + "u.exp_total, u.nivel, PKG_GAMIFICACION.FN_CALCULAR_RACHA_ACTIVA(u.id_usuario) AS racha_actual, "
+            + "u.racha_maxima, u.vidas, "
             + "u.fecha_registro, u.ultima_actividad, r.nombre_rol, r.descripcion AS rol_descripcion "
             + "FROM Usuarios u "
             + "JOIN Roles r ON r.id_rol = u.id_rol ";
