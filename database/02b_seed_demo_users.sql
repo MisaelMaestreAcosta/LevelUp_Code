@@ -31,7 +31,7 @@ INSERT INTO Usuarios (
     2, 2, 'Admin', NULL, 'Sistema', NULL,
     'admin@levelup.edu.co',
     'pbkdf2$120000$bGV2ZWx1cF9zYWx0X2FkbQ==$hw4HnfeGWlcKrVXVi9gBxfnc5k8+TsaFjpyqESnXSOY=',
-    4200, 10, 21, 30, 5,
+    4200, 15, 21, 30, 5,
     TRUNC(SYSDATE) - 60, SYSTIMESTAMP
 );
 

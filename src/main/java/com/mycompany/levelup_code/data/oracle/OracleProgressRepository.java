@@ -85,6 +85,19 @@ public class OracleProgressRepository implements ProgressRepository {
         int userId = progress.getUser().getId();
         int lessonId = progress.getLesson().getId();
 
+        if (progress.getStatus() == ProgressStatus.IN_PROGRESS) {
+            String plsql = "{call PKG_GAMIFICACION.SP_INICIAR_LECCION(?, ?)}";
+            try (Connection conn = DatabaseConnection.getConnection();
+                 CallableStatement stmt = conn.prepareCall(plsql)) {
+                stmt.setInt(1, userId);
+                stmt.setInt(2, lessonId);
+                stmt.execute();
+            } catch (SQLException e) {
+                throw new BusinessException("Error al iniciar la lección en Oracle.", e);
+            }
+            return findByUserAndLesson(userId, lessonId).orElse(progress);
+        }
+
         if (progress.getStatus() == ProgressStatus.COMPLETED) {
             String plsql = "{call PKG_GAMIFICACION.SP_COMPLETAR_LECCION(?, ?, ?, ?)}";
             try (Connection conn = DatabaseConnection.getConnection()) {
@@ -134,7 +147,7 @@ public class OracleProgressRepository implements ProgressRepository {
         String mergeSql = "MERGE INTO Progreso_Leccion dst "
                 + "USING (SELECT ? AS id_usuario, ? AS id_leccion FROM dual) src "
                 + "ON (dst.id_usuario = src.id_usuario AND dst.id_leccion = src.id_leccion) "
-                + "WHEN MATCHED THEN UPDATE SET dst.estado = ?, dst.fecha_completado = ? "
+                + "WHEN MATCHED THEN UPDATE SET dst.estado = ?, dst.fecha_completado = ? WHERE dst.estado <> 'COMPLETADA' "
                 + "WHEN NOT MATCHED THEN INSERT (id_usuario, id_leccion, estado, fecha_completado) "
                 + "VALUES (?, ?, ?, ?)";
 
