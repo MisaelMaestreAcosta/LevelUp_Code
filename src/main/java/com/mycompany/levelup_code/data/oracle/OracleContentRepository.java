@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -534,22 +535,8 @@ public class OracleContentRepository implements ContentRepository {
                     throw new SQLException("No se encontró la configuración de código del reto.");
                 }
             }
-            try (PreparedStatement stmt = conn.prepareStatement(
-                    "DELETE FROM Casos_Prueba WHERE id_reto = ?")) {
-                stmt.setInt(1, code.getId());
-                stmt.executeUpdate();
-            }
-            String caseSql = "INSERT INTO Casos_Prueba "
-                    + "(id_reto, entrada, salida_esperada, es_oculto) VALUES (?, NVL(?,EMPTY_CLOB()), NVL(?,EMPTY_CLOB()), ?)";
-            try (PreparedStatement stmt = conn.prepareStatement(caseSql)) {
-                for (TestCase testCase : code.getTestCases()) {
-                    stmt.setInt(1, code.getId());
-                    stmt.setClob(2, new java.io.StringReader(testCase.getInput() == null ? "" : testCase.getInput()));
-                    stmt.setClob(3, new java.io.StringReader(testCase.getExpectedOutput() == null ? "" : testCase.getExpectedOutput()));
-                    stmt.setInt(4, testCase.isHidden() ? 1 : 0);
-                    stmt.addBatch();
-                }
-                stmt.executeBatch();
+            if (!preserveMissionCases(conn, code)) {
+                replaceTestCases(conn, code);
             }
         } else if (challenge instanceof QuizChallenge quiz) {
             String quizSql = "UPDATE Reto_Quiz SET opciones = ?, respuesta_correcta = ? "
@@ -566,6 +553,60 @@ public class OracleContentRepository implements ContentRepository {
 
         saveActivityDetails(conn, challenge, true);
         return challenge;
+    }
+
+    private boolean preserveMissionCases(Connection conn, CodeChallenge code) throws SQLException {
+        try (var stmt = conn.prepareStatement(
+                "SELECT 1 FROM user_tables WHERE table_name = 'REQUISITO_CASO_PRUEBA'");
+             var rows = stmt.executeQuery()) {
+            if (!rows.next()) return false;
+        }
+
+        String sql = "SELECT entrada, salida_esperada, es_oculto FROM Casos_Prueba c "
+                + "WHERE c.id_reto = ? AND EXISTS (SELECT 1 FROM Requisito_Caso_Prueba rc "
+                + "WHERE rc.id_reto = c.id_reto) ORDER BY c.id_caso";
+        try (var stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, code.getId());
+            try (var rows = stmt.executeQuery()) {
+                if (!rows.next()) return false;
+                var submittedCases = code.getTestCases().iterator();
+                do {
+                    if (!submittedCases.hasNext()) throw missionCaseChange();
+                    TestCase submitted = submittedCases.next();
+                    if (!Objects.requireNonNullElse(submitted.getInput(), "").equals(rows.getString("entrada"))
+                            || !Objects.requireNonNullElse(submitted.getExpectedOutput(), "").equals(rows.getString("salida_esperada"))
+                            || submitted.isHidden() != (rows.getInt("es_oculto") == 1)) {
+                        throw missionCaseChange();
+                    }
+                } while (rows.next());
+                if (submittedCases.hasNext()) throw missionCaseChange();
+                return true;
+            }
+        }
+    }
+
+    private IllegalArgumentException missionCaseChange() {
+        return new IllegalArgumentException(
+                "Conserva los casos de prueba de este reto. Una misión profesional los usa para verificar sus requisitos.");
+    }
+
+    private void replaceTestCases(Connection conn, CodeChallenge code) throws SQLException {
+        try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM Casos_Prueba WHERE id_reto = ?")) {
+            stmt.setInt(1, code.getId());
+            stmt.executeUpdate();
+        }
+        String sql = "INSERT INTO Casos_Prueba (id_reto, entrada, salida_esperada, es_oculto) "
+                + "VALUES (?, NVL(?,EMPTY_CLOB()), NVL(?,EMPTY_CLOB()), ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            for (TestCase testCase : code.getTestCases()) {
+                stmt.setInt(1, code.getId());
+                stmt.setClob(2, new java.io.StringReader(Objects.requireNonNullElse(testCase.getInput(), "")));
+                stmt.setClob(3, new java.io.StringReader(Objects.requireNonNullElse(testCase.getExpectedOutput(), "")));
+                stmt.setInt(4, testCase.isHidden() ? 1 : 0);
+                stmt.addBatch();
+            }
+            stmt.executeBatch();
+        }
     }
 
     private void saveActivityDetails(Connection connection, Challenge challenge, boolean updating) throws SQLException {
