@@ -69,56 +69,16 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
 
 ## 🚀 Puesta en Marcha Rápida
 
-### 1. Configuración de Base de Datos en Oracle
-1. Conéctate como administrador (`SYS AS SYSDBA` o `SYSTEM`) en la base de datos conectable `XEPDB1`:
-   ```sql
-   ALTER SESSION SET CONTAINER = XEPDB1;
-   ```
-2. Ejecuta el script de creación de usuario con privilegios mínimos explícitos y cuota acotada (`100M`):
-   - [`database/00_setup_user.sql`](database/00_setup_user.sql) *(solicita la contraseña local mediante `&levelup_db_password`)*
-3. Crea una nueva conexión en SQL Developer con el usuario creado (`LEVELUP_ADMIN`) y ejecuta en orden:
-   - [`database/01_schema.sql`](database/01_schema.sql) (crea las 18 tablas normalizadas)
-   - [`database/02_seed.sql`](database/02_seed.sql) (carga inicial de roles, lenguajes, módulos, lecciones, retos y logros; requiere un catálogo vacío)
-   - *(Opcional — solo entornos de demostración/pruebas)* [`database/02b_seed_demo_users.sql`](database/02b_seed_demo_users.sql) (cuentas e historiales de prueba)
-   - [`database/05_student_notebook.sql`](database/05_student_notebook.sql) (crea notas y retos favoritos por usuario)
-   - [`database/06_learning_goals.sql`](database/06_learning_goals.sql) (crea metas personales)
-   - [`database/07_user_preferences.sql`](database/07_user_preferences.sql) (crea preferencias del editor)
-   - [`database/08_content_publication.sql`](database/08_content_publication.sql) (añade estados de publicación y soluciones de referencia)
-   - [`database/09_content_versions.sql`](database/09_content_versions.sql) (conserva versiones del contenido y vincula intentos)
-   - [`database/10_challenge_types.sql`](database/10_challenge_types.sql) (añade predicción, depuración y ordenamiento)
-   - [`database/12_seed_starter_templates.sql`](database/12_seed_starter_templates.sql) (separa las plantillas de las soluciones y conserva el historial)
-   - [`database/13_challenge_guidance.sql`](database/13_challenge_guidance.sql) (guarda pistas y explicaciones por versión del reto)
-   - [`database/14_module_finals.sql`](database/14_module_finals.sql) (añade un reto final de análisis de código por módulo)
-   - [`database/15_expanded_curriculum.sql`](database/15_expanded_curriculum.sql) (añade 9 módulos, 18 lecciones, 36 retos base, 9 finales y 9 logros sin borrar progreso)
-   - [`database/15_professional_missions.sql`](database/15_professional_missions.sql) (crea misiones y requisitos vinculados a los casos de prueba)
-   - [`database/16_seed_discount_mission.sql`](database/16_seed_discount_mission.sql) (instala el reto de Java de Tienda Horizonte)
-   - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
+### 1. Configuración de base de datos en Oracle
 
-   En una base existente, aplica una vez los scripts 05–10 que falten y recompila
-   `database/03_plsql_gamificacion.sql` para actualizar la gamificación y los reintentos idempotentes.
-   Comprueba las tablas instaladas antes de ejecutar cada script de creación.
+La [guía de la carpeta database](database/README.md) explica qué ejecutar en cada situación.
 
-   Para actualizar las plantillas de una instalación existente con los scripts 01–10
-   completos, ejecuta `database/12_seed_starter_templates.sql`. La migración conserva
-   los intentos y crea nuevas versiones de los retos originales que siguen intactos.
-   Se puede repetir y omite los retos editados. El script maestro ya la incluye.
-
-   Después de la migración 12, aplica en orden `13_challenge_guidance.sql`,
-   `14_module_finals.sql` y `15_expanded_curriculum.sql` para habilitar las guías,
-   los retos finales y los nuevos módulos. Las tres migraciones se pueden repetir y
-   conservan el historial. El script maestro enlaza `15_expanded_curriculum.sql`
-   mediante `@@`, por lo que ambos archivos deben permanecer en el mismo directorio.
-
-   Después de `14_module_finals.sql`, también puedes instalar la primera misión con
-   `15_professional_missions.sql` y `16_seed_discount_mission.sql`, en ese orden.
-   El script maestro ejecuta ambos después de la ampliación del plan de estudios.
-   Puedes repetirlos sin duplicar la misión ni sobrescribir intentos.
+- **Instalación completa para la demostración.** Crea `LEVELUP_ADMIN` con [00_setup_user.sql](database/00_setup_user.sql) si todavía no existe. Luego conéctate como `LEVELUP_ADMIN` y abre [11_master_database.sql](database/11_master_database.sql) desde el repositorio completo. El maestro ejecuta los scripts en orden con F5. Su fase de limpieza elimina las tablas de LevelUp Code y requiere confirmación explícita.
+- **Base existente.** Aplica las migraciones pendientes según la guía. Con el esquema completo, [17_data_access.sql](database/17_data_access.sql) instala los paquetes de consultas que usa Java.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
-Para demostrar el funcionamiento de la lógica de negocio en base de datos sin alterar datos persistidos:
-1. Abre [`database/04_test_plsql.sql`](database/04_test_plsql.sql) en SQL Developer o DBeaver (requiere haber cargado los datos de prueba de `02b_seed_demo_users.sql`).
-2. Asegúrate de tener activa la salida de consola (`SET SERVEROUTPUT ON;`).
-3. Ejecuta el bloque anónimo completo: valida funciones y procedimientos y revierte todos los cambios al final mediante `ROLLBACK TO sp_inicio_pruebas`.
+
+Con los datos de demostración instalados, ejecuta [04_test_plsql.sql](database/04_test_plsql.sql) con F5 como `LEVELUP_ADMIN`. El archivo habilita `DBMS_OUTPUT`, muestra el resultado de las comprobaciones y revierte los cambios de prueba. El maestro lo ejecuta al final.
 
 ### 3. Configuración Obligatoria de Credenciales Locales
 La aplicación no incluye credenciales por defecto en el código fuente. Configúralas mediante `db.properties` o variables de entorno (`DB_URL`, `DB_USER`, `DB_PASSWORD`):
