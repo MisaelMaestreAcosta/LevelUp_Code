@@ -11,7 +11,6 @@ import com.mycompany.levelup_code.domain.model.UserAchievement;
 import com.mycompany.levelup_code.domain.model.UserStats;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -27,26 +26,13 @@ import java.util.Optional;
  */
 public class OracleAchievementRepository implements AchievementRepository {
 
-    private static final String SELECT_ACHIEVEMENT_SQL =
-            "SELECT l.id_logro, l.nombre_insignia, l.descripcion, l.tipo_condicion, "
-            + "lr.dias_requeridos, le.exp_requerida, lc.retos_requeridos "
-            + "FROM Logros l "
-            + "LEFT JOIN Logro_Racha lr ON lr.id_logro = l.id_logro "
-            + "LEFT JOIN Logro_EXP le   ON le.id_logro = l.id_logro "
-            + "LEFT JOIN Logro_Retos lc ON lc.id_logro = l.id_logro ";
-
     private final UserDAO userDAO = new UserDAO();
 
     @Override
     public Optional<UserStats> findStatsByUserId(int userId) {
-        String sql = "SELECT PKG_GAMIFICACION.FN_CALCULAR_RACHA_ACTIVA(u.id_usuario) AS racha_actual, "
-                + "u.racha_maxima, u.exp_total, "
-                + "(SELECT COUNT(DISTINCT i.id_reto) FROM Intentos i WHERE i.id_usuario = u.id_usuario AND i.es_correcto = 1) AS retos_aprobados "
-                + "FROM Usuarios u WHERE u.id_usuario = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.estadisticas_logros", userId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     return Optional.of(new UserStats(
                             rs.getInt("racha_actual"),
@@ -65,14 +51,9 @@ public class OracleAchievementRepository implements AchievementRepository {
     @Override
     public List<Achievement> findNotUnlockedByUser(int userId) {
         List<Achievement> list = new ArrayList<>();
-        String sql = SELECT_ACHIEVEMENT_SQL
-                + "WHERE NOT EXISTS ("
-                + "  SELECT 1 FROM Usuario_Logro ul WHERE ul.id_usuario = ? AND ul.id_logro = l.id_logro"
-                + ") ORDER BY l.id_logro ASC";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.logros_pendientes", userId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     list.add(mapAchievement(rs));
                 }
@@ -91,19 +72,8 @@ public class OracleAchievementRepository implements AchievementRepository {
                 ? userAchievement.getUnlockedAt()
                 : LocalDateTime.now();
 
-        String sql = "INSERT INTO Usuario_Logro (id_usuario, id_logro, fecha_desbloqueado) "
-                + "SELECT ?, ?, ? FROM dual "
-                + "WHERE NOT EXISTS ("
-                + "  SELECT 1 FROM Usuario_Logro WHERE id_usuario = ? AND id_logro = ?"
-                + ")";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, achId);
-            stmt.setTimestamp(3, Timestamp.valueOf(unlockedAt));
-            stmt.setInt(4, userId);
-            stmt.setInt(5, achId);
-            int affected = stmt.executeUpdate();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            int affected = OracleCalls.number(conn, "PKG_SEGUIMIENTO.otorgar_logro", userId, achId, Timestamp.valueOf(unlockedAt));
             if (affected > 0) {
                 return Optional.of(userAchievement);
             }
@@ -116,21 +86,10 @@ public class OracleAchievementRepository implements AchievementRepository {
     @Override
     public List<UserAchievement> findUnlockedByUser(int userId) {
         List<UserAchievement> list = new ArrayList<>();
-        String sql = "SELECT ul.id_usuario, ul.id_logro, ul.fecha_desbloqueado, "
-                + "l.nombre_insignia, l.descripcion, l.tipo_condicion, "
-                + "lr.dias_requeridos, le.exp_requerida, lc.retos_requeridos "
-                + "FROM Usuario_Logro ul "
-                + "JOIN Logros l ON l.id_logro = ul.id_logro "
-                + "LEFT JOIN Logro_Racha lr ON lr.id_logro = l.id_logro "
-                + "LEFT JOIN Logro_EXP le   ON le.id_logro = l.id_logro "
-                + "LEFT JOIN Logro_Retos lc ON lc.id_logro = l.id_logro "
-                + "WHERE ul.id_usuario = ? ORDER BY ul.fecha_desbloqueado DESC";
-
         User user = userDAO.findById(userId).orElse(null);
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.logros_obtenidos", userId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     Achievement ach = mapAchievement(rs);
                     Timestamp ts = rs.getTimestamp("fecha_desbloqueado");
@@ -150,10 +109,9 @@ public class OracleAchievementRepository implements AchievementRepository {
 
     public List<Achievement> findAllCatalog() {
         List<Achievement> list = new ArrayList<>();
-        String sql = SELECT_ACHIEVEMENT_SQL + "ORDER BY l.id_logro ASC";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.catalogo_logros");
+             ResultSet rs = OracleCalls.rows(stmt)) {
             while (rs.next()) {
                 list.add(mapAchievement(rs));
             }

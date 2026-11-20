@@ -34,11 +34,10 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public boolean existsLanguageByName(String name) {
-        String sql = "SELECT 1 FROM Lenguajes WHERE LOWER(nombre) = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, name.trim().toLowerCase(Locale.ROOT));
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn,
+                     "PKG_CATALOGO.existe_lenguaje", name.trim().toLowerCase(Locale.ROOT))) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 return rs.next();
             }
         } catch (SQLException e) {
@@ -48,12 +47,10 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public boolean existsLanguageByNameExceptId(String name, int excludedId) {
-        String sql = "SELECT 1 FROM Lenguajes WHERE LOWER(nombre) = ? AND id_lenguaje <> ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, name.trim().toLowerCase(Locale.ROOT));
-            stmt.setInt(2, excludedId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn,
+                     "PKG_CATALOGO.otro_lenguaje", name.trim().toLowerCase(Locale.ROOT), excludedId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 return rs.next();
             }
         } catch (SQLException e) {
@@ -63,11 +60,9 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Optional<Language> findLanguageById(int id) {
-        String sql = "SELECT id_lenguaje, nombre, descripcion, icono_url, activo FROM Lenguajes WHERE id_lenguaje = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.lenguaje_por_id", id)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     Language lang = mapLanguageRow(rs);
                     loadModulesAndLessons(conn, lang);
@@ -82,13 +77,9 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Optional<CourseModule> findModuleById(int id) {
-        String sql = "SELECT m.id_modulo, m.id_lenguaje, m.nombre_modulo, m.descripcion, m.orden_secuencia, "
-                + "l.nombre AS lang_nombre, l.descripcion AS lang_desc, l.icono_url, l.activo "
-                + "FROM Modulos m JOIN Lenguajes l ON l.id_lenguaje = m.id_lenguaje WHERE m.id_modulo = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.modulo_por_id", id)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     Language lang = new Language(
                             rs.getInt("id_lenguaje"),
@@ -116,17 +107,9 @@ public class OracleContentRepository implements ContentRepository {
 
     @Override
     public Optional<Lesson> findLessonById(int id) {
-        String sql = "SELECT le.id_leccion, le.id_modulo, le.titulo, le.contenido, le.orden_secuencia, le.exp_recompensa, "
-                + "m.nombre_modulo, m.descripcion AS mod_desc, m.orden_secuencia AS mod_orden, "
-                + "lg.id_lenguaje, lg.nombre AS lang_nombre, lg.descripcion AS lang_desc, lg.icono_url, lg.activo "
-                + "FROM Lecciones le "
-                + "JOIN Modulos m ON m.id_modulo = le.id_modulo "
-                + "JOIN Lenguajes lg ON lg.id_lenguaje = m.id_lenguaje "
-                + "WHERE le.id_leccion = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.leccion_por_id", id)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     Language lang = new Language(
                             rs.getInt("id_lenguaje"),
@@ -171,11 +154,9 @@ public class OracleContentRepository implements ContentRepository {
     public List<Language> findActiveLanguages() {
         List<Language> languages = new ArrayList<>();
         Map<Integer, Language> languagesById = new LinkedHashMap<>();
-        String sql = "SELECT id_lenguaje, nombre, descripcion, icono_url, activo "
-                + "FROM Lenguajes WHERE activo = 1 ORDER BY id_lenguaje ASC";
         try (Connection conn = DatabaseConnection.getConnection()) {
-            try (PreparedStatement stmt = conn.prepareStatement(sql);
-                 ResultSet rs = stmt.executeQuery()) {
+            try (var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.lenguajes_activos");
+                 ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     Language lang = mapLanguageRow(rs);
                     languages.add(lang);
@@ -194,12 +175,8 @@ public class OracleContentRepository implements ContentRepository {
         if (languagesById.isEmpty()) return;
 
         Map<Integer, CourseModule> modulesById = new LinkedHashMap<>();
-        String modulesSql = "SELECT m.id_modulo, m.id_lenguaje, m.nombre_modulo, "
-                + "m.descripcion, m.orden_secuencia FROM Modulos m "
-                + "JOIN Lenguajes l ON l.id_lenguaje = m.id_lenguaje "
-                + "WHERE l.activo = 1 ORDER BY m.id_lenguaje, m.orden_secuencia";
-        try (PreparedStatement stmt = conn.prepareStatement(modulesSql);
-             ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.modulos_activos");
+             ResultSet rs = OracleCalls.rows(stmt)) {
             while (rs.next()) {
                 Language language = languagesById.get(rs.getInt("id_lenguaje"));
                 if (language == null) continue;
@@ -215,14 +192,8 @@ public class OracleContentRepository implements ContentRepository {
         }
 
         Map<Integer, Lesson> lessonsById = new LinkedHashMap<>();
-        String lessonsSql = "SELECT le.id_leccion, le.id_modulo, le.titulo, le.contenido, "
-                + "le.orden_secuencia, le.exp_recompensa FROM Lecciones le "
-                + "JOIN Modulos m ON m.id_modulo = le.id_modulo "
-                + "JOIN Lenguajes l ON l.id_lenguaje = m.id_lenguaje "
-                + "WHERE l.activo = 1 "
-                + "ORDER BY m.id_lenguaje, m.orden_secuencia, le.orden_secuencia";
-        try (PreparedStatement stmt = conn.prepareStatement(lessonsSql);
-             ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.lecciones_activas");
+             ResultSet rs = OracleCalls.rows(stmt)) {
             while (rs.next()) {
                 CourseModule module = modulesById.get(rs.getInt("id_modulo"));
                 if (module == null) continue;
@@ -252,11 +223,8 @@ public class OracleContentRepository implements ContentRepository {
     }
 
     private void loadModulesAndLessons(Connection conn, Language lang) throws SQLException {
-        String modSql = "SELECT id_modulo, nombre_modulo, descripcion, orden_secuencia "
-                + "FROM Modulos WHERE id_lenguaje = ? ORDER BY orden_secuencia ASC";
-        try (PreparedStatement stmt = conn.prepareStatement(modSql)) {
-            stmt.setInt(1, lang.getId());
-            try (ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.modulos_lenguaje", lang.getId())) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     CourseModule mod = new CourseModule(
                             rs.getInt("id_modulo"),
@@ -273,11 +241,8 @@ public class OracleContentRepository implements ContentRepository {
     }
 
     private void loadLessonsForModule(Connection conn, CourseModule mod) throws SQLException {
-        String lesSql = "SELECT id_leccion, titulo, contenido, orden_secuencia, exp_recompensa "
-                + "FROM Lecciones WHERE id_modulo = ? ORDER BY orden_secuencia ASC";
-        try (PreparedStatement stmt = conn.prepareStatement(lesSql)) {
-            stmt.setInt(1, mod.getId());
-            try (ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_CATALOGO.lecciones_modulo", mod.getId())) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     Lesson lesson = new Lesson(
                             rs.getInt("id_leccion"),
@@ -380,26 +345,9 @@ public class OracleContentRepository implements ContentRepository {
 
     /** Caller owns the transaction, allowing publication metadata to commit together. */
     public Challenge saveChallenge(Connection conn, Challenge challenge) throws SQLException {
-        String baseSql = "INSERT INTO Retos (id_leccion, titulo_reto, enunciado, tipo_reto, dificultad, exp_recompensa, orden_secuencia) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ("
-                + "SELECT NVL(MAX(orden_secuencia), 0) + 1 FROM Retos WHERE id_leccion = ?"
-                + "))";
-
-        try (PreparedStatement stmt = conn.prepareStatement(baseSql, new String[]{"ID_RETO"})) {
-            stmt.setInt(1, challenge.getLesson().getId());
-            stmt.setString(2, challenge.getTitle());
-            stmt.setString(3, challenge.getDescription());
-            stmt.setString(4, challenge.getType().databaseValue());
-            stmt.setString(5, challenge.getDifficulty().name());
-            stmt.setInt(6, challenge.getExpReward());
-            stmt.setInt(7, challenge.getLesson().getId());
-            stmt.executeUpdate();
-            try (ResultSet rs = stmt.getGeneratedKeys()) {
-                if (rs.next()) {
-                    challenge.setId(rs.getInt(1));
-                }
-            }
-        }
+        challenge.setId(OracleCalls.number(conn, "PKG_RETOS.insertar_reto",
+                challenge.getLesson().getId(), challenge.getTitle(), OracleCalls.clob(challenge.getDescription()),
+                challenge.getType().databaseValue(), challenge.getDifficulty().name(), challenge.getExpReward()));
 
         if (challenge instanceof CodeChallenge) {
             CodeChallenge cc = (CodeChallenge) challenge;
@@ -556,18 +504,13 @@ public class OracleContentRepository implements ContentRepository {
     }
 
     private boolean preserveMissionCases(Connection conn, CodeChallenge code) throws SQLException {
-        try (var stmt = conn.prepareStatement(
-                "SELECT 1 FROM user_tables WHERE table_name = 'REQUISITO_CASO_PRUEBA'");
-             var rows = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_DIAGNOSTICO.tabla_casos_mision");
+             var rows = OracleCalls.rows(stmt)) {
             if (!rows.next()) return false;
         }
 
-        String sql = "SELECT entrada, salida_esperada, es_oculto FROM Casos_Prueba c "
-                + "WHERE c.id_reto = ? AND EXISTS (SELECT 1 FROM Requisito_Caso_Prueba rc "
-                + "WHERE rc.id_reto = c.id_reto) ORDER BY c.id_caso";
-        try (var stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, code.getId());
-            try (var rows = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_RETOS.casos_protegidos", code.getId())) {
+            try (var rows = OracleCalls.rows(stmt)) {
                 if (!rows.next()) return false;
                 var submittedCases = code.getTestCases().iterator();
                 do {

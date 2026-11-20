@@ -10,9 +10,8 @@ public final class OraclePracticeRepository {
     public Map<Integer, LocalDate> lastAttempts(int userId) throws SQLException {
         Map<Integer, LocalDate> attempts = new HashMap<>();
         try (var connection = DatabaseConnection.getConnection();
-             var statement = connection.prepareStatement("SELECT id_reto,TRUNC(MAX(fecha_intento)) FROM Intentos WHERE id_usuario=? GROUP BY id_reto")) {
-            statement.setInt(1, userId);
-            try (var rows = statement.executeQuery()) {
+             var statement = OracleCalls.cursor(connection, "PKG_SEGUIMIENTO.ultimas_practicas", userId)) {
+            try (var rows = OracleCalls.rows(statement)) {
                 while (rows.next()) attempts.put(rows.getInt(1), rows.getDate(2).toLocalDate());
             }
         }

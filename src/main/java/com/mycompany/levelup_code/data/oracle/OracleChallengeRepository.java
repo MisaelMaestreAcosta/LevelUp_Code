@@ -15,7 +15,6 @@ import com.mycompany.levelup_code.domain.model.OutputPredictionChallenge;
 import com.mycompany.levelup_code.domain.model.CodeOrderingChallenge;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -30,32 +29,11 @@ import java.util.Optional;
  */
 public class OracleChallengeRepository implements ChallengeRepository {
 
-    private static final String SELECT_CHALLENGE_SQL =
-            "SELECT r.id_reto, r.id_leccion, r.titulo_reto, r.enunciado, r.tipo_reto, "
-            + "r.dificultad, r.exp_recompensa, r.orden_secuencia, r.revision, "
-            + "rc.codigo_inicial, rc.limite_tiempo_ms, "
-            + "rq.opciones, rq.respuesta_correcta, rp.codigo_ejemplo, ro.fragmentos, ro.orden_correcto, "
-            + "l.titulo AS leccion_titulo, l.contenido AS leccion_contenido, "
-            + "l.orden_secuencia AS leccion_orden, l.exp_recompensa AS leccion_exp, "
-            + "m.id_modulo, m.nombre_modulo, m.descripcion AS modulo_desc, m.orden_secuencia AS modulo_orden, "
-            + "lg.id_lenguaje, lg.nombre AS lenguaje_nombre, lg.descripcion AS lenguaje_desc, "
-            + "lg.icono_url, lg.activo "
-            + "FROM Retos r "
-            + "JOIN Lecciones l ON l.id_leccion = r.id_leccion "
-            + "JOIN Modulos m ON m.id_modulo = l.id_modulo "
-            + "JOIN Lenguajes lg ON lg.id_lenguaje = m.id_lenguaje "
-            + "LEFT JOIN Reto_Codigo rc ON rc.id_reto = r.id_reto "
-            + "LEFT JOIN Reto_Quiz rq ON rq.id_reto = r.id_reto "
-            + "LEFT JOIN Reto_Prediccion rp ON rp.id_reto = r.id_reto "
-            + "LEFT JOIN Reto_Ordenamiento ro ON ro.id_reto = r.id_reto ";
-
     @Override
     public Optional<Challenge> findById(int challengeId) {
-        String sql = SELECT_CHALLENGE_SQL + "WHERE r.id_reto = ? AND r.estado='PUBLICADO' AND lg.activo=1";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, challengeId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_RETOS.reto_publicado", challengeId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     return Optional.of(mapChallenge(conn, rs));
                 }
@@ -68,10 +46,8 @@ public class OracleChallengeRepository implements ChallengeRepository {
 
     public List<Challenge> findByLessonId(Connection conn, Lesson lesson) throws SQLException {
         List<Challenge> challenges = new ArrayList<>();
-        String sql = SELECT_CHALLENGE_SQL + "WHERE r.id_leccion = ? AND r.estado='PUBLICADO' ORDER BY r.orden_secuencia ASC";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, lesson.getId());
-            try (ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_RETOS.retos_leccion", lesson.getId())) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     Challenge ch = mapChallengeWithLesson(conn, rs, lesson);
                     challenges.add(ch);
@@ -86,10 +62,8 @@ public class OracleChallengeRepository implements ChallengeRepository {
         if (lessonsById.isEmpty()) return;
 
         Map<Integer, CodeChallenge> codeChallengesById = new HashMap<>();
-        String sql = SELECT_CHALLENGE_SQL + "WHERE lg.activo = 1 AND r.estado='PUBLICADO' "
-                + "ORDER BY lg.id_lenguaje, m.orden_secuencia, l.orden_secuencia, r.orden_secuencia";
-        try (PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_RETOS.catalogo_retos");
+             ResultSet rs = OracleCalls.rows(stmt)) {
             while (rs.next()) {
                 Lesson lesson = lessonsById.get(rs.getInt("id_leccion"));
                 if (lesson == null) continue;
@@ -106,15 +80,8 @@ public class OracleChallengeRepository implements ChallengeRepository {
         OracleModuleFinalRepository.load(conn, lessonsById.values().stream()
                 .flatMap(lesson -> lesson.getChallenges().stream()).toList());
         if (codeChallengesById.isEmpty()) return;
-        String casesSql = "SELECT cp.id_caso, cp.id_reto, cp.entrada, cp.salida_esperada, cp.es_oculto "
-                + "FROM Casos_Prueba cp "
-                + "JOIN Retos r ON r.id_reto = cp.id_reto "
-                + "JOIN Lecciones le ON le.id_leccion = r.id_leccion "
-                + "JOIN Modulos m ON m.id_modulo = le.id_modulo "
-                + "JOIN Lenguajes lg ON lg.id_lenguaje = m.id_lenguaje "
-                + "WHERE lg.activo = 1 AND r.estado='PUBLICADO' ORDER BY cp.id_reto, cp.id_caso";
-        try (PreparedStatement stmt = conn.prepareStatement(casesSql);
-             ResultSet rs = stmt.executeQuery()) {
+        try (var stmt = OracleCalls.cursor(conn, "PKG_RETOS.casos_catalogo");
+             ResultSet rs = OracleCalls.rows(stmt)) {
             while (rs.next()) {
                 CodeChallenge challenge = codeChallengesById.get(rs.getInt("id_reto"));
                 if (challenge == null) continue;
@@ -129,9 +96,8 @@ public class OracleChallengeRepository implements ChallengeRepository {
     }
 
     Challenge findForAuthoring(Connection conn, int challengeId) throws SQLException {
-        try (PreparedStatement statement = conn.prepareStatement(SELECT_CHALLENGE_SQL + "WHERE r.id_reto=?")) {
-            statement.setInt(1, challengeId);
-            try (ResultSet result = statement.executeQuery()) {
+        try (var statement = OracleCalls.cursor(conn, "PKG_RETOS.reto_editor", challengeId)) {
+            try (ResultSet result = OracleCalls.rows(statement)) {
                 if (!result.next()) throw new IllegalArgumentException("El reto ya no existe.");
                 return mapChallenge(conn, result);
             }
@@ -170,11 +136,8 @@ public class OracleChallengeRepository implements ChallengeRepository {
         OracleModuleFinalRepository.load(conn, List.of(challenge));
         if (!(challenge instanceof CodeChallenge codeChallenge)) return challenge;
 
-        String casesSql = "SELECT id_caso, entrada, salida_esperada, es_oculto "
-                + "FROM Casos_Prueba WHERE id_reto = ? ORDER BY id_caso ASC";
-        try (PreparedStatement caseStmt = conn.prepareStatement(casesSql)) {
-            caseStmt.setInt(1, codeChallenge.getId());
-            try (ResultSet caseRs = caseStmt.executeQuery()) {
+        try (var caseStmt = OracleCalls.cursor(conn, "PKG_RETOS.casos_reto", codeChallenge.getId())) {
+            try (ResultSet caseRs = OracleCalls.rows(caseStmt)) {
                 while (caseRs.next()) {
                     codeChallenge.addTestCase(new TestCase(
                             caseRs.getInt("id_caso"),

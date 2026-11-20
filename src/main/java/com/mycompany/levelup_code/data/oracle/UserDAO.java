@@ -21,15 +21,6 @@ import java.util.Optional;
  */
 public class UserDAO implements GenericDAO<User, Integer> {
 
-    private static final String SELECT_BASE =
-            "SELECT u.id_usuario, u.id_rol, u.primer_nombre, u.segundo_nombre, "
-            + "u.primer_apellido, u.segundo_apellido, u.correo_electronico, u.password_hash, "
-            + "u.exp_total, u.nivel, PKG_GAMIFICACION.FN_CALCULAR_RACHA_ACTIVA(u.id_usuario) AS racha_actual, "
-            + "u.racha_maxima, u.vidas, "
-            + "u.fecha_registro, u.ultima_actividad, r.nombre_rol, r.descripcion AS rol_descripcion "
-            + "FROM Usuarios u "
-            + "JOIN Roles r ON r.id_rol = u.id_rol ";
-
     @Override
     public User insert(User user) {
         String sql = "INSERT INTO Usuarios ("
@@ -77,11 +68,9 @@ public class UserDAO implements GenericDAO<User, Integer> {
 
     @Override
     public Optional<User> findById(Integer id) {
-        String sql = SELECT_BASE + "WHERE u.id_usuario = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_USUARIOS.usuario_por_id", id)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     return Optional.of(mapRow(rs));
                 }
@@ -96,11 +85,10 @@ public class UserDAO implements GenericDAO<User, Integer> {
         if (email == null || email.trim().isEmpty()) {
             return Optional.empty();
         }
-        String sql = SELECT_BASE + "WHERE LOWER(u.correo_electronico) = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, email.trim().toLowerCase(Locale.ROOT));
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn,
+                     "PKG_USUARIOS.usuario_por_correo", email.trim().toLowerCase(Locale.ROOT))) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     return Optional.of(mapRow(rs));
                 }
@@ -114,10 +102,9 @@ public class UserDAO implements GenericDAO<User, Integer> {
     @Override
     public List<User> findAll() {
         List<User> list = new ArrayList<>();
-        String sql = SELECT_BASE + "ORDER BY u.exp_total DESC, u.id_usuario ASC";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_USUARIOS.ranking_usuarios");
+             ResultSet rs = OracleCalls.rows(stmt)) {
             while (rs.next()) {
                 list.add(mapRow(rs));
             }

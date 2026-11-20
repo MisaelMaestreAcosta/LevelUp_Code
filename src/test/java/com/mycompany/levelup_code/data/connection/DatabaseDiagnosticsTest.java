@@ -17,6 +17,7 @@ class DatabaseDiagnosticsTest {
         var report = DatabaseDiagnostics.evaluate(objects, columns);
         assertTrue(report.connected());
         assertTrue(report.scripts().contains("03_plsql_gamificacion.sql"));
+        assertTrue(report.scripts().contains("17_data_access.sql"));
         assertTrue(report.scripts().contains("05_student_notebook.sql"));
         assertFalse(report.scripts().contains("08_content_publication.sql"));
         assertFalse(report.scripts().contains("09_content_versions.sql"));
