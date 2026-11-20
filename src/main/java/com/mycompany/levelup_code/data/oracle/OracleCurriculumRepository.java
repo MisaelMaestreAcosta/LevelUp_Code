@@ -24,8 +24,8 @@ public final class OracleCurriculumRepository {
     public List<Course> courses(int administratorId) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection()) {
             OracleAuthoringRepository.requireAdministrator(connection, administratorId);
-            try (var statement = connection.prepareStatement("SELECT id_lenguaje,nombre FROM Lenguajes WHERE activo=1 ORDER BY id_lenguaje");
-                 var rows = statement.executeQuery()) {
+            try (var statement = OracleCalls.cursor(connection, "PKG_CATALOGO.cursos_editor");
+                 var rows = OracleCalls.rows(statement)) {
                 List<Course> courses = new ArrayList<>();
                 while (rows.next()) courses.add(new Course(rows.getInt(1), rows.getString(2)));
                 return List.copyOf(courses);
@@ -41,12 +41,9 @@ public final class OracleCurriculumRepository {
     }
 
     private List<Entry> list(Connection connection, Kind kind, int parentId, boolean lock) throws SQLException {
-        String sql = "SELECT " + kind.id + "," + kind.title + "," + kind.content + ",orden_secuencia,"
-                + (kind == Kind.LESSON ? "exp_recompensa" : "0") + " FROM " + kind.table
-                + " WHERE " + kind.parent + "=? ORDER BY orden_secuencia" + (lock ? " FOR UPDATE" : "");
-        try (var statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, parentId);
-            try (var rows = statement.executeQuery()) {
+        try (var statement = OracleCalls.cursor(connection, kind == Kind.MODULE
+                ? "PKG_CATALOGO.orden_modulos" : "PKG_CATALOGO.orden_lecciones", parentId, lock ? 1 : 0)) {
+            try (var rows = OracleCalls.rows(statement)) {
                 List<Entry> entries = new ArrayList<>();
                 while (rows.next()) entries.add(new Entry(rows.getInt(1), parentId, rows.getString(2), rows.getString(3), rows.getInt(4), rows.getInt(5)));
                 return entries;
@@ -106,12 +103,9 @@ public final class OracleCurriculumRepository {
     }
 
     private void lockParent(Connection connection, Kind kind, int parentId) throws SQLException {
-        String sql = kind == Kind.MODULE
-                ? "SELECT id_lenguaje FROM Lenguajes WHERE id_lenguaje=? AND activo=1 FOR UPDATE"
-                : "SELECT m.id_modulo FROM Modulos m JOIN Lenguajes l ON l.id_lenguaje=m.id_lenguaje WHERE m.id_modulo=? AND l.activo=1 FOR UPDATE OF m.id_modulo";
-        try (var statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, parentId);
-            try (var result = statement.executeQuery()) {
+        try (var statement = OracleCalls.cursor(connection, kind == Kind.MODULE
+                ? "PKG_CATALOGO.bloquear_curso_activo" : "PKG_CATALOGO.bloquear_modulo_activo", parentId)) {
+            try (var result = OracleCalls.rows(statement)) {
                 if (!result.next()) throw new IllegalArgumentException("Selecciona un curso o módulo activo y existente.");
             }
         }

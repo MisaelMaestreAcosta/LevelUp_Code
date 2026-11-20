@@ -13,10 +13,8 @@ public final class OracleAuthoringRepository {
     }
 
     static void requireAdministrator(Connection connection, int administratorId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM Usuarios u "
-                + "JOIN Roles r ON r.id_rol=u.id_rol WHERE u.id_usuario=? AND UPPER(TRIM(r.nombre_rol))='ADMINISTRADOR'")) {
-            statement.setInt(1, administratorId);
-            try (ResultSet result = statement.executeQuery()) {
+        try (var statement = OracleCalls.cursor(connection, "PKG_USUARIOS.administrador", administratorId)) {
+            try (ResultSet result = OracleCalls.rows(statement)) {
                 if (!result.next()) throw new SecurityException("Se requiere una cuenta de administrador vigente.");
             }
         }
@@ -32,9 +30,8 @@ public final class OracleAuthoringRepository {
         try (Connection connection = DatabaseConnection.getConnection()) {
             requireAdministrator(connection, administratorId);
             List<Entry> entries = new ArrayList<>();
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "SELECT id_reto,titulo_reto,estado,revision FROM Retos ORDER BY id_reto DESC");
-                 ResultSet result = statement.executeQuery()) {
+            try (var statement = OracleCalls.cursor(connection, "PKG_RETOS.catalogo_editor");
+                 ResultSet result = OracleCalls.rows(statement)) {
                 while (result.next()) entries.add(new Entry(result.getInt(1), result.getString(2),
                         PublicationState.valueOf(result.getString(3)), result.getInt(4)));
             }
@@ -49,10 +46,9 @@ public final class OracleAuthoringRepository {
             try {
                 PublicationState state;
                 int revision;
-                try (PreparedStatement statement = connection.prepareStatement(
-                        "SELECT estado,revision FROM Retos WHERE id_reto=? FOR UPDATE")) {
-                    statement.setInt(1, challengeId);
-                    try (ResultSet result = statement.executeQuery()) {
+                try (var statement = OracleCalls.cursor(connection,
+                        "PKG_RETOS.bloquear_estado_reto", challengeId)) {
+                    try (ResultSet result = OracleCalls.rows(statement)) {
                         if (!result.next()) throw new IllegalArgumentException("El reto ya no existe.");
                         state = PublicationState.valueOf(result.getString(1));
                         revision = result.getInt(2);
@@ -60,10 +56,9 @@ public final class OracleAuthoringRepository {
                 }
                 Challenge challenge = new OracleChallengeRepository().findForAuthoring(connection, challengeId);
                 String reference = "";
-                try (PreparedStatement statement = connection.prepareStatement(
-                        "SELECT codigo_solucion FROM Solucion_Referencia WHERE id_reto=?")) {
-                    statement.setInt(1, challengeId);
-                    try (ResultSet result = statement.executeQuery()) {
+                try (var statement = OracleCalls.cursor(connection,
+                        "PKG_RETOS.solucion_referencia", challengeId)) {
+                    try (ResultSet result = OracleCalls.rows(statement)) {
                         if (result.next()) reference = result.getString(1);
                     }
                 }
@@ -85,10 +80,9 @@ public final class OracleAuthoringRepository {
                 requireAdministrator(connection, administratorId);
                 OracleContentRepository content = new OracleContentRepository();
                 if (originalId > 0) {
-                    try (PreparedStatement statement = connection.prepareStatement(
-                            "SELECT revision,id_leccion,tipo_reto FROM Retos WHERE id_reto=? FOR UPDATE")) {
-                        statement.setInt(1, originalId);
-                        try (ResultSet result = statement.executeQuery()) {
+                    try (var statement = OracleCalls.cursor(connection,
+                            "PKG_RETOS.bloquear_revision_reto", originalId)) {
+                        try (ResultSet result = OracleCalls.rows(statement)) {
                             if (!result.next() || result.getInt(1) != draft.revision()) {
                                 throw new IllegalStateException("El reto cambió. Actualiza la lista y vuelve a cargarlo.");
                             }
@@ -100,10 +94,9 @@ public final class OracleAuthoringRepository {
                     }
                     content.updateChallenge(connection, challenge);
                 } else {
-                    try (PreparedStatement statement = connection.prepareStatement(
-                            "SELECT id_leccion FROM Lecciones WHERE id_leccion=? FOR UPDATE")) {
-                        statement.setInt(1, challenge.getLessonId());
-                        try (ResultSet result = statement.executeQuery()) {
+                    try (var statement = OracleCalls.cursor(connection,
+                            "PKG_CATALOGO.bloquear_leccion", challenge.getLessonId())) {
+                        try (ResultSet result = OracleCalls.rows(statement)) {
                             if (!result.next()) throw new IllegalArgumentException("Selecciona una lección existente.");
                         }
                     }

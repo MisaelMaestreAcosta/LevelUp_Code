@@ -9,7 +9,6 @@ import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -34,13 +33,9 @@ public class OracleProgressRepository implements ProgressRepository {
 
     @Override
     public Optional<LessonProgress> findByUserAndLesson(int userId, int lessonId) {
-        String sql = "SELECT id_usuario, id_leccion, estado, fecha_completado "
-                + "FROM Progreso_Leccion WHERE id_usuario = ? AND id_leccion = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, lessonId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.progreso_leccion", userId, lessonId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     User user = userDAO.findById(userId).orElse(null);
                     Lesson lesson = contentRepository.findLessonById(lessonId).orElse(null);
@@ -64,12 +59,10 @@ public class OracleProgressRepository implements ProgressRepository {
 
     @Override
     public Map<Integer, ProgressStatus> findStatusesByUser(int userId) {
-        String sql = "SELECT id_leccion, estado FROM Progreso_Leccion WHERE id_usuario = ?";
         Map<Integer, ProgressStatus> statuses = new HashMap<>();
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.estados_lecciones", userId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     statuses.put(rs.getInt("id_leccion"), mapStatusFromDb(rs.getString("estado")));
                 }
@@ -144,32 +137,8 @@ public class OracleProgressRepository implements ProgressRepository {
                 ? Timestamp.valueOf(progress.getApprovedAt())
                 : null;
 
-        String mergeSql = "MERGE INTO Progreso_Leccion dst "
-                + "USING (SELECT ? AS id_usuario, ? AS id_leccion FROM dual) src "
-                + "ON (dst.id_usuario = src.id_usuario AND dst.id_leccion = src.id_leccion) "
-                + "WHEN MATCHED THEN UPDATE SET dst.estado = ?, dst.fecha_completado = ? WHERE dst.estado <> 'COMPLETADA' "
-                + "WHEN NOT MATCHED THEN INSERT (id_usuario, id_leccion, estado, fecha_completado) "
-                + "VALUES (?, ?, ?, ?)";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(mergeSql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, lessonId);
-            stmt.setString(3, dbState);
-            if (completedTs != null) {
-                stmt.setTimestamp(4, completedTs);
-            } else {
-                stmt.setNull(4, Types.TIMESTAMP);
-            }
-            stmt.setInt(5, userId);
-            stmt.setInt(6, lessonId);
-            stmt.setString(7, dbState);
-            if (completedTs != null) {
-                stmt.setTimestamp(8, completedTs);
-            } else {
-                stmt.setNull(8, Types.TIMESTAMP);
-            }
-            stmt.executeUpdate();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            OracleCalls.execute(conn, "PKG_SEGUIMIENTO.guardar_estado_leccion", userId, lessonId, dbState, completedTs);
             return progress;
         } catch (SQLException e) {
             throw new BusinessException("Error al guardar progreso de lección en Oracle: " + e.getMessage(), e);

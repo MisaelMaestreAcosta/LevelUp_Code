@@ -13,9 +13,8 @@ final class OracleGuidanceRepository {
     private OracleGuidanceRepository() { }
 
     static boolean installed(Connection connection) throws SQLException {
-        try (var statement = connection.prepareStatement("SELECT COUNT(*) FROM user_tab_columns "
-                + "WHERE table_name IN ('RETOS','VERSION_RETO') AND column_name='GUIA_DIDACTICA'");
-             var rows = statement.executeQuery()) {
+        try (var statement = OracleCalls.cursor(connection, "PKG_DIAGNOSTICO.columnas_guias");
+             var rows = OracleCalls.rows(statement)) {
             rows.next();
             return rows.getInt(1) == 2;
         }
@@ -24,8 +23,8 @@ final class OracleGuidanceRepository {
     static void load(Connection connection, Collection<Challenge> challenges) throws SQLException {
         if (challenges.isEmpty() || !installed(connection)) return;
         Map<Integer, Challenge> byId = challenges.stream().collect(Collectors.toMap(Challenge::getId, Function.identity(), (a, b) -> a));
-        try (var statement = connection.prepareStatement("SELECT id_reto,guia_didactica FROM Retos WHERE guia_didactica IS NOT NULL");
-             var rows = statement.executeQuery()) {
+        try (var statement = OracleCalls.cursor(connection, "PKG_RETOS.guias_retos");
+             var rows = OracleCalls.rows(statement)) {
             while (rows.next()) {
                 Challenge challenge = byId.get(rows.getInt(1));
                 if (challenge != null) challenge.setGuidance(ChallengeGuidanceCodec.decode(rows.getString(2)));

@@ -28,7 +28,7 @@ class SeedContentConsistencyTest {
     }
 
     @Test
-    void migrationContainsMatchingReferenceSolutionsAndIsIncludedInMaster() throws Exception {
+    void migrationContainsMatchingReferenceSolutions() throws Exception {
         String migration = read("12_seed_starter_templates.sql");
         var entries = Pattern.compile("separate_template\\((\\d+),\\s*(.*?)\\n    \\);", Pattern.DOTALL).matcher(migration);
         int count = 0;
@@ -41,15 +41,27 @@ class SeedContentConsistencyTest {
             count++;
         }
         assertEquals(18, count);
+    }
+
+    @Test
+    void masterRunsTheDatabaseScriptsInDependencyOrder() throws Exception {
         String master = read("11_master_database.sql");
-        assertTrue(master.contains(read("02_seed.sql").strip()));
-        assertTrue(master.contains(migration.strip()));
-        assertTrue(master.contains(read("13_challenge_guidance.sql").strip()));
-        assertTrue(master.contains(read("14_module_finals.sql").strip()));
-        assertTrue(master.contains("@@15_expanded_curriculum.sql"));
-        assertTrue(master.contains(read("15_professional_missions.sql").strip()));
-        assertTrue(master.contains(read("16_seed_discount_mission.sql").strip()));
-        assertTrue(master.contains(read("00_drop.sql").strip()));
+        List<String> includes = master.lines()
+                .map(String::strip)
+                .filter(line -> line.startsWith("@@"))
+                .map(line -> line.substring(2))
+                .toList();
+        assertEquals(List.of("00_drop.sql", "01_schema.sql", "02_seed.sql", "02b_seed_demo_users.sql",
+                "05_student_notebook.sql", "06_learning_goals.sql", "07_user_preferences.sql",
+                "08_content_publication.sql", "09_content_versions.sql", "10_challenge_types.sql",
+                "03_plsql_gamificacion.sql", "12_seed_starter_templates.sql", "13_challenge_guidance.sql",
+                "14_module_finals.sql", "15_expanded_curriculum.sql", "15_professional_missions.sql",
+                "16_seed_discount_mission.sql", "17_data_access.sql", "04_test_plsql.sql"), includes);
+        for (String include : includes) assertFalse(read(include).isBlank(), include);
+        int cleanup = master.indexOf("@@00_drop.sql");
+        String confirmation = master.substring(0, cleanup);
+        assertTrue(confirmation.contains("DEFINE levelup_confirm_rebuild = \"NO\""));
+        assertTrue(confirmation.contains("-20090"));
     }
 
     @Test

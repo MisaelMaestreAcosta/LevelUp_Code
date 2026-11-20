@@ -16,24 +16,10 @@ public final class OracleGoalRepository {
         }
     }
     public List<LearningGoal> load(int userId) throws SQLException {
-        String sql="SELECT g.id_meta,g.tipo_meta,g.valor_objetivo,g.fecha_inicio,g.fecha_fin, "
-                + "CASE g.tipo_meta "
-                + "WHEN 'RETOS' THEN (SELECT COUNT(DISTINCT i.id_reto) FROM Intentos i "
-                + "WHERE i.id_usuario=g.id_usuario AND i.es_correcto=1 "
-                + "AND i.fecha_intento>=g.fecha_inicio AND i.fecha_intento<g.fecha_fin+1) "
-                + "WHEN 'LECCIONES' THEN (SELECT COUNT(*) FROM Progreso_Leccion p "
-                + "WHERE p.id_usuario=g.id_usuario AND p.estado='COMPLETADA' "
-                + "AND p.fecha_completado>=g.fecha_inicio AND p.fecha_completado<g.fecha_fin+1) "
-                + "WHEN 'XP' THEN (SELECT NVL(SUM(a.exp_ganada),0) FROM Actividad_Diaria a "
-                + "WHERE a.id_usuario=g.id_usuario AND a.fecha>=g.fecha_inicio AND a.fecha<g.fecha_fin+1) "
-                + "WHEN 'DIAS' THEN (SELECT COUNT(DISTINCT TRUNC(a.fecha)) FROM Actividad_Diaria a "
-                + "WHERE a.id_usuario=g.id_usuario AND a.exp_ganada>0 "
-                + "AND a.fecha>=g.fecha_inicio AND a.fecha<g.fecha_fin+1) END avance "
-                + "FROM Meta_Usuario g WHERE g.id_usuario=? ORDER BY g.fecha_fin DESC,g.id_meta DESC";
         var goals=new ArrayList<LearningGoal>();
-        try (Connection conn=DatabaseConnection.getConnection(); PreparedStatement stmt=conn.prepareStatement(sql)) {
-            stmt.setInt(1,userId);
-            try (ResultSet rs=stmt.executeQuery()) {
+        try (Connection conn=DatabaseConnection.getConnection(); var stmt=OracleCalls.cursor(conn,
+                "PKG_ESPACIO_ESTUDIANTE.metas_usuario", userId)) {
+            try (ResultSet rs=OracleCalls.rows(stmt)) {
                 while(rs.next()) goals.add(new LearningGoal(rs.getInt(1),LearningGoal.Type.valueOf(rs.getString(2)),
                         rs.getInt(3),rs.getDate(4).toLocalDate(),rs.getDate(5).toLocalDate(),rs.getInt(6)));
             }
