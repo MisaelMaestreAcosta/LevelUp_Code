@@ -7,7 +7,6 @@ import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.Connection;
 import java.sql.Date;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -24,13 +23,10 @@ public class OracleActivityRepository implements ActivityRepository {
 
     @Override
     public Optional<DailyActivity> findByUserAndDate(int userId, LocalDate date) {
-        String sql = "SELECT id_actividad, id_usuario, fecha, exp_ganada "
-                + "FROM Actividad_Diaria WHERE id_usuario = ? AND TRUNC(fecha) = TRUNC(?)";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setDate(2, Date.valueOf(date));
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn,
+                     "PKG_SEGUIMIENTO.actividad_en_fecha", userId, Date.valueOf(date))) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 if (rs.next()) {
                     User user = userDAO.findById(userId).orElse(null);
                     Date dbDate = rs.getDate("fecha");
@@ -55,22 +51,8 @@ public class OracleActivityRepository implements ActivityRepository {
         LocalDate date = activity.getActivityDate() != null ? activity.getActivityDate() : LocalDate.now();
         int exp = Math.max(0, activity.getExperienceGained());
 
-        String mergeSql = "MERGE INTO Actividad_Diaria dst "
-                + "USING (SELECT ? AS id_usuario, TRUNC(?) AS fecha FROM dual) src "
-                + "ON (dst.id_usuario = src.id_usuario AND TRUNC(dst.fecha) = src.fecha) "
-                + "WHEN MATCHED THEN UPDATE SET dst.exp_ganada = ? "
-                + "WHEN NOT MATCHED THEN INSERT (id_usuario, fecha, exp_ganada) "
-                + "VALUES (?, TRUNC(?), ?)";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(mergeSql)) {
-            stmt.setInt(1, userId);
-            stmt.setDate(2, Date.valueOf(date));
-            stmt.setInt(3, exp);
-            stmt.setInt(4, userId);
-            stmt.setDate(5, Date.valueOf(date));
-            stmt.setInt(6, exp);
-            stmt.executeUpdate();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            OracleCalls.execute(conn, "PKG_SEGUIMIENTO.guardar_actividad", userId, Date.valueOf(date), exp);
             return activity;
         } catch (SQLException e) {
             throw new BusinessException("Error al registrar actividad diaria en Oracle: " + e.getMessage(), e);
@@ -79,15 +61,11 @@ public class OracleActivityRepository implements ActivityRepository {
 
     public List<DailyActivity> findRecentByUser(int userId, int days) {
         List<DailyActivity> result = new ArrayList<>();
-        String sql = "SELECT id_actividad, id_usuario, fecha, exp_ganada "
-                + "FROM Actividad_Diaria WHERE id_usuario = ? AND fecha >= TRUNC(SYSDATE) - ? "
-                + "ORDER BY fecha ASC";
         User user = userDAO.findById(userId).orElse(null);
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, Math.max(1, days));
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn,
+                     "PKG_SEGUIMIENTO.actividad_reciente", userId, Math.max(1, days))) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     Date d = rs.getDate("fecha");
                     result.add(new DailyActivity(

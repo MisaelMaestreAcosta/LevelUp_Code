@@ -15,10 +15,8 @@ public final class OracleNotebookRepository {
         var notes = new ArrayList<Note>();
         var favorites = new HashSet<Integer>();
         try (Connection conn = DatabaseConnection.getConnection()) {
-            try (PreparedStatement stmt = conn.prepareStatement("SELECT id_nota,id_reto,titulo,contenido "
-                    + "FROM Nota_Estudio WHERE id_usuario=? ORDER BY fecha_edicion DESC")) {
-                stmt.setInt(1, userId);
-                try (ResultSet rs = stmt.executeQuery()) {
+            try (var stmt = OracleCalls.cursor(conn, "PKG_ESPACIO_ESTUDIANTE.notas_usuario", userId)) {
+                try (ResultSet rs = OracleCalls.rows(stmt)) {
                     while (rs.next()) {
                         int challenge = rs.getInt(2);
                         Integer challengeId = rs.wasNull() ? null : challenge;
@@ -26,9 +24,8 @@ public final class OracleNotebookRepository {
                     }
                 }
             }
-            try (PreparedStatement stmt = conn.prepareStatement("SELECT id_reto FROM Reto_Favorito WHERE id_usuario=?")) {
-                stmt.setInt(1, userId);
-                try (ResultSet rs = stmt.executeQuery()) { while (rs.next()) favorites.add(rs.getInt(1)); }
+            try (var stmt = OracleCalls.cursor(conn, "PKG_ESPACIO_ESTUDIANTE.favoritos_usuario", userId)) {
+                try (ResultSet rs = OracleCalls.rows(stmt)) { while (rs.next()) favorites.add(rs.getInt(1)); }
             }
         }
         return new Notebook(notes, favorites);
@@ -73,22 +70,15 @@ public final class OracleNotebookRepository {
     }
 
     public void favorite(int userId, int challengeId, boolean saved) throws SQLException {
-        String sql = saved
-                ? "MERGE INTO Reto_Favorito f USING (SELECT ? id_usuario, ? id_reto FROM dual) v "
-                    + "ON (f.id_usuario=v.id_usuario AND f.id_reto=v.id_reto) "
-                    + "WHEN NOT MATCHED THEN INSERT(id_usuario,id_reto) VALUES(v.id_usuario,v.id_reto)"
-                : "DELETE FROM Reto_Favorito WHERE id_usuario=? AND id_reto=?";
-        try (Connection conn = DatabaseConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1,userId); stmt.setInt(2,challengeId); stmt.executeUpdate();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            OracleCalls.execute(conn, "PKG_ESPACIO_ESTUDIANTE.guardar_favorito", userId, challengeId, saved ? 1 : 0);
         }
     }
 
     public boolean isFavorite(int userId, int challengeId) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM Reto_Favorito WHERE id_usuario=? AND id_reto=?")) {
-            statement.setInt(1, userId);
-            statement.setInt(2, challengeId);
-            try (ResultSet result = statement.executeQuery()) { return result.next(); }
+             var statement = OracleCalls.cursor(connection, "PKG_ESPACIO_ESTUDIANTE.es_favorito", userId, challengeId)) {
+            try (ResultSet result = OracleCalls.rows(statement)) { return result.next(); }
         }
     }
 }

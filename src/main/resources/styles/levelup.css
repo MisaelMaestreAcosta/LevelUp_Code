@@ -1180,6 +1180,7 @@
 .learning-workspace .notes-list .list-cell:selected .card-title { -fx-text-fill: #1D4ED8; }
 .learning-workspace .badge-indigo { -fx-text-fill: #1D4ED8; }
 .learning-workspace .badge-green { -fx-text-fill: #15803D; }
+.learning-workspace .badge-amber { -fx-text-fill: #B45309; }
 .learning-workspace .badge-neutral { -fx-text-fill: #475569; }
 .learning-workspace .separator .line {
     -fx-border-color: #E2E8F0;
@@ -1308,6 +1309,18 @@
 }
 .achievement-card-unlocked .progress-bar > .bar { -fx-background-color: #16A34A; }
 .learning-navigation { -fx-background-color: #FFFFFF; -fx-background-radius: 10; -fx-padding: 10; -fx-hgap: 10; -fx-vgap: 8; }
+.mission-card {
+    -fx-border-color: #2563EB #D8DEE9 #D8DEE9 #D8DEE9;
+    -fx-border-width: 3 1 1 1;
+    -fx-padding: 18 20;
+}
+.mission-requirement {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-border-color: #D8DEE9;
+    -fx-border-radius: 10;
+    -fx-padding: 12 14;
+}
 .xp-history .chart-plot-background { -fx-background-color: #F8FAFC; }
 .xp-history .chart-bar { -fx-bar-fill: #2563EB; -fx-background-radius: 4 4 0 0; }
 .xp-history .axis { -fx-tick-label-fill: #475569; }

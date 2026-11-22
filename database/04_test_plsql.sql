@@ -200,7 +200,7 @@ BEGIN
         p_vidas_restauradas => v_vidas_rest
     );
 
-    REGISTRAR_TEST('Sin restauración mientras aún quedan vidas', v_vidas_rest = 4, 'Vidas restantes: ' || v_vidas_rest);
+    REGISTRAR_TEST('Conserva vidas parciales con intentos hoy', v_vidas_rest = 4, 'Vidas restantes: ' || v_vidas_rest);
 
     UPDATE Usuarios SET vidas = 0 WHERE id_usuario = 1;
     PKG_GAMIFICACION.SP_RECUPERAR_VIDAS(
@@ -234,6 +234,14 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('6. PROCEDIMIENTO: PKG_GAMIFICACION.SP_COMPLETAR_LECCION');
     DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');
 
+    DELETE FROM Progreso_Leccion WHERE id_usuario = 1 AND id_leccion = 2;
+    BEGIN
+        PKG_GAMIFICACION.SP_COMPLETAR_LECCION(1, 2, v_exp_otorgada, v_nuevo_nivel);
+        REGISTRAR_TEST('Rechaza lección sin iniciar', FALSE, 'Se guardó sin iniciar');
+    EXCEPTION WHEN OTHERS THEN
+        REGISTRAR_TEST('Rechaza lección sin iniciar', SQLCODE = -20012, SQLERRM);
+    END;
+    PKG_GAMIFICACION.SP_INICIAR_LECCION(1, 2);
     PKG_GAMIFICACION.SP_COMPLETAR_LECCION(
         p_id_usuario  => 1,
         p_id_leccion  => 2,
@@ -241,8 +249,24 @@ BEGIN
         p_nuevo_nivel => v_nuevo_nivel
     );
 
-    REGISTRAR_TEST('Lección completada con éxito', v_nuevo_nivel >= 5,
-                   'XP otorgada: +' || v_exp_otorgada || ' | Nivel actual: ' || v_nuevo_nivel);
+    DECLARE
+        v_esperada NUMBER;
+        v_fecha TIMESTAMP;
+        v_fecha_final TIMESTAMP;
+    BEGIN
+        SELECT exp_recompensa INTO v_esperada FROM Lecciones WHERE id_leccion = 2;
+        SELECT fecha_completado INTO v_fecha FROM Progreso_Leccion
+        WHERE id_usuario = 1 AND id_leccion = 2 AND estado = 'COMPLETADA';
+        REGISTRAR_TEST('Lección completada con XP exacta',
+                       v_fecha IS NOT NULL AND v_exp_otorgada = v_esperada,
+                       'XP otorgada: ' || v_exp_otorgada);
+        PKG_GAMIFICACION.SP_INICIAR_LECCION(1, 2);
+        SELECT fecha_completado INTO v_fecha_final FROM Progreso_Leccion
+        WHERE id_usuario = 1 AND id_leccion = 2 AND estado = 'COMPLETADA';
+        REGISTRAR_TEST('Reapertura conserva la fecha', v_fecha = v_fecha_final, 'Fecha preservada');
+        PKG_GAMIFICACION.SP_COMPLETAR_LECCION(1, 2, v_exp_otorgada, v_nuevo_nivel);
+        REGISTRAR_TEST('Completar otra vez no concede XP', v_exp_otorgada = 0, 'XP adicional: ' || v_exp_otorgada);
+    END;
 
     -- =========================================================================
     -- CASO 7: MANEJO ROBUSTO DE EXCEPCIONES CONTROLADAS
@@ -290,6 +314,18 @@ BEGIN
                              || ' | Vidas: ' || est.vidas);
     END LOOP;
 
+    DECLARE
+        v_racha_actual NUMBER;
+        v_racha_maxima NUMBER;
+        v_record NUMBER;
+    BEGIN
+        SELECT COUNT(*) + 1 INTO v_record FROM Actividad_Diaria WHERE id_usuario = 1;
+        UPDATE Usuarios SET racha_maxima = v_record WHERE id_usuario = 1;
+        PKG_GAMIFICACION.SP_SINCRONIZAR_RACHA(1, v_racha_actual, v_racha_maxima);
+        REGISTRAR_TEST('Sincronizar conserva el récord histórico', v_racha_maxima = v_record,
+                       'Récord antes y después: ' || v_record || '/' || v_racha_maxima);
+    END;
+
     -- Deshacer cambios de la prueba para mantener la base de datos en su estado inicial
     ROLLBACK TO sp_inicio_pruebas;
 
@@ -310,9 +346,10 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');
     DBMS_OUTPUT.PUT_LINE('RESUMEN DE PRUEBAS PL/SQL: ' || v_pruebas_exito || ' de ' || v_total_pruebas || ' pruebas superadas.');
     IF v_pruebas_exito = v_total_pruebas THEN
-        DBMS_OUTPUT.PUT_LINE('ESTADO FINAL: [APROBADO] — Todos los objetos operan al 100% sin alterar datos.');
+        DBMS_OUTPUT.PUT_LINE('ESTADO FINAL: [APROBADO] — Pasaron todas las comprobaciones ejecutadas.');
     ELSE
         DBMS_OUTPUT.PUT_LINE('ESTADO FINAL: [REVISAR] — Algunas pruebas fallaron.');
+        RAISE_APPLICATION_ERROR(-20093, 'Fallaron las pruebas PL/SQL de LevelUp Code.');
     END IF;
     DBMS_OUTPUT.PUT_LINE('================================================================================');
 
@@ -325,6 +362,7 @@ EXCEPTION
                 ROLLBACK;
         END;
         DBMS_OUTPUT.PUT_LINE('ERROR CRÍTICO NO CONTROLADO EN EL BLOQUE ANÓNIMO: ' || SQLERRM);
+        RAISE;
 END;
 /
 

@@ -136,6 +136,8 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
      *   - Cambia estado a 'COMPLETADA' con estampa de tiempo.
      *   - Si no estaba completada previamente, otorga la XP de la lección y actualiza nivel.
      */
+    PROCEDURE SP_INICIAR_LECCION(p_id_usuario IN NUMBER, p_id_leccion IN NUMBER);
+
     PROCEDURE SP_COMPLETAR_LECCION(
         p_id_usuario     IN  NUMBER,
         p_id_leccion     IN  NUMBER,
@@ -152,7 +154,7 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
         p_vidas_restauradas   OUT NUMBER
     );
 
-    /** Recalcula las rachas actual y máxima usando únicamente días consecutivos reales. */
+    /** Recalcula la racha actual y conserva el récord histórico si supera el historial disponible. */
     PROCEDURE SP_SINCRONIZAR_RACHA(
         p_id_usuario    IN  NUMBER,
         p_racha_actual  OUT NUMBER,
@@ -490,6 +492,23 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
     END SP_REGISTRAR_INTENTO_RETO;
 
     -- -------------------------------------------------------------------------
+    PROCEDURE SP_INICIAR_LECCION(p_id_usuario IN NUMBER, p_id_leccion IN NUMBER) IS
+        v_id_usuario NUMBER;
+    BEGIN
+        SELECT id_usuario INTO v_id_usuario
+        FROM Usuarios WHERE id_usuario = p_id_usuario FOR UPDATE;
+
+        MERGE INTO Progreso_Leccion dst
+        USING (SELECT v_id_usuario AS id_usr, p_id_leccion AS id_lec FROM dual) src
+        ON (dst.id_usuario = src.id_usr AND dst.id_leccion = src.id_lec)
+        WHEN MATCHED THEN
+            UPDATE SET dst.estado = C_ESTADO_ENCURSO, dst.fecha_completado = NULL
+            WHERE dst.estado = 'PENDIENTE'
+        WHEN NOT MATCHED THEN
+            INSERT (id_usuario, id_leccion, estado)
+            VALUES (src.id_usr, src.id_lec, C_ESTADO_ENCURSO);
+    END SP_INICIAR_LECCION;
+
     -- IMPLEMENTACIÓN: SP_COMPLETAR_LECCION
     -- -------------------------------------------------------------------------
     PROCEDURE SP_COMPLETAR_LECCION(
@@ -539,6 +558,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
             p_xp_otorgada := 0;
             p_nuevo_nivel := FN_CALCULAR_NIVEL(v_exp_usuario);
             RETURN;
+        END IF;
+
+        IF v_estado_actual <> C_ESTADO_ENCURSO THEN
+            RAISE_APPLICATION_ERROR(-20012, 'La lección debe estar en curso para completarse.');
         END IF;
 
         p_xp_otorgada := v_exp_leccion;
@@ -644,15 +667,17 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
         p_racha_actual  OUT NUMBER,
         p_racha_maxima  OUT NUMBER
     ) IS
-        v_usuario_existe NUMBER;
+        v_racha_max_guardada NUMBER;
     BEGIN
-        SELECT COUNT(*) INTO v_usuario_existe
-        FROM Usuarios
-        WHERE id_usuario = p_id_usuario;
-
-        IF v_usuario_existe = 0 THEN
-            RAISE_APPLICATION_ERROR(-20021, 'Usuario #' || p_id_usuario || ' no encontrado.');
-        END IF;
+        BEGIN
+            SELECT racha_maxima INTO v_racha_max_guardada
+            FROM Usuarios
+            WHERE id_usuario = p_id_usuario
+            FOR UPDATE;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE_APPLICATION_ERROR(-20021, 'Usuario #' || p_id_usuario || ' no encontrado.');
+        END;
 
         WITH dias AS (
             SELECT DISTINCT TRUNC(fecha) AS dia
@@ -672,7 +697,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
                        WHEN fin IN (TRUNC(SYSDATE), TRUNC(SYSDATE) - 1) THEN longitud
                        ELSE 0
                    END), 0),
-               NVL(MAX(longitud), 0)
+               GREATEST(v_racha_max_guardada, NVL(MAX(longitud), 0))
         INTO p_racha_actual, p_racha_maxima
         FROM rachas;
 

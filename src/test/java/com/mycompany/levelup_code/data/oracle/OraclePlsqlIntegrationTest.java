@@ -1,6 +1,8 @@
 package com.mycompany.levelup_code.data.oracle;
 
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,10 +10,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Savepoint;
 import java.sql.Types;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -20,6 +24,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * no hay una instancia Oracle configurada o disponible en el entorno de construcción.
  */
 class OraclePlsqlIntegrationTest {
+
+    @Test void initialSeedGuardRejectsAnExistingCatalog() throws Exception {
+        Assumptions.assumeTrue(DatabaseConnection.isDatabaseReady(), "Oracle local no disponible.");
+        var guard = Pattern.compile("(?ms)^DECLARE\\R(.*?)^/").matcher(
+                Files.readString(Path.of("database", "02_seed.sql")));
+        assertTrue(guard.find());
+        try (Connection conn = DatabaseConnection.getConnection(); var statement = conn.createStatement()) {
+            try (var roles = statement.executeQuery("SELECT 1 FROM Roles FETCH FIRST 1 ROW ONLY")) {
+                Assumptions.assumeTrue(roles.next(), "Se requiere un catálogo instalado.");
+            }
+            var error = assertThrows(SQLException.class, () -> statement.execute("DECLARE\n" + guard.group(1)));
+            assertEquals(20094, error.getErrorCode());
+        }
+    }
 
     @Test
     void storedProceduresRespectCallerSavepointWithoutPersistingChanges() throws SQLException {

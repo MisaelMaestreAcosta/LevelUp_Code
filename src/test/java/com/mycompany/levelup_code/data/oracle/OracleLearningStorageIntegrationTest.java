@@ -62,6 +62,25 @@ class OracleLearningStorageIntegrationTest {
     }
 
     @Test
+    void profileAndAchievementStatsIgnoreAnExpiredStoredStreak() throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement stored = connection.prepareStatement("UPDATE Usuarios SET racha_actual=7, racha_maxima=7 WHERE id_usuario=?");
+             PreparedStatement activity = connection.prepareStatement(
+                     "INSERT INTO Actividad_Diaria(id_usuario,fecha,exp_ganada) VALUES(?,TRUNC(SYSDATE)-2,20)")) {
+            stored.setInt(1, userId);
+            stored.executeUpdate();
+            activity.setInt(1, userId);
+            activity.executeUpdate();
+        }
+        var profile = new UserDAO().findById(userId).orElseThrow();
+        assertEquals(0, profile.getCurrentStreak());
+        assertEquals(7, profile.getMaxStreak());
+        var stats = new OracleAchievementRepository().findStatsByUserId(userId).orElseThrow();
+        assertEquals(0, stats.getCurrentStreak());
+        assertEquals(7, stats.getMaxStreak());
+    }
+
+    @Test
     void analyticsCalendarAndReviewRemainPrivateAndExcludeSolvedChallenges() throws SQLException {
         int challengeId = firstId("SELECT MIN(id_reto) FROM Retos WHERE estado='PUBLICADO'");
         Assumptions.assumeTrue(challengeId > 0, "Se necesita un reto publicado.");

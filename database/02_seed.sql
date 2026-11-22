@@ -12,10 +12,24 @@
 -- =============================================================================
 
 SET DEFINE OFF;
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK;
 
--- Limpieza idempotente del catálogo para permitir re-ejecución directa (F5)
-DELETE FROM Modulos;
-DELETE FROM Logros;
+-- La carga inicial requiere un catálogo vacío. Las instalaciones existentes usan migraciones.
+DECLARE
+    v_catalogo_existente NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_catalogo_existente
+    FROM dual
+    WHERE EXISTS (SELECT 1 FROM Roles)
+       OR EXISTS (SELECT 1 FROM Lenguajes)
+       OR EXISTS (SELECT 1 FROM Modulos)
+       OR EXISTS (SELECT 1 FROM Logros);
+
+    IF v_catalogo_existente > 0 THEN
+        RAISE_APPLICATION_ERROR(-20094, 'El catálogo ya existe. Aplica las migraciones que falten.');
+    END IF;
+END;
+/
 
 -- 1. ROLES
 MERGE INTO Roles dst

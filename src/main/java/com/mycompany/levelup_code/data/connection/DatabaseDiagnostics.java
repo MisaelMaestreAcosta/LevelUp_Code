@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.data.connection;
 
+import com.mycompany.levelup_code.data.oracle.OracleCalls;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -38,8 +39,16 @@ public final class DatabaseDiagnostics {
             new Requirement("10_challenge_types.sql", List.of("RETO_PREDICCION/TABLE", "RETO_ORDENAMIENTO/TABLE"), List.of()),
             new Requirement("13_challenge_guidance.sql", List.of(), List.of("RETOS.GUIA_DIDACTICA", "VERSION_RETO.GUIA_DIDACTICA")),
             new Requirement("14_module_finals.sql", List.of("FINAL_MODULO/TABLE"), List.of()),
+            new Requirement("15_professional_missions.sql", List.of("MISION_PROFESIONAL/TABLE",
+                    "REQUISITO_MISION/TABLE", "REQUISITO_CASO_PRUEBA/TABLE"), List.of()),
             new Requirement("03_plsql_gamificacion.sql", List.of("PKG_GAMIFICACION/PACKAGE",
-                    "PKG_GAMIFICACION/PACKAGE BODY", "TRG_AUDIT_USUARIOS/TRIGGER"), List.of("INTENTOS.ID_SOLICITUD"))
+                    "PKG_GAMIFICACION/PACKAGE BODY", "TRG_AUDIT_USUARIOS/TRIGGER"), List.of("INTENTOS.ID_SOLICITUD")),
+            new Requirement("17_data_access.sql", List.of("PKG_DIAGNOSTICO/PACKAGE", "PKG_DIAGNOSTICO/PACKAGE BODY",
+                    "PKG_USUARIOS/PACKAGE", "PKG_USUARIOS/PACKAGE BODY",
+                    "PKG_CATALOGO/PACKAGE", "PKG_CATALOGO/PACKAGE BODY",
+                    "PKG_RETOS/PACKAGE", "PKG_RETOS/PACKAGE BODY",
+                    "PKG_SEGUIMIENTO/PACKAGE", "PKG_SEGUIMIENTO/PACKAGE BODY",
+                    "PKG_ESPACIO_ESTUDIANTE/PACKAGE", "PKG_ESPACIO_ESTUDIANTE/PACKAGE BODY"), List.of())
     );
 
     private DatabaseDiagnostics() { }
@@ -48,16 +57,20 @@ public final class DatabaseDiagnostics {
         try (Connection connection = DatabaseConnection.getConnection()) {
             Set<String> objects = new HashSet<>();
             Set<String> columns = new HashSet<>();
-            try (var statement = connection.prepareStatement(
-                    "SELECT object_name,object_type FROM user_objects WHERE status='VALID'")) {
+            try (var statement = OracleCalls.cursor(connection, "PKG_DIAGNOSTICO.objetos_validos")) {
                 statement.setQueryTimeout(10);
-                try (var rows = statement.executeQuery()) {
+                try (var rows = OracleCalls.rows(statement)) {
                     while (rows.next()) objects.add(rows.getString(1) + "/" + rows.getString(2));
                 }
+            } catch (SQLException ex) {
+                if (ex.getErrorCode() == 6550 || ex.getErrorCode() == 4063 || ex.getErrorCode() == 6508) {
+                    return new Report(true, List.of("17_data_access.sql"));
+                }
+                throw ex;
             }
-            try (var statement = connection.prepareStatement("SELECT table_name,column_name FROM user_tab_columns")) {
+            try (var statement = OracleCalls.cursor(connection, "PKG_DIAGNOSTICO.columnas_instaladas")) {
                 statement.setQueryTimeout(10);
-                try (var rows = statement.executeQuery()) {
+                try (var rows = OracleCalls.rows(statement)) {
                     while (rows.next()) columns.add(rows.getString(1) + "." + rows.getString(2));
                 }
             }

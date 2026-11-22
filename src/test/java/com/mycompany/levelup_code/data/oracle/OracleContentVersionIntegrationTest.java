@@ -3,6 +3,8 @@ package com.mycompany.levelup_code.data.oracle;
 import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.domain.model.*;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -79,6 +81,56 @@ class OracleContentVersionIntegrationTest {
                 }
             } finally { connection.rollback(); }
         }
+    }
+
+    @Test void preservingMissionCasesKeepsTheirLinksWhenEditingTheChallenge() throws Exception {
+        Assumptions.assumeTrue(DatabaseConnection.isDatabaseReady(), "Oracle local no disponible.");
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            try (var statement = connection.createStatement();
+                 var result = statement.executeQuery("SELECT 1 FROM user_tables WHERE table_name='REQUISITO_CASO_PRUEBA'")) {
+                Assumptions.assumeTrue(result.next(), "Instala la migración de misiones.");
+            }
+            Integer challengeId;
+            try (var statement = connection.createStatement();
+                 var result = statement.executeQuery("SELECT MIN(rc.id_reto) FROM Requisito_Caso_Prueba rc "
+                         + "JOIN Retos r ON r.id_reto=rc.id_reto JOIN Lecciones l ON l.id_leccion=r.id_leccion "
+                         + "JOIN Modulos m ON m.id_modulo=l.id_modulo JOIN Lenguajes lg ON lg.id_lenguaje=m.id_lenguaje "
+                         + "WHERE r.estado='PUBLICADO' AND lg.activo=1")) {
+                assertTrue(result.next());
+                challengeId = result.getObject(1, Integer.class);
+            }
+            Assumptions.assumeTrue(challengeId != null, "Se requiere una misión publicada con casos vinculados.");
+            CodeChallenge challenge = (CodeChallenge) new OracleChallengeRepository().findById(challengeId).orElseThrow();
+            connection.setAutoCommit(false);
+            try {
+                var originalLinks = missionCaseLinks(connection, challengeId);
+                assertFalse(originalLinks.isEmpty());
+                challenge.setTitle("Edición de prueba de la misión");
+                var repository = new OracleContentRepository();
+                repository.updateChallenge(connection, challenge);
+                assertEquals(originalLinks, missionCaseLinks(connection, challengeId));
+
+                TestCase first = challenge.getTestCases().getFirst();
+                first.setExpectedOutput(first.getExpectedOutput() + " cambio");
+                assertThrows(IllegalArgumentException.class, () -> repository.updateChallenge(connection, challenge));
+                assertEquals(originalLinks, missionCaseLinks(connection, challengeId));
+            } finally {
+                connection.rollback();
+            }
+        }
+    }
+
+    private List<String> missionCaseLinks(Connection connection, int challengeId) throws SQLException {
+        var links = new ArrayList<String>();
+        try (var statement = connection.prepareStatement(
+                "SELECT codigo_mision, orden_requisito, id_caso FROM Requisito_Caso_Prueba WHERE id_reto=? "
+                + "ORDER BY codigo_mision, orden_requisito, id_caso")) {
+            statement.setInt(1, challengeId);
+            try (var rows = statement.executeQuery()) {
+                while (rows.next()) links.add(rows.getString(1) + "/" + rows.getInt(2) + "/" + rows.getInt(3));
+            }
+        }
+        return links;
     }
 
     private void insertAttempt(Connection connection, int userId, int challengeId) throws SQLException {

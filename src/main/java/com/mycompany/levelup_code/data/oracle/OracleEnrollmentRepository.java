@@ -4,7 +4,6 @@ import com.mycompany.levelup_code.data.connection.DatabaseConnection;
 import com.mycompany.levelup_code.data.dao.EnrollmentRepository;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashSet;
@@ -21,11 +20,9 @@ public class OracleEnrollmentRepository implements EnrollmentRepository {
             throw new IllegalArgumentException("El identificador de usuario debe ser válido.");
         }
         Set<Integer> ids = new LinkedHashSet<>();
-        String sql = "SELECT id_lenguaje FROM Inscripciones WHERE id_usuario = ? ORDER BY fecha_inscripcion ASC";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_USUARIOS.inscripciones_usuario", userId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     ids.add(rs.getInt("id_lenguaje"));
                 }
@@ -41,12 +38,9 @@ public class OracleEnrollmentRepository implements EnrollmentRepository {
         if (userId <= 0 || languageId <= 0) {
             return false;
         }
-        String sql = "SELECT 1 FROM Inscripciones WHERE id_usuario = ? AND id_lenguaje = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, languageId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_USUARIOS.esta_inscrito", userId, languageId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 return rs.next();
             }
         } catch (SQLException e) {
@@ -59,18 +53,8 @@ public class OracleEnrollmentRepository implements EnrollmentRepository {
         if (userId <= 0 || languageId <= 0) {
             throw new IllegalArgumentException("El usuario y el lenguaje deben ser válidos para inscribirse.");
         }
-        String mergeSql = "MERGE INTO Inscripciones dst "
-                + "USING (SELECT ? AS id_usuario, ? AS id_lenguaje FROM dual) src "
-                + "ON (dst.id_usuario = src.id_usuario AND dst.id_lenguaje = src.id_lenguaje) "
-                + "WHEN NOT MATCHED THEN "
-                + "INSERT (id_usuario, id_lenguaje, fecha_inscripcion) VALUES (?, ?, SYSDATE)";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(mergeSql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, languageId);
-            stmt.setInt(3, userId);
-            stmt.setInt(4, languageId);
-            stmt.executeUpdate();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            OracleCalls.execute(conn, "PKG_USUARIOS.inscribir", userId, languageId);
         } catch (SQLException e) {
             throw new BusinessException("Error al registrar inscripción en Oracle: " + e.getMessage(), e);
         }

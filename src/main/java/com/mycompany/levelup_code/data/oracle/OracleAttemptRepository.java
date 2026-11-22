@@ -10,7 +10,6 @@ import com.mycompany.levelup_code.domain.model.User;
 import com.mycompany.levelup_code.exception.BusinessException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -44,12 +43,9 @@ public class OracleAttemptRepository implements AttemptRepository {
     @Override
     public Map<Integer, ChallengeProgress> findProgressByUser(int userId) {
         Map<Integer, ChallengeProgress> progress = new HashMap<>();
-        String sql = "SELECT id_reto, MAX(es_correcto) AS aprobado "
-                + "FROM Intentos WHERE id_usuario = ? GROUP BY id_reto";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.progreso_retos", userId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     progress.put(rs.getInt("id_reto"), rs.getInt("aprobado") == 1
                             ? ChallengeProgress.SOLVED : ChallengeProgress.ATTEMPTED);
@@ -63,12 +59,9 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public boolean hasSuccessfulAttempt(int userId, int challengeId) {
-        String sql = "SELECT 1 FROM Intentos WHERE id_usuario = ? AND id_reto = ? AND es_correcto = 1 FETCH FIRST 1 ROWS ONLY";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, challengeId);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn, "PKG_SEGUIMIENTO.reto_aprobado", userId, challengeId)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 return rs.next();
             }
         } catch (SQLException e) {
@@ -82,9 +75,9 @@ public class OracleAttemptRepository implements AttemptRepository {
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try (CallableStatement cstmt = conn.prepareCall(plsql)) {
-                try (PreparedStatement lock = conn.prepareStatement("SELECT estado,revision FROM Retos WHERE id_reto=? FOR UPDATE")) {
-                    lock.setInt(1, attempt.getChallenge().getId());
-                    try (ResultSet current = lock.executeQuery()) {
+                try (var lock = OracleCalls.cursor(conn,
+                        "PKG_RETOS.bloquear_estado_reto", attempt.getChallenge().getId())) {
+                    try (ResultSet current = OracleCalls.rows(lock)) {
                         if (!current.next() || !"PUBLICADO".equals(current.getString(1))
                                 || current.getInt(2) != attempt.getChallenge().getRevision()) {
                             throw new IllegalStateException("El reto cambió durante la evaluación. Abre su versión actual para enviar.");
@@ -162,20 +155,13 @@ public class OracleAttemptRepository implements AttemptRepository {
     public List<Attempt> findRecentByUserAndChallenge(int userId, int challengeId, int limit) {
         if (limit <= 0) throw new IllegalArgumentException("El límite debe ser mayor que cero.");
         List<Attempt> list = new ArrayList<>();
-        String sql = "SELECT * FROM (SELECT i.*,v.revision AS version_reto,v.enunciado AS enunciado_version "
-                + "FROM Intentos i JOIN Version_Reto v ON v.id_version=i.id_version_reto "
-                + "WHERE i.id_usuario = ? AND i.id_reto = ? "
-                + "ORDER BY i.fecha_intento DESC,i.id_intento DESC) WHERE ROWNUM <= ?";
-
         User user = userDAO.findById(userId).orElse(null);
         Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
 
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, userId);
-            stmt.setInt(2, challengeId);
-            stmt.setInt(3, limit);
-            try (ResultSet rs = stmt.executeQuery()) {
+             var stmt = OracleCalls.cursor(conn,
+                     "PKG_SEGUIMIENTO.intentos_recientes", userId, challengeId, limit)) {
+            try (ResultSet rs = OracleCalls.rows(stmt)) {
                 while (rs.next()) {
                     AttemptResult result = rs.getInt("es_correcto") == 1
                             ? AttemptResult.CORRECT
@@ -204,12 +190,9 @@ public class OracleAttemptRepository implements AttemptRepository {
 
     @Override
     public Optional<Attempt> findByRequestId(int userId, int challengeId, String requestId) {
-        String sql = "SELECT i.*,v.revision AS version_reto,v.enunciado AS enunciado_version "
-                + "FROM Intentos i JOIN Version_Reto v ON v.id_version=i.id_version_reto "
-                + "WHERE i.id_usuario=? AND i.id_reto=? AND i.id_solicitud=?";
-        try (Connection connection = DatabaseConnection.getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, userId); statement.setInt(2, challengeId); statement.setString(3, requestId);
-            try (ResultSet result = statement.executeQuery()) {
+        try (Connection connection = DatabaseConnection.getConnection(); var statement = OracleCalls.cursor(connection,
+                "PKG_SEGUIMIENTO.intento_por_solicitud", userId, challengeId, requestId)) {
+            try (ResultSet result = OracleCalls.rows(statement)) {
                 if (!result.next()) return Optional.empty();
                 User user = userDAO.findById(userId).orElseThrow();
                 Challenge historical = challengeRepository.findForAuthoring(connection, challengeId);

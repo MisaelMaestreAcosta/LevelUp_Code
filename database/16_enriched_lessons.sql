@@ -3,6 +3,9 @@
 -- Conserva IDs, módulos, progreso y recompensas. Solo mejora el CLOB contenido.
 -- =============================================================================
 
+SET DEFINE OFF;
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK;
+
 MERGE INTO Lecciones dst
 USING (
     SELECT id_leccion, nuevo_contenido

@@ -1,5 +1,6 @@
 package com.mycompany.levelup_code.data.connection;
 
+import com.mycompany.levelup_code.data.oracle.OracleCalls;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
@@ -131,9 +132,9 @@ public final class DatabaseConnection {
      */
     public static boolean isDatabaseReady() {
         try (Connection conn = getConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement("SELECT 1 FROM Usuarios FETCH FIRST 1 ROWS ONLY")) {
+             var ps = OracleCalls.cursor(conn, "PKG_DIAGNOSTICO.comprobar_usuarios")) {
             ps.setQueryTimeout(Math.max(1, (READ_TIMEOUT_MS + 999) / 1_000));
-            ps.executeQuery();
+            OracleCalls.rows(ps).close();
             return true;
         } catch (SQLException ex) {
             return false;
