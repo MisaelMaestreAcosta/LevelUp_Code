@@ -90,6 +90,7 @@ Plataforma interactiva para el aprendizaje comparativo y resolución de retos al
    - [`database/13_challenge_guidance.sql`](database/13_challenge_guidance.sql) (guarda pistas y explicaciones por versión del reto)
    - [`database/14_module_finals.sql`](database/14_module_finals.sql) (añade un reto final de análisis de código por módulo)
    - [`database/15_expanded_curriculum.sql`](database/15_expanded_curriculum.sql) (añade 9 módulos, 18 lecciones, 36 retos base, 9 finales y 9 logros sin borrar progreso)
+   - [`database/16_enriched_lessons.sql`](database/16_enriched_lessons.sql) (amplía las lecciones existentes con lecturas estructuradas)
    - [`database/03_plsql_gamificacion.sql`](database/03_plsql_gamificacion.sql) (compila el disparador `TRG_AUDIT_USUARIOS` y el paquete `PKG_GAMIFICACION`)
 
    En una base existente, aplica una vez los scripts 05–10 que falten y recompila

@@ -219,6 +219,8 @@ public class DashboardFrame {
     private Label badgeConn;
     private Button btnRetryConnection;
     private Timeline connectionWatch;
+    private LocalDate lastLivesRefreshDate;
+    private boolean livesRefreshChecking;
     private boolean healthChecking;
     private boolean connectionAvailable;
     private boolean dataStale;
@@ -280,7 +282,7 @@ public class DashboardFrame {
                     loadDomainDataFromOracleOrSeed();
                     loadEnrollmentsFromOracle();
                     loadAchievementsFromOracleOrSeed();
-                    return fetchDashboardState(0, recoverExhaustedLivesOnOpen());
+                    return fetchDashboardState(0, recoverDailyLivesOnOpen());
                 } catch (RuntimeException ex) {
                     updateMessage(DatabaseDiagnostics.inspect().message());
                     throw ex;
@@ -342,13 +344,16 @@ public class DashboardFrame {
                         : Map.copyOf(demoChallengeProgress));
     }
 
-    private boolean recoverExhaustedLivesOnOpen() {
-        if (!oracleConnected || currentUser.getId() <= 0 || currentUser.getLives() > 0) {
+    private boolean recoverDailyLivesOnOpen() {
+        lastLivesRefreshDate = LocalDate.now();
+        if (!oracleConnected || currentUser.getId() <= 0 || currentUser.getLives() >= 5) {
             return false;
         }
         try {
-            return AppContext.getInstance().getGamificationService()
-                    .recoverLivesIfEligible(currentUser) > 0;
+            int previousLives = currentUser.getLives();
+            int refreshedLives = AppContext.getInstance().getGamificationService()
+                    .recoverLivesIfEligible(currentUser);
+            return refreshedLives > previousLives;
         } catch (RuntimeException ex) {
             LOGGER.log(Level.WARNING,
                     "No se pudo comprobar la recuperación automática de vidas", ex);
@@ -1459,7 +1464,8 @@ public class DashboardFrame {
                 route.getChildren().add(createSkillNodeRow(selectedList.indexOf(lesson) + 1, lesson,
                         resolveLessonProgressStatus(lesson, 0)));
             }
-            String title = module == null ? "Módulo curricular" : module.getTitle();
+            String title = module == null ? "Módulo curricular"
+                    : module.getTitle().replaceFirst("(?i)^Módulo\\s+[456]\\s*:\\s*", "");
             String key = langKey + ":" + (module == null ? "default" : module.getId());
             long readings = allModuleLessons.stream().filter(item -> lessonStatuses.get(item) == ProgressStatus.COMPLETED).count();
             List<Challenge> challenges = allModuleLessons.stream().flatMap(item -> item.getChallenges().stream()).toList();
@@ -2411,7 +2417,10 @@ public class DashboardFrame {
             target = codingLab;
         } else if ("PROFILE".equals(cardKey)) {
             if (profilePane == null) profilePane = new ProfilePane(currentUser, oracleConnected,
-                    () -> profileName.setText(currentUser.getUsername()));
+                    () -> profileName.setText(currentUser.getUsername()),
+                    achievementsCatalog, unlockedAchievementIds,
+                    () -> switchWorkspaceView("ACHIEVEMENTS"));
+            profilePane.refreshAchievements(achievementsCatalog, unlockedAchievementIds);
             target = profilePane;
         } else if ("NOTEBOOK".equals(cardKey)) {
             if (notebookPane==null) notebookPane = new NotebookPane(currentUser, oracleConnected,
@@ -2431,6 +2440,9 @@ public class DashboardFrame {
         }
 
         workspaceContainer.getChildren().setAll(target);
+        boolean showDashboardHeader = !"PROFILE".equals(cardKey);
+        dashboardHeader.setVisible(showDashboardHeader);
+        dashboardHeader.setManaged(showDashboardHeader);
         workspaceScroll.setVvalue(0);
         Theme.playFadeIn(target);
 
@@ -2549,9 +2561,41 @@ public class DashboardFrame {
 
     private void startConnectionWatch() {
         if (!oracleConnected || connectionWatch != null) return;
-        connectionWatch = new Timeline(new KeyFrame(Duration.seconds(30), event -> checkConnection()));
+        connectionWatch = new Timeline(new KeyFrame(Duration.seconds(30), event -> {
+            refreshLivesAfterDateChange();
+            checkConnection();
+        }));
         connectionWatch.setCycleCount(Timeline.INDEFINITE);
         connectionWatch.play();
+    }
+
+    private void refreshLivesAfterDateChange() {
+        LocalDate today = LocalDate.now();
+        if (disposed || livesRefreshChecking || today.equals(lastLivesRefreshDate)) return;
+        lastLivesRefreshDate = today;
+        if (currentUser.getId() <= 0 || currentUser.getLives() >= 5) return;
+
+        int previousLives = currentUser.getLives();
+        livesRefreshChecking = true;
+        Task<Integer> task = new Task<>() {
+            @Override protected Integer call() {
+                return AppContext.getInstance().getGamificationService().recoverLivesIfEligible(currentUser);
+            }
+        };
+        task.setOnSucceeded(event -> {
+            livesRefreshChecking = false;
+            if (disposed) return;
+            refreshGamificationTelemetry();
+            if (task.getValue() > previousLives) {
+                syncStatus.setText("¡Tus 5 vidas diarias se recuperaron automáticamente!");
+            }
+        });
+        task.setOnFailed(event -> {
+            livesRefreshChecking = false;
+            lastLivesRefreshDate = null;
+            LOGGER.log(Level.WARNING, "No se pudo actualizar la recarga diaria de vidas", task.getException());
+        });
+        startTask(task, "daily-lives-refresh");
     }
 
     private void checkConnection() {

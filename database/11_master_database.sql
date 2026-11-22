@@ -2042,8 +2042,8 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
     );
 
     /**
-     * Restaura las vidas agotadas al inicio de un nuevo día (máximo 5).
-     * Devuelve 0 cuando todavía hubo intentos durante el día actual.
+     * Restaura las vidas disponibles a 5 al inicio de un nuevo día.
+     * Conserva el saldo actual cuando ya hubo intentos durante el día.
      */
     PROCEDURE SP_RECUPERAR_VIDAS(
         p_id_usuario          IN  NUMBER,
@@ -2089,10 +2089,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
 
         -- Cursor explícito ordenado por fecha descendente
         CURSOR c_actividades IS
-            SELECT fecha
+            SELECT DISTINCT TRUNC(fecha) AS fecha
             FROM Actividad_Diaria
             WHERE id_usuario = p_id_usuario
-            ORDER BY fecha DESC;
+            ORDER BY TRUNC(fecha) DESC;
     BEGIN
         FOR r IN c_actividades LOOP
             IF v_primera THEN
@@ -2503,7 +2503,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
                 RAISE_APPLICATION_ERROR(-20021, 'Usuario #' || p_id_usuario || ' no encontrado.');
         END;
 
-        IF v_vidas_actuales > 0 THEN
+        IF v_vidas_actuales >= C_VIDAS_MAXIMAS THEN
             p_vidas_restauradas := v_vidas_actuales;
             RETURN;
         END IF;
@@ -2514,7 +2514,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
           AND fecha_intento >= TRUNC(SYSDATE);
 
         IF v_intentos_hoy > 0 THEN
-            p_vidas_restauradas := 0;
+            p_vidas_restauradas := v_vidas_actuales;
             RETURN;
         END IF;
 

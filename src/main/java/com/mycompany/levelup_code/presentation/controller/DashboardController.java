@@ -211,7 +211,7 @@ public class DashboardController {
             if (userRepository == null || achievementRepository == null) {
                 throw new IllegalStateException("Telemetría Oracle no configurada.");
             }
-            User fresh = userRepository.findById(currentUser.getId())
+            User fresh = userRepository.refreshStreakStats(currentUser.getId())
                     .orElseThrow(() -> new IllegalStateException("No se encontró el usuario actual en Oracle."));
             UserStats stats = achievementRepository.findStatsByUserId(currentUser.getId())
                     .orElseThrow(() -> new IllegalStateException("No se encontraron las estadísticas del usuario en Oracle."));

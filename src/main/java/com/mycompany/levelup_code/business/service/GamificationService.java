@@ -95,15 +95,13 @@ public class GamificationService {
 
     /** Continúa la racha si hubo actividad ayer; si no, la inicia de nuevo. */
     private void updateStreak(User user, LocalDate today) {
-        LocalDate yesterday = today.minusDays(1);
-        Optional<DailyActivity> previousActivity =
-                activityRepository.findByUserAndDate(user.getId(), yesterday);
-
-        if (previousActivity.isPresent()) {
-            user.setCurrentStreak(user.getCurrentStreak() + 1);
-        } else {
-            user.setCurrentStreak(1);
+        int consecutiveDays = 1;
+        LocalDate previousDay = today.minusDays(1);
+        while (activityRepository.findByUserAndDate(user.getId(), previousDay).isPresent()) {
+            consecutiveDays++;
+            previousDay = previousDay.minusDays(1);
         }
+        user.setCurrentStreak(consecutiveDays);
 
         if (user.getCurrentStreak() > user.getMaxStreak()) {
             user.setMaxStreak(user.getCurrentStreak());
