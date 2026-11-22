@@ -529,6 +529,197 @@
     -fx-padding: 16;
 }
 
+/* Perfil */
+.profile-pane {
+    -fx-padding: 2 0 18 0;
+}
+
+.profile-hero {
+    -fx-padding: 22 24;
+    -fx-background-color: linear-gradient(to right, #1D4ED8, #4338CA);
+    -fx-background-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(30, 64, 175, 0.20), 18, 0, 0, 6);
+}
+
+.profile-avatar {
+    -fx-min-width: 68;
+    -fx-min-height: 68;
+    -fx-pref-width: 68;
+    -fx-pref-height: 68;
+    -fx-max-width: 68;
+    -fx-max-height: 68;
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+    -fx-background-radius: 34;
+    -fx-border-color: rgba(255, 255, 255, 0.42);
+    -fx-border-radius: 34;
+    -fx-border-width: 1.5;
+}
+
+.profile-name {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #FFFFFF;
+}
+
+.profile-email {
+    -fx-font-size: 13px;
+    -fx-text-fill: #DBEAFE;
+}
+
+.profile-metric {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 5 11;
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #1E293B;
+    -fx-border-color: rgba(255, 255, 255, 0.9);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.14), 5, 0, 0, 2);
+}
+
+.profile-metric.badge-indigo {
+    -fx-background-color: #EFF6FF;
+    -fx-text-fill: #1D4ED8;
+    -fx-border-color: #93C5FD;
+}
+
+.profile-metric.badge-amber {
+    -fx-background-color: #FFFBEB;
+    -fx-text-fill: #92400E;
+    -fx-border-color: #FCD34D;
+}
+
+.profile-metric.badge-green {
+    -fx-background-color: #F0FDF4;
+    -fx-text-fill: #166534;
+    -fx-border-color: #86EFAC;
+}
+
+.profile-account-card,
+.profile-achievements-card {
+    -fx-padding: 20 22;
+}
+
+.field-caption {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64748B;
+}
+
+.profile-password-pane {
+    -fx-background-color: transparent;
+}
+
+.profile-password-pane > .title {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 9;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 9;
+    -fx-padding: 11 13;
+}
+
+.profile-password-pane > .title > .text {
+    -fx-fill: #334155;
+    -fx-font-weight: bold;
+}
+
+.profile-password-pane > *.content {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 12 0 0 0;
+}
+
+.password-content {
+    -fx-padding: 4 0 0 0;
+}
+
+.profile-status,
+.profile-offline-note {
+    -fx-padding: 11 14;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+}
+
+.profile-status-success {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #BBF7D0;
+    -fx-text-fill: #15803D;
+}
+
+.profile-status-error {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #FECACA;
+    -fx-text-fill: #B91C1C;
+}
+
+.profile-offline-note {
+    -fx-background-color: #FFFBEB;
+    -fx-border-color: #FDE68A;
+    -fx-text-fill: #92400E;
+}
+
+.profile-achievement-count {
+    -fx-padding: 6 11;
+    -fx-background-color: #ECFDF5;
+    -fx-background-radius: 999;
+    -fx-text-fill: #15803D;
+    -fx-font-weight: bold;
+}
+
+.profile-achievement-progress {
+    -fx-pref-height: 8;
+    -fx-min-height: 8;
+    -fx-padding: 0;
+}
+
+.profile-achievement-progress > .track {
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+}
+
+.profile-achievement-progress > .bar {
+    -fx-background-color: linear-gradient(to right, #22C55E, #16A34A);
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+
+.profile-achievements-gallery {
+    -fx-padding: 2 0;
+}
+
+.profile-achievement-badge {
+    -fx-pref-width: 330;
+    -fx-min-width: 250;
+    -fx-padding: 11 13;
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 11;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 11;
+}
+
+.profile-achievement-badge:hover {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #86EFAC;
+}
+
+.profile-badge-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+
+.profile-achievements-empty {
+    -fx-pref-width: 520;
+    -fx-padding: 18;
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 11;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 11;
+    -fx-border-style: segments(5, 5);
+}
+
 /* Opciones de Quiz y Casos de Prueba */
 .quiz-option-card,
 .quiz-option-card-selected,

@@ -75,6 +75,7 @@ La [guía de la carpeta database](database/README.md) explica qué ejecutar en c
 
 - **Instalación completa para la demostración.** Crea `LEVELUP_ADMIN` con [00_setup_user.sql](database/00_setup_user.sql) si todavía no existe. Luego conéctate como `LEVELUP_ADMIN` y abre [11_master_database.sql](database/11_master_database.sql) desde el repositorio completo. El maestro ejecuta los scripts en orden con F5. Su fase de limpieza elimina las tablas de LevelUp Code y requiere confirmación explícita.
 - **Base existente.** Aplica las migraciones pendientes según la guía. Con el esquema completo, [17_data_access.sql](database/17_data_access.sql) instala los paquetes de consultas que usa Java.
+- **Actualización de aprendizaje.** En una base al día, recompila [03_plsql_gamificacion.sql](database/03_plsql_gamificacion.sql) y ejecuta [16_enriched_lessons.sql](database/16_enriched_lessons.sql) antes de iniciar el Java actualizado.
 
 ### 2. Pruebas de PL/SQL en Oracle SQL Developer
 

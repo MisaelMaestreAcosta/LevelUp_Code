@@ -37,6 +37,21 @@ public class OracleUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> refreshStreakStats(int userId) {
+        try (Connection connection = DatabaseConnection.getConnection();
+             CallableStatement statement = connection.prepareCall(
+                     "{call PKG_GAMIFICACION.SP_SINCRONIZAR_RACHA(?, ?, ?)}")) {
+            statement.setInt(1, userId);
+            statement.registerOutParameter(2, Types.NUMERIC);
+            statement.registerOutParameter(3, Types.NUMERIC);
+            statement.execute();
+            return userDAO.findById(userId);
+        } catch (SQLException ex) {
+            throw new BusinessException("No se pudo recalcular la racha desde la actividad real.", ex);
+        }
+    }
+
+    @Override
     public User save(User user) {
         return userDAO.save(user);
     }
@@ -73,19 +88,13 @@ public class OracleUserRepository implements UserRepository {
 
     @Override
     public int recoverLivesIfEligible(int userId) {
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            conn.setAutoCommit(false);
-            try (CallableStatement stmt = conn.prepareCall("{call PKG_GAMIFICACION.SP_RECUPERAR_VIDAS(?, ?)}")) {
-                stmt.setInt(1, userId);
-                stmt.registerOutParameter(2, Types.NUMERIC);
-                stmt.execute();
-                int restored = stmt.getInt(2);
-                conn.commit();
-                return restored;
-            } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
-            }
+        try (Connection connection = DatabaseConnection.getConnection();
+             CallableStatement statement = connection.prepareCall(
+                     "{call PKG_GAMIFICACION.SP_RECUPERAR_VIDAS(?, ?)}")) {
+            statement.setInt(1, userId);
+            statement.registerOutParameter(2, Types.NUMERIC);
+            statement.execute();
+            return statement.getInt(2);
         } catch (SQLException ex) {
             throw new BusinessException("No se pudieron recuperar las vidas en Oracle: " + ex.getMessage(), ex);
         }

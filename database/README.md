@@ -18,6 +18,7 @@ En una instalación manual para uso real, omite `02b_seed_demo_users.sql` y la p
 
 - Aplica únicamente los archivos pendientes según los objetos instalados, siguiendo el orden del maestro a partir de las migraciones que falten. Los scripts `05` a `10` son de aplicación única.
 - Si tu esquema ya tiene las migraciones hasta misiones y el paquete de gamificación vigente, ejecuta [17_data_access.sql](17_data_access.sql) con F5 como `LEVELUP_ADMIN`. El archivo instala los paquetes que usa Java y llama a cada uno desde la subcarpeta `packages/`.
+- Para actualizar desde la versión anterior de gamificación, ejecuta [03_plsql_gamificacion.sql](03_plsql_gamificacion.sql) y luego [16_enriched_lessons.sql](16_enriched_lessons.sql) con F5. El primero instala la sincronización de rachas y la recarga diaria de vidas. El segundo amplía las lecturas conservando los identificadores de las lecciones y el progreso.
 - Reserva `00_drop.sql`, `01_schema.sql` y `02_seed.sql` para la preparación inicial o la reconstrucción. El maestro es una instalación completa y su fase de limpieza elimina los datos del proyecto.
 
 ## Qué contiene cada grupo
@@ -29,11 +30,11 @@ En una instalación manual para uso real, omite `02b_seed_demo_users.sql` y la p
 | Herramientas del estudiante | [05_student_notebook.sql](05_student_notebook.sql), [06_learning_goals.sql](06_learning_goals.sql), [07_user_preferences.sql](07_user_preferences.sql) | Añaden cuaderno, favoritos, metas y preferencias. |
 | Publicación y evaluación | [08_content_publication.sql](08_content_publication.sql), [09_content_versions.sql](09_content_versions.sql), [10_challenge_types.sql](10_challenge_types.sql) | Añaden publicación, versiones de retos, vínculo histórico de los intentos y modalidades complementarias. |
 | Gamificación y consultas | [03_plsql_gamificacion.sql](03_plsql_gamificacion.sql), [17_data_access.sql](17_data_access.sql) | Aplican las reglas de XP, vidas y progreso. Exponen las consultas a Java mediante procedimientos. |
-| Catálogo ampliado | [12_seed_starter_templates.sql](12_seed_starter_templates.sql), [13_challenge_guidance.sql](13_challenge_guidance.sql), [14_module_finals.sql](14_module_finals.sql), [15_expanded_curriculum.sql](15_expanded_curriculum.sql) | Incorporan plantillas, soluciones de referencia, pistas, finales y módulos adicionales. |
+| Catálogo ampliado | [12_seed_starter_templates.sql](12_seed_starter_templates.sql), [13_challenge_guidance.sql](13_challenge_guidance.sql), [14_module_finals.sql](14_module_finals.sql), [15_expanded_curriculum.sql](15_expanded_curriculum.sql), [16_enriched_lessons.sql](16_enriched_lessons.sql) | Incorporan plantillas, soluciones de referencia, pistas, finales, módulos adicionales y lecturas ampliadas. |
 | Misiones | [15_professional_missions.sql](15_professional_missions.sql), [16_seed_discount_mission.sql](16_seed_discount_mission.sql) | Crean la estructura de misiones y cargan Tienda Horizonte. |
 | Operación y pruebas | [00_drop.sql](00_drop.sql), [11_master_database.sql](11_master_database.sql), [04_test_plsql.sql](04_test_plsql.sql) | Limpian, coordinan la instalación y comprueban las reglas PL/SQL. |
 
-Los números son identificadores históricos. Los dos archivos que empiezan por `15` tienen funciones distintas. Para el orden de ejecución usa el maestro.
+Los números son identificadores históricos. Para el orden de ejecución usa el maestro.
 
 ## Paquetes instalados
 

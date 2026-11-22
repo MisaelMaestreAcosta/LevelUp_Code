@@ -11,6 +11,7 @@ import com.mycompany.levelup_code.domain.model.Attempt;
 import com.mycompany.levelup_code.domain.model.ChallengeCountAchievement;
 import com.mycompany.levelup_code.domain.model.CodeChallenge;
 import com.mycompany.levelup_code.domain.model.CourseModule;
+import com.mycompany.levelup_code.domain.model.DailyActivity;
 import com.mycompany.levelup_code.domain.model.ExperienceAchievement;
 import com.mycompany.levelup_code.domain.model.Language;
 import com.mycompany.levelup_code.domain.model.Lesson;
@@ -27,6 +28,7 @@ import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeContentRe
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeProgressRepository;
 import com.mycompany.levelup_code.support.InMemoryTestRepositories.FakeUserRepository;
 import java.util.Arrays;
+import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,33 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GamificationAndChallengeServiceTest {
+
+    @Test
+    void streakUsesOnlyConsecutiveActivityDaysInsteadOfTheStoredCounter() {
+        FakeUserRepository users = new FakeUserRepository();
+        FakeActivityRepository activities = new FakeActivityRepository();
+        FakeAttemptRepository attempts = new FakeAttemptRepository(false);
+        AchievementService achievements = new AchievementService(new FakeAchievementRepository(users, attempts));
+        GamificationService service = new GamificationService(
+                users, activities, new StandardLevelPolicy(), achievements);
+        User student = new User();
+        student.setId(501);
+        student.setCurrentStreak(9);
+        student.setMaxStreak(9);
+        users.save(student);
+
+        DailyActivity oldActivity = new DailyActivity();
+        oldActivity.setUser(student);
+        oldActivity.setActivityDate(LocalDate.now().minusDays(2));
+        oldActivity.setExperienceGained(20);
+        activities.saveOrUpdate(oldActivity);
+
+        service.awardExperience(student, 10);
+
+        assertEquals(1, student.getCurrentStreak(),
+                "Un día sin actividad debe romper la racha, aunque el contador guardado fuera mayor");
+        assertEquals(9, student.getMaxStreak(), "La racha máxima histórica no debe disminuir en memoria");
+    }
 
     @Test
     void evaluatorErrorsAreRecordedWithoutTakingAStudentLife() {

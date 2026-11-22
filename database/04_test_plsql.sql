@@ -200,7 +200,7 @@ BEGIN
         p_vidas_restauradas => v_vidas_rest
     );
 
-    REGISTRAR_TEST('Sin restauración mientras aún quedan vidas', v_vidas_rest = 4, 'Vidas restantes: ' || v_vidas_rest);
+    REGISTRAR_TEST('Conserva vidas parciales con intentos hoy', v_vidas_rest = 4, 'Vidas restantes: ' || v_vidas_rest);
 
     UPDATE Usuarios SET vidas = 0 WHERE id_usuario = 1;
     PKG_GAMIFICACION.SP_RECUPERAR_VIDAS(
@@ -313,6 +313,18 @@ BEGIN
                              || ' | XP: ' || est.exp_total
                              || ' | Vidas: ' || est.vidas);
     END LOOP;
+
+    DECLARE
+        v_racha_actual NUMBER;
+        v_racha_maxima NUMBER;
+        v_record NUMBER;
+    BEGIN
+        SELECT COUNT(*) + 1 INTO v_record FROM Actividad_Diaria WHERE id_usuario = 1;
+        UPDATE Usuarios SET racha_maxima = v_record WHERE id_usuario = 1;
+        PKG_GAMIFICACION.SP_SINCRONIZAR_RACHA(1, v_racha_actual, v_racha_maxima);
+        REGISTRAR_TEST('Sincronizar conserva el récord histórico', v_racha_maxima = v_record,
+                       'Récord antes y después: ' || v_record || '/' || v_racha_maxima);
+    END;
 
     -- Deshacer cambios de la prueba para mantener la base de datos en su estado inicial
     ROLLBACK TO sp_inicio_pruebas;

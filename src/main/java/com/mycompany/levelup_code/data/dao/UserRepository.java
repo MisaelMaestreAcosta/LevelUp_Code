@@ -28,7 +28,12 @@ public interface UserRepository {
         throw new UnsupportedOperationException("El cambio de contraseña requiere una cuenta conectada.");
     }
 
-    /** Restores exhausted lives if the database's daily rule allows it. */
+    /** Recalculates current and maximum streaks from actual consecutive activity days. */
+    default Optional<User> refreshStreakStats(int userId) {
+        return findById(userId);
+    }
+
+    /** Restores the daily life allowance if the database's daily rule allows it. */
     default int recoverLivesIfEligible(int userId) {
         throw new UnsupportedOperationException("La recuperación de vidas no está disponible en este repositorio.");
     }

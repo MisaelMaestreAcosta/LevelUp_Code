@@ -55,8 +55,9 @@ class SeedContentConsistencyTest {
                 "05_student_notebook.sql", "06_learning_goals.sql", "07_user_preferences.sql",
                 "08_content_publication.sql", "09_content_versions.sql", "10_challenge_types.sql",
                 "03_plsql_gamificacion.sql", "12_seed_starter_templates.sql", "13_challenge_guidance.sql",
-                "14_module_finals.sql", "15_expanded_curriculum.sql", "15_professional_missions.sql",
-                "16_seed_discount_mission.sql", "17_data_access.sql", "04_test_plsql.sql"), includes);
+                "14_module_finals.sql", "15_expanded_curriculum.sql", "16_enriched_lessons.sql",
+                "15_professional_missions.sql", "16_seed_discount_mission.sql", "17_data_access.sql",
+                "04_test_plsql.sql"), includes);
         for (String include : includes) assertFalse(read(include).isBlank(), include);
         int cleanup = master.indexOf("@@00_drop.sql");
         String confirmation = master.substring(0, cleanup);
