@@ -152,6 +152,13 @@ CREATE OR REPLACE PACKAGE PKG_GAMIFICACION AS
         p_vidas_restauradas   OUT NUMBER
     );
 
+    /** Recalcula las rachas actual y máxima usando únicamente días consecutivos reales. */
+    PROCEDURE SP_SINCRONIZAR_RACHA(
+        p_id_usuario    IN  NUMBER,
+        p_racha_actual  OUT NUMBER,
+        p_racha_maxima  OUT NUMBER
+    );
+
 END PKG_GAMIFICACION;
 /
 
@@ -628,6 +635,53 @@ CREATE OR REPLACE PACKAGE BODY PKG_GAMIFICACION AS
             ROLLBACK TO sp_proc_vidas;
             RAISE;
     END SP_RECUPERAR_VIDAS;
+
+    -- -------------------------------------------------------------------------
+    -- IMPLEMENTACIÓN: SP_SINCRONIZAR_RACHA
+    -- -------------------------------------------------------------------------
+    PROCEDURE SP_SINCRONIZAR_RACHA(
+        p_id_usuario    IN  NUMBER,
+        p_racha_actual  OUT NUMBER,
+        p_racha_maxima  OUT NUMBER
+    ) IS
+        v_usuario_existe NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO v_usuario_existe
+        FROM Usuarios
+        WHERE id_usuario = p_id_usuario;
+
+        IF v_usuario_existe = 0 THEN
+            RAISE_APPLICATION_ERROR(-20021, 'Usuario #' || p_id_usuario || ' no encontrado.');
+        END IF;
+
+        WITH dias AS (
+            SELECT DISTINCT TRUNC(fecha) AS dia
+            FROM Actividad_Diaria
+            WHERE id_usuario = p_id_usuario
+        ),
+        numerados AS (
+            SELECT dia, dia - ROW_NUMBER() OVER (ORDER BY dia) AS grupo
+            FROM dias
+        ),
+        rachas AS (
+            SELECT MAX(dia) AS fin, COUNT(*) AS longitud
+            FROM numerados
+            GROUP BY grupo
+        )
+        SELECT NVL(MAX(CASE
+                       WHEN fin IN (TRUNC(SYSDATE), TRUNC(SYSDATE) - 1) THEN longitud
+                       ELSE 0
+                   END), 0),
+               NVL(MAX(longitud), 0)
+        INTO p_racha_actual, p_racha_maxima
+        FROM rachas;
+
+        UPDATE Usuarios
+        SET racha_actual = p_racha_actual,
+            racha_maxima = p_racha_maxima
+        WHERE id_usuario = p_id_usuario
+          AND (racha_actual <> p_racha_actual OR racha_maxima <> p_racha_maxima);
+    END SP_SINCRONIZAR_RACHA;
 
 END PKG_GAMIFICACION;
 /
